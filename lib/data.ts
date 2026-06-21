@@ -1,0 +1,486 @@
+// Data access layer. Every page imports from here.
+//
+// If Supabase is configured (env set), these run real queries.
+// Otherwise they return the built-in seed data so the UI is fully navigable
+// with zero backend setup. Swapping in Supabase requires no page changes.
+
+import { createClient } from "./supabase/server";
+import { createAdminClient } from "./supabase/admin";
+import { hasServiceRole, isSupabaseConfigured } from "./supabase/env";
+import { deterministicLicenseKey, generateLicenseKey } from "./license";
+import {
+  dashboardMetrics as seedMetrics,
+  orders as seedOrders,
+  payoutDetails as seedPayoutDetails,
+  payouts as seedPayouts,
+  payoutSummary as seedPayoutSummary,
+  products as seedProducts,
+  reviews as seedReviews,
+} from "./seed-data";
+import type {
+  DashboardMetrics,
+  License,
+  Order,
+  OrderStatus,
+  Payout,
+  PayoutDetails,
+  PayoutSummary,
+  Platform,
+  Product,
+  Review,
+  Vendor,
+} from "./types";
+
+// The seed vendor whose dashboard we show until real auth is wired.
+export const DEMO_VENDOR_ID = "v_adeyemi";
+
+// ---- Row shapes returned by Supabase (snake_case, joined vendor) -------------
+
+interface VendorRow {
+  id: string;
+  slug: string;
+  name: string;
+  initials: string;
+  verified: boolean;
+}
+
+interface ProductRow {
+  id: string;
+  slug: string;
+  name: string;
+  price_minor: number;
+  currency: "NGN" | "USD";
+  platform: Platform;
+  category: string;
+  tagline: string;
+  description: string;
+  system_requirements: string;
+  os_badges: string[];
+  version: string;
+  file_path: string | null;
+  file_name: string | null;
+  file_size: number | null;
+  download_count: number;
+  rating_avg: number | null;
+  rating_count: number | null;
+  vendor: VendorRow | VendorRow[] | null;
+}
+
+function mapVendor(v: VendorRow): Vendor {
+  return {
+    id: v.id,
+    slug: v.slug,
+    name: v.name,
+    initials: v.initials,
+    verified: v.verified,
+  };
+}
+
+function mapProduct(row: ProductRow): Product {
+  const v = Array.isArray(row.vendor) ? row.vendor[0] : row.vendor;
+  return {
+    id: row.id,
+    slug: row.slug,
+    name: row.name,
+    price_minor: row.price_minor,
+    currency: row.currency,
+    platform: row.platform,
+    category: row.category,
+    tagline: row.tagline,
+    description: row.description,
+    system_requirements: row.system_requirements,
+    os_badges: row.os_badges ?? [],
+    version: row.version ?? "1.0.0",
+    file_path: row.file_path ?? null,
+    file_name: row.file_name ?? null,
+    file_size: row.file_size ?? null,
+    download_count: row.download_count ?? 0,
+    rating_avg: Number(row.rating_avg ?? 0),
+    rating_count: row.rating_count ?? 0,
+    vendor: v
+      ? mapVendor(v)
+      : { id: "", slug: "", name: "Unknown vendor", initials: "?", verified: false },
+  };
+}
+
+const PRODUCT_SELECT =
+  "id, slug, name, price_minor, currency, platform, category, tagline, description, system_requirements, os_badges, version, file_path, file_name, file_size, download_count, rating_avg, rating_count, vendor:vendors(id, slug, name, initials, verified)";
+
+// ---- Public queries ----------------------------------------------------------
+
+export async function getProducts(
+  platform?: Platform,
+  search?: string
+): Promise<Product[]> {
+  const q = search?.trim().toLowerCase();
+
+  if (!isSupabaseConfigured) {
+    let list = platform ? seedProducts.filter((p) => p.platform === platform) : seedProducts;
+    if (q) {
+      list = list.filter((p) =>
+        [p.name, p.tagline, p.category, p.vendor.name]
+          .join(" ")
+          .toLowerCase()
+          .includes(q)
+      );
+    }
+    return list;
+  }
+
+  const supabase = await createClient();
+  let query = supabase.from("products").select(PRODUCT_SELECT).order("name");
+  if (platform) query = query.eq("platform", platform);
+  if (q) {
+    const like = `%${q}%`;
+    query = query.or(`name.ilike.${like},tagline.ilike.${like},category.ilike.${like}`);
+  }
+  const { data, error } = await query;
+  if (error || !data) return seedProducts;
+  return (data as unknown as ProductRow[]).map(mapProduct);
+}
+
+export async function getProductBySlug(slug: string): Promise<Product | null> {
+  if (!isSupabaseConfigured) {
+    return seedProducts.find((p) => p.slug === slug) ?? null;
+  }
+  const supabase = await createClient();
+  const { data, error } = await supabase
+    .from("products")
+    .select(PRODUCT_SELECT)
+    .eq("slug", slug)
+    .maybeSingle();
+  if (error || !data) return seedProducts.find((p) => p.slug === slug) ?? null;
+  return mapProduct(data as unknown as ProductRow);
+}
+
+export async function getRecentOrders(vendorId = DEMO_VENDOR_ID): Promise<Order[]> {
+  if (!isSupabaseConfigured) {
+    return seedOrders;
+  }
+  const supabase = await createClient();
+  const { data, error } = await supabase
+    .from("orders")
+    .select(
+      "id, buyer_name, buyer_initials, amount_minor, currency, status, gateway, created_at, product:products(id, name, slug, price_minor, currency)"
+    )
+    .eq("vendor_id", vendorId)
+    .order("created_at", { ascending: false })
+    .limit(10);
+  if (error || !data) return seedOrders;
+  return data as unknown as Order[];
+}
+
+export async function getDashboardMetrics(
+  vendorId = DEMO_VENDOR_ID
+): Promise<DashboardMetrics> {
+  if (!isSupabaseConfigured) {
+    return seedMetrics;
+  }
+  const supabase = await createClient();
+  const { data, error } = await supabase.rpc("vendor_metrics_30d", {
+    p_vendor_id: vendorId,
+  });
+  if (error || !data) return seedMetrics;
+  // RPC returns a single row matching DashboardMetrics.
+  return (Array.isArray(data) ? data[0] : data) as DashboardMetrics;
+}
+
+export async function getOrderById(orderId: string): Promise<Order | null> {
+  if (!isSupabaseConfigured) {
+    return seedOrders.find((o) => o.id === orderId) ?? seedOrders[0] ?? null;
+  }
+  const supabase = await createClient();
+  const { data, error } = await supabase
+    .from("orders")
+    .select(
+      "id, buyer_name, buyer_initials, amount_minor, currency, status, gateway, created_at, product:products(id, name, slug, price_minor, currency)"
+    )
+    .eq("id", orderId)
+    .maybeSingle();
+  if (error || !data) return null;
+  return data as unknown as Order;
+}
+
+// ---- Vendor products ---------------------------------------------------------
+
+export async function getVendorProducts(vendorId = DEMO_VENDOR_ID): Promise<Product[]> {
+  if (!isSupabaseConfigured) {
+    return seedProducts.filter((p) => p.vendor.id === vendorId);
+  }
+  const supabase = await createClient();
+  const { data, error } = await supabase
+    .from("products")
+    .select(PRODUCT_SELECT)
+    .eq("vendor_id", vendorId)
+    .order("name");
+  if (error || !data) return [];
+  return (data as unknown as ProductRow[]).map(mapProduct);
+}
+
+/** Load one of the vendor's products by id, enforcing ownership. */
+export async function getVendorProductById(
+  id: string,
+  vendorId: string
+): Promise<Product | null> {
+  if (!isSupabaseConfigured) {
+    return seedProducts.find((p) => p.id === id && p.vendor.id === vendorId) ?? null;
+  }
+  const supabase = await createClient();
+  const { data, error } = await supabase
+    .from("products")
+    .select(PRODUCT_SELECT)
+    .eq("id", id)
+    .eq("vendor_id", vendorId)
+    .maybeSingle();
+  if (error || !data) return null;
+  return mapProduct(data as unknown as ProductRow);
+}
+
+// ---- Vendor orders -----------------------------------------------------------
+
+export async function getVendorOrders(
+  vendorId = DEMO_VENDOR_ID,
+  status?: OrderStatus
+): Promise<Order[]> {
+  if (!isSupabaseConfigured) {
+    return status ? seedOrders.filter((o) => o.status === status) : seedOrders;
+  }
+  const supabase = await createClient();
+  let query = supabase
+    .from("orders")
+    .select(
+      "id, buyer_name, buyer_initials, amount_minor, currency, status, gateway, created_at, product:products(id, name, slug, price_minor, currency)"
+    )
+    .eq("vendor_id", vendorId)
+    .order("created_at", { ascending: false });
+  if (status) query = query.eq("status", status);
+  const { data, error } = await query;
+  if (error || !data) return [];
+  return data as unknown as Order[];
+}
+
+// ---- Payouts -----------------------------------------------------------------
+
+export async function getPayoutSummary(
+  vendorId = DEMO_VENDOR_ID
+): Promise<PayoutSummary> {
+  if (!isSupabaseConfigured) return seedPayoutSummary;
+  const supabase = await createClient();
+  // Lifetime paid revenue.
+  const { data: paidOrders } = await supabase
+    .from("orders")
+    .select("amount_minor")
+    .eq("vendor_id", vendorId)
+    .eq("status", "paid");
+  const { data: pendingOrders } = await supabase
+    .from("orders")
+    .select("amount_minor")
+    .eq("vendor_id", vendorId)
+    .eq("status", "pending");
+  const { data: paidOuts } = await supabase
+    .from("payouts")
+    .select("amount_minor")
+    .eq("vendor_id", vendorId)
+    .in("status", ["paid", "requested"]);
+
+  const sum = (rows: { amount_minor: number }[] | null) =>
+    (rows ?? []).reduce((t, r) => t + r.amount_minor, 0);
+
+  const revenue = sum(paidOrders);
+  const withdrawn = sum(paidOuts);
+  return {
+    available_minor: Math.max(0, revenue - withdrawn),
+    pending_minor: sum(pendingOrders),
+    paid_out_minor: withdrawn,
+    currency: "NGN",
+  };
+}
+
+export async function getPayouts(vendorId = DEMO_VENDOR_ID): Promise<Payout[]> {
+  if (!isSupabaseConfigured) return seedPayouts;
+  const supabase = await createClient();
+  const { data, error } = await supabase
+    .from("payouts")
+    .select("id, amount_minor, currency, status, method, reference, created_at, paid_at")
+    .eq("vendor_id", vendorId)
+    .order("created_at", { ascending: false });
+  if (error || !data) return [];
+  return data as unknown as Payout[];
+}
+
+export async function getPayoutDetails(
+  vendorId = DEMO_VENDOR_ID
+): Promise<PayoutDetails> {
+  if (!isSupabaseConfigured) return seedPayoutDetails;
+  const supabase = await createClient();
+  const { data } = await supabase
+    .from("vendors")
+    .select("payout_bank, payout_account_name, payout_account_number")
+    .eq("id", vendorId)
+    .maybeSingle();
+  return {
+    bank: data?.payout_bank ?? "",
+    account_name: data?.payout_account_name ?? "",
+    account_number: data?.payout_account_number ?? "",
+  };
+}
+
+// ---- Reviews -----------------------------------------------------------------
+
+export async function getReviews(productId: string): Promise<Review[]> {
+  if (!isSupabaseConfigured) {
+    return seedReviews.filter((r) => r.product_id === productId);
+  }
+  const supabase = await createClient();
+  const { data, error } = await supabase
+    .from("reviews")
+    .select("id, product_id, author_name, rating, body, created_at")
+    .eq("product_id", productId)
+    .order("created_at", { ascending: false });
+  if (error || !data) return [];
+  return data as unknown as Review[];
+}
+
+// ---- Licenses ----------------------------------------------------------------
+
+const LICENSE_SELECT =
+  "id, key, email, status, issued_at, order_id, product:products(id, name, slug, version, file_name)";
+
+interface LicenseRow {
+  id: string;
+  key: string;
+  email: string | null;
+  status: "active" | "revoked";
+  issued_at: string;
+  order_id: string;
+  product:
+    | { id: string; name: string; slug: string; version: string; file_name: string | null }
+    | { id: string; name: string; slug: string; version: string; file_name: string | null }[]
+    | null;
+}
+
+function mapLicense(row: LicenseRow): License {
+  const p = Array.isArray(row.product) ? row.product[0] : row.product;
+  return {
+    id: row.id,
+    key: row.key,
+    email: row.email ?? "",
+    status: row.status,
+    issued_at: row.issued_at,
+    order_id: row.order_id,
+    product: p
+      ? { id: p.id, name: p.name, slug: p.slug, version: p.version, file_name: p.file_name }
+      : { id: "", name: "Unknown", slug: "", version: "1.0.0", file_name: null },
+  };
+}
+
+/** Build a deterministic license from a seed order (mock mode, no persistence). */
+function mockLicenseFromOrder(order: Order, email = ""): License {
+  const product = seedProducts.find((p) => p.slug === order.product.slug);
+  return {
+    id: `lic_${order.id}`,
+    key: deterministicLicenseKey(order.id),
+    email,
+    status: "active",
+    issued_at: order.created_at || new Date().toISOString(),
+    order_id: order.id,
+    product: {
+      id: order.product.id,
+      name: order.product.name,
+      slug: order.product.slug,
+      version: product?.version ?? "1.0.0",
+      file_name: product?.file_name ?? null,
+    },
+  };
+}
+
+// License persistence runs through the trusted service-role client (there is no
+// buyer auth). Without a service-role key, the buyer flow uses deterministic
+// mock licenses so it stays demoable.
+
+export async function getLicenseByOrder(orderId: string): Promise<License | null> {
+  if (!hasServiceRole) {
+    const order = await getOrderById(orderId);
+    return order ? mockLicenseFromOrder(order) : null;
+  }
+  const admin = createAdminClient();
+  const { data } = await admin
+    .from("licenses")
+    .select(LICENSE_SELECT)
+    .eq("order_id", orderId)
+    .maybeSingle();
+  return data ? mapLicense(data as unknown as LicenseRow) : null;
+}
+
+export async function getLicenseByKey(key: string): Promise<License | null> {
+  if (!hasServiceRole) return null; // can't reverse a deterministic key in mock mode
+  const admin = createAdminClient();
+  const { data } = await admin
+    .from("licenses")
+    .select(LICENSE_SELECT)
+    .eq("key", key)
+    .maybeSingle();
+  return data ? mapLicense(data as unknown as LicenseRow) : null;
+}
+
+export async function getLicensesByEmail(email: string): Promise<License[]> {
+  if (!hasServiceRole) {
+    // Demo: surface every paid seed order as a license for the entered email.
+    return seedOrders
+      .filter((o) => o.status === "paid")
+      .map((o) => mockLicenseFromOrder(o, email));
+  }
+  const admin = createAdminClient();
+  const { data } = await admin
+    .from("licenses")
+    .select(LICENSE_SELECT)
+    .eq("email", email)
+    .eq("status", "active")
+    .order("issued_at", { ascending: false });
+  return ((data as unknown as LicenseRow[]) ?? []).map(mapLicense);
+}
+
+/**
+ * Issue (or return the existing) license for an order. Idempotent.
+ * Called by the Paystack webhook in production and by the success page in the
+ * mock flow so the key shown is real and stored when Supabase is connected.
+ */
+export async function issueLicenseForOrder(
+  orderId: string,
+  email: string
+): Promise<License | null> {
+  if (!hasServiceRole) {
+    const order = await getOrderById(orderId);
+    return order ? mockLicenseFromOrder(order, email) : null;
+  }
+
+  const admin = createAdminClient();
+
+  // Already issued? Return it.
+  const existing = await getLicenseByOrder(orderId);
+  if (existing) return existing;
+
+  // Look up the order to get the product, then mark it paid and mint the key.
+  const { data: order } = await admin
+    .from("orders")
+    .select("id, product_id")
+    .eq("id", orderId)
+    .maybeSingle();
+  if (!order) return null;
+
+  await admin.from("orders").update({ status: "paid" }).eq("id", orderId);
+
+  const { data: inserted } = await admin
+    .from("licenses")
+    .insert({
+      order_id: orderId,
+      product_id: (order as { product_id: string }).product_id,
+      key: generateLicenseKey(),
+      email,
+      status: "active",
+    })
+    .select(LICENSE_SELECT)
+    .single();
+
+  return inserted ? mapLicense(inserted as unknown as LicenseRow) : null;
+}

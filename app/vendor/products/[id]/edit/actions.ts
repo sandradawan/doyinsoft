@@ -1,0 +1,93 @@
+"use server";
+
+import { redirect } from "next/navigation";
+import { revalidatePath } from "next/cache";
+import { hasServiceRole, isSupabaseConfigured } from "@/lib/supabase/env";
+import { createAdminClient } from "@/lib/supabase/admin";
+import { SOFTWARE_BUCKET } from "@/lib/storage";
+import { getCurrentVendor, requireVendor } from "@/lib/auth";
+import { getVendorProductById } from "@/lib/data";
+import type { Currency, Platform } from "@/lib/types";
+
+export interface EditProductState {
+  error?: string;
+}
+
+const NEED_SUPABASE =
+  "Editing products needs a connected Supabase project with a service-role key.";
+
+export async function updateProduct(
+  _prev: EditProductState,
+  formData: FormData
+): Promise<EditProductState> {
+  if (!isSupabaseConfigured || !hasServiceRole) return { error: NEED_SUPABASE };
+
+  const vendor = await getCurrentVendor();
+  if (!vendor) return { error: "Please sign in as a vendor first." };
+
+  const id = String(formData.get("id") ?? "");
+  const existing = await getVendorProductById(id, vendor.id);
+  if (!existing) return { error: "Product not found, or you don't own it." };
+
+  const admin = createAdminClient();
+
+  // Optional: replace the binary (new version upload).
+  let filePatch: Record<string, unknown> = {};
+  const file = formData.get("file");
+  if (file instanceof File && file.size > 0) {
+    const filePath = `${vendor.id}/${existing.slug}/${file.name}`;
+    const { error: uploadError } = await admin.storage
+      .from(SOFTWARE_BUCKET)
+      .upload(filePath, file, { upsert: true, contentType: file.type || undefined });
+    if (uploadError) return { error: `Upload failed: ${uploadError.message}` };
+    filePatch = { file_path: filePath, file_name: file.name, file_size: file.size };
+  }
+
+  const osBadges = String(formData.get("os_badges") ?? "")
+    .split(",")
+    .map((s) => s.trim())
+    .filter(Boolean);
+
+  const { error } = await admin
+    .from("products")
+    .update({
+      name: String(formData.get("name") ?? "").trim() || existing.name,
+      price_minor: Math.round((parseFloat(String(formData.get("price") ?? "0")) || 0) * 100),
+      currency: (String(formData.get("currency") ?? existing.currency) as Currency),
+      platform: (String(formData.get("platform") ?? existing.platform) as Platform),
+      category: String(formData.get("category") ?? "").trim(),
+      tagline: String(formData.get("tagline") ?? "").trim(),
+      description: String(formData.get("description") ?? "").trim(),
+      system_requirements: String(formData.get("system_requirements") ?? "").trim(),
+      os_badges: osBadges,
+      version: String(formData.get("version") || existing.version).trim(),
+      ...filePatch,
+    })
+    .eq("id", id)
+    .eq("vendor_id", vendor.id);
+
+  if (error) return { error: `Could not update: ${error.message}` };
+
+  revalidatePath("/vendor/products");
+  revalidatePath(`/products/${existing.slug}`);
+  redirect("/vendor/products");
+}
+
+export async function deleteProduct(formData: FormData) {
+  const vendor = await requireVendor();
+  if (!isSupabaseConfigured || !hasServiceRole) redirect("/vendor/products");
+
+  const id = String(formData.get("id") ?? "");
+  const existing = await getVendorProductById(id, vendor.id);
+  if (!existing) redirect("/vendor/products");
+
+  const admin = createAdminClient();
+  if (existing.file_path) {
+    await admin.storage.from(SOFTWARE_BUCKET).remove([existing.file_path]);
+  }
+  await admin.from("products").delete().eq("id", id).eq("vendor_id", vendor.id);
+
+  revalidatePath("/vendor/products");
+  revalidatePath("/");
+  redirect("/vendor/products");
+}
