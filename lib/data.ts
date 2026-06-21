@@ -139,8 +139,12 @@ export async function getProducts(
     query = query.or(`name.ilike.${like},tagline.ilike.${like},category.ilike.${like}`);
   }
   const { data, error } = await query;
-  if (error || !data) return seedProducts;
-  return (data as unknown as ProductRow[]).map(mapProduct);
+  // Connected to Supabase → return the real data only (no demo fallback).
+  if (error) {
+    console.error("getProducts:", error.message);
+    return [];
+  }
+  return ((data as unknown as ProductRow[]) ?? []).map(mapProduct);
 }
 
 export async function getProductBySlug(slug: string): Promise<Product | null> {
@@ -153,8 +157,11 @@ export async function getProductBySlug(slug: string): Promise<Product | null> {
     .select(PRODUCT_SELECT)
     .eq("slug", slug)
     .maybeSingle();
-  if (error || !data) return seedProducts.find((p) => p.slug === slug) ?? null;
-  return mapProduct(data as unknown as ProductRow);
+  if (error) {
+    console.error("getProductBySlug:", error.message);
+    return null;
+  }
+  return data ? mapProduct(data as unknown as ProductRow) : null;
 }
 
 export async function getRecentOrders(vendorId = DEMO_VENDOR_ID): Promise<Order[]> {
@@ -170,8 +177,11 @@ export async function getRecentOrders(vendorId = DEMO_VENDOR_ID): Promise<Order[
     .eq("vendor_id", vendorId)
     .order("created_at", { ascending: false })
     .limit(10);
-  if (error || !data) return seedOrders;
-  return data as unknown as Order[];
+  if (error) {
+    console.error("getRecentOrders:", error.message);
+    return [];
+  }
+  return (data as unknown as Order[]) ?? [];
 }
 
 export async function getDashboardMetrics(
@@ -184,7 +194,10 @@ export async function getDashboardMetrics(
   const { data, error } = await supabase.rpc("vendor_metrics_30d", {
     p_vendor_id: vendorId,
   });
-  if (error || !data) return seedMetrics;
+  if (error || !data) {
+    if (error) console.error("getDashboardMetrics:", error.message);
+    return { revenue_minor: 0, units_sold: 0, pending_payout_minor: 0, currency: "NGN" };
+  }
   // RPC returns a single row matching DashboardMetrics.
   return (Array.isArray(data) ? data[0] : data) as DashboardMetrics;
 }
