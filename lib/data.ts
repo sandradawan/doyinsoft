@@ -130,6 +130,11 @@ function mapProduct(row: ProductRow): Product {
 const PRODUCT_SELECT =
   "id, slug, name, price_minor, currency, platform, category, tagline, description, system_requirements, os_badges, version, file_path, file_name, file_size, download_count, rating_avg, rating_count, icon_url, screenshots, status, featured, rejection_reason, launched_at, upvotes, vendor:vendors(id, slug, name, initials, verified, suspended, whatsapp)";
 
+// Columns guaranteed to exist since the first migration. Used as a fallback so
+// a not-yet-run migration can never empty the storefront.
+const CORE_SELECT =
+  "id, slug, name, price_minor, currency, platform, category, tagline, description, system_requirements, os_badges, vendor:vendors(id, slug, name, initials, verified)";
+
 // ---- Public queries ----------------------------------------------------------
 
 export async function getProducts(
@@ -168,12 +173,28 @@ export async function getProducts(
     query = query.or(`name.ilike.${like},tagline.ilike.${like},category.ilike.${like}`);
   }
   const { data, error } = await query;
-  // Connected to Supabase → return the real data only (no demo fallback).
-  if (error) {
-    console.error("getProducts:", error.message);
+  if (!error) {
+    return ((data as unknown as ProductRow[]) ?? [])
+      .map(mapProduct)
+      .filter((p) => !p.vendor.suspended);
+  }
+
+  // A column may be missing if a migration hasn't been run — retry with the
+  // core columns only so the storefront still works.
+  console.error("getProducts (full select failed, using core):", error.message);
+  let fb = supabase.from("products").select(CORE_SELECT).order("name");
+  if (platform) fb = fb.eq("platform", platform);
+  if (cat) fb = fb.eq("category", cat);
+  if (q) {
+    const like = `%${q}%`;
+    fb = fb.or(`name.ilike.${like},tagline.ilike.${like},category.ilike.${like}`);
+  }
+  const res = await fb;
+  if (res.error) {
+    console.error("getProducts (core select failed):", res.error.message);
     return [];
   }
-  return ((data as unknown as ProductRow[]) ?? [])
+  return ((res.data as unknown as ProductRow[]) ?? [])
     .map(mapProduct)
     .filter((p) => !p.vendor.suspended);
 }
@@ -190,13 +211,21 @@ export async function getProductBySlug(slug: string): Promise<Product | null> {
     .eq("slug", slug)
     .eq("status", "approved")
     .maybeSingle();
-  if (error) {
-    console.error("getProductBySlug:", error.message);
-    return null;
+  if (!error) {
+    if (!data) return null;
+    const product = mapProduct(data as unknown as ProductRow);
+    return product.vendor.suspended ? null : product;
   }
-  if (!data) return null;
-  const product = mapProduct(data as unknown as ProductRow);
-  return product.vendor.suspended ? null : product;
+
+  // Fallback to core columns if a migration is pending.
+  console.error("getProductBySlug (full select failed, using core):", error.message);
+  const res = await supabase
+    .from("products")
+    .select(CORE_SELECT)
+    .eq("slug", slug)
+    .maybeSingle();
+  if (res.error || !res.data) return null;
+  return mapProduct(res.data as unknown as ProductRow);
 }
 
 export async function getRecentOrders(vendorId = DEMO_VENDOR_ID): Promise<Order[]> {
