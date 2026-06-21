@@ -12,6 +12,8 @@ export interface Vendor {
   name: string;
   initials: string;
   verified: boolean;
+  /** Banned vendors: their products are hidden and they can't publish. */
+  suspended?: boolean;
 }
 
 export interface Product {

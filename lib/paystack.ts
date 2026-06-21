@@ -8,6 +8,25 @@ export const isPaystackConfigured = SECRET.length > 0;
 export const PLATFORM_COMMISSION_PERCENT =
   Number(process.env.PLATFORM_COMMISSION_PERCENT ?? "") || 15;
 
+/** Refund a transaction by its reference. Best-effort. */
+export async function refundPaystackTransaction(
+  reference: string
+): Promise<{ ok: boolean; error?: string }> {
+  if (!SECRET) return { ok: false, error: "Paystack not configured." };
+  if (!reference) return { ok: false, error: "No payment reference on this order." };
+  try {
+    const res = await fetch("https://api.paystack.co/refund", {
+      method: "POST",
+      headers: { Authorization: `Bearer ${SECRET}`, "Content-Type": "application/json" },
+      body: JSON.stringify({ transaction: reference }),
+    });
+    const json = await res.json();
+    return json?.status ? { ok: true } : { ok: false, error: json?.message ?? "Refund failed." };
+  } catch {
+    return { ok: false, error: "Could not reach Paystack." };
+  }
+}
+
 export interface Bank {
   name: string;
   code: string;
@@ -39,6 +58,7 @@ export async function createPaystackSubaccount(opts: {
   businessName: string;
   bankCode: string;
   accountNumber: string;
+  commission?: number;
 }): Promise<{ code?: string; error?: string }> {
   if (!SECRET) return { error: "Paystack is not configured." };
   try {
@@ -49,7 +69,7 @@ export async function createPaystackSubaccount(opts: {
         business_name: opts.businessName,
         settlement_bank: opts.bankCode,
         account_number: opts.accountNumber,
-        percentage_charge: PLATFORM_COMMISSION_PERCENT,
+        percentage_charge: opts.commission ?? PLATFORM_COMMISSION_PERCENT,
       }),
     });
     const json = await res.json();

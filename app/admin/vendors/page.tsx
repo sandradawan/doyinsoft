@@ -1,6 +1,6 @@
 import { BadgeCheck } from "lucide-react";
 import { adminVendors } from "@/lib/data";
-import { toggleVerified } from "../actions";
+import { toggleSuspended, toggleVerified } from "../actions";
 
 export default async function AdminVendorsPage() {
   const vendors = await adminVendors();
@@ -25,6 +25,11 @@ export default async function AdminVendorsPage() {
                 <p className="m-0 font-medium inline-flex items-center gap-1">
                   {v.name}
                   {v.verified && <BadgeCheck size={13} className="text-success" />}
+                  {v.suspended && (
+                    <span className="text-[11px] text-info bg-info-bg px-2 py-[1px] rounded-md">
+                      suspended
+                    </span>
+                  )}
                 </p>
                 <p className="m-0 text-[11px] text-ink-faint">/{v.slug}</p>
               </div>
@@ -40,6 +45,15 @@ export default async function AdminVendorsPage() {
                   ].join(" ")}
                 >
                   {v.verified ? "Unverify" : "Verify"}
+                </button>
+              </form>
+              <form action={toggleSuspended}>
+                <input type="hidden" name="id" value={v.id} />
+                <input type="hidden" name="suspended" value={String(v.suspended ?? false)} />
+                <button
+                  className="text-[12px] rounded-md px-3 py-[6px] border border-line text-ink-soft bg-transparent cursor-pointer hover:border-line-strong"
+                >
+                  {v.suspended ? "Unban" : "Ban"}
                 </button>
               </form>
             </div>

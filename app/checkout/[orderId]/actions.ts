@@ -4,7 +4,7 @@ import { redirect } from "next/navigation";
 import { hasServiceRole } from "@/lib/supabase/env";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { getOrderById, getProductBySlug, getVendorSubaccountCode } from "@/lib/data";
-import { toNgnCharge } from "@/lib/money";
+import { getSettings } from "@/lib/settings";
 import type { Currency, Gateway } from "@/lib/types";
 
 const PAYSTACK_SECRET = process.env.PAYSTACK_SECRET_KEY ?? "";
@@ -31,7 +31,9 @@ export async function startCheckout(
   let orderId = input.orderId;
 
   // Always charge NGN (Paystack NG accounts can't take USD). Convert if needed.
-  const chargeMinor = toNgnCharge(input.amountMinor, input.currency);
+  const { usd_to_ngn } = await getSettings();
+  const chargeMinor =
+    input.currency === "USD" ? Math.round(input.amountMinor * usd_to_ngn) : input.amountMinor;
   const chargeCurrency: Currency = "NGN";
 
   const product = input.productSlug ? await getProductBySlug(input.productSlug) : null;

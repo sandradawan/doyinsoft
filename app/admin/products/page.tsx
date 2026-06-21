@@ -81,6 +81,12 @@ export default async function AdminProductsPage({
                         <Star size={11} className="fill-current" /> featured
                       </span>
                     )}
+                    <Link
+                      href={`/admin/products/${p.id}`}
+                      className="text-[11px] text-brand no-underline hover:underline ml-auto"
+                    >
+                      Review →
+                    </Link>
                   </div>
                   <p className="text-[12px] text-ink-soft m-0">
                     by {p.vendor.name} · {p.category || "—"} ·{" "}

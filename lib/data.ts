@@ -47,6 +47,7 @@ interface VendorRow {
   name: string;
   initials: string;
   verified: boolean;
+  suspended?: boolean;
 }
 
 interface ProductRow {
@@ -83,6 +84,7 @@ function mapVendor(v: VendorRow): Vendor {
     name: v.name,
     initials: v.initials,
     verified: v.verified,
+    suspended: v.suspended ?? false,
   };
 }
 
@@ -119,7 +121,7 @@ function mapProduct(row: ProductRow): Product {
 }
 
 const PRODUCT_SELECT =
-  "id, slug, name, price_minor, currency, platform, category, tagline, description, system_requirements, os_badges, version, file_path, file_name, file_size, download_count, rating_avg, rating_count, icon_url, screenshots, status, featured, rejection_reason, vendor:vendors(id, slug, name, initials, verified)";
+  "id, slug, name, price_minor, currency, platform, category, tagline, description, system_requirements, os_badges, version, file_path, file_name, file_size, download_count, rating_avg, rating_count, icon_url, screenshots, status, featured, rejection_reason, vendor:vendors(id, slug, name, initials, verified, suspended)";
 
 // ---- Public queries ----------------------------------------------------------
 
@@ -160,7 +162,9 @@ export async function getProducts(
     console.error("getProducts:", error.message);
     return [];
   }
-  return ((data as unknown as ProductRow[]) ?? []).map(mapProduct);
+  return ((data as unknown as ProductRow[]) ?? [])
+    .map(mapProduct)
+    .filter((p) => !p.vendor.suspended);
 }
 
 export async function getProductBySlug(slug: string): Promise<Product | null> {
@@ -179,7 +183,9 @@ export async function getProductBySlug(slug: string): Promise<Product | null> {
     console.error("getProductBySlug:", error.message);
     return null;
   }
-  return data ? mapProduct(data as unknown as ProductRow) : null;
+  if (!data) return null;
+  const product = mapProduct(data as unknown as ProductRow);
+  return product.vendor.suspended ? null : product;
 }
 
 export async function getRecentOrders(vendorId = DEMO_VENDOR_ID): Promise<Order[]> {
@@ -358,9 +364,65 @@ export async function adminVendors(): Promise<Vendor[]> {
   const admin = createAdminClient();
   const { data } = await admin
     .from("vendors")
-    .select("id, slug, name, initials, verified")
+    .select("id, slug, name, initials, verified, suspended")
     .order("created_at", { ascending: false });
   return (data as Vendor[]) ?? [];
+}
+
+/** Any product by id (admin) — ignores status, for the review screen. */
+export async function adminProductById(id: string): Promise<Product | null> {
+  if (!hasServiceRole) return seedProducts.find((p) => p.id === id) ?? null;
+  const admin = createAdminClient();
+  const { data } = await admin.from("products").select(PRODUCT_SELECT).eq("id", id).maybeSingle();
+  return data ? mapProduct(data as unknown as ProductRow) : null;
+}
+
+export interface AdminReview extends Review {
+  product_name: string;
+}
+
+export async function adminReviews(limit = 100): Promise<AdminReview[]> {
+  if (!hasServiceRole) {
+    return seedReviews.map((r) => ({
+      ...r,
+      product_name: seedProducts.find((p) => p.id === r.product_id)?.name ?? "—",
+    }));
+  }
+  const admin = createAdminClient();
+  const { data } = await admin
+    .from("reviews")
+    .select("id, product_id, author_name, rating, body, created_at, product:products(name)")
+    .order("created_at", { ascending: false })
+    .limit(limit);
+  return (
+    (data as (Review & { product: { name: string } | { name: string }[] | null })[]) ?? []
+  ).map((r) => {
+    const p = Array.isArray(r.product) ? r.product[0] : r.product;
+    return {
+      id: r.id,
+      product_id: r.product_id,
+      author_name: r.author_name,
+      rating: r.rating,
+      body: r.body,
+      created_at: r.created_at,
+      product_name: p?.name ?? "—",
+    };
+  });
+}
+
+export async function adminOrders(status?: OrderStatus): Promise<Order[]> {
+  if (!hasServiceRole) return status ? seedOrders.filter((o) => o.status === status) : seedOrders;
+  const admin = createAdminClient();
+  let q = admin
+    .from("orders")
+    .select(
+      "id, buyer_name, buyer_initials, amount_minor, currency, status, gateway, created_at, product:products(id, name, slug, price_minor, currency)"
+    )
+    .order("created_at", { ascending: false })
+    .limit(100);
+  if (status) q = q.eq("status", status);
+  const { data } = await q;
+  return (data as unknown as Order[]) ?? [];
 }
 
 export async function adminStats(): Promise<{
@@ -690,7 +752,8 @@ export async function getLicensesByEmail(email: string): Promise<License[]> {
  */
 export async function issueLicenseForOrder(
   orderId: string,
-  email: string
+  email: string,
+  reference?: string
 ): Promise<License | null> {
   if (!hasServiceRole) {
     const order = await getOrderById(orderId);
@@ -711,7 +774,10 @@ export async function issueLicenseForOrder(
     .maybeSingle();
   if (!order) return null;
 
-  await admin.from("orders").update({ status: "paid" }).eq("id", orderId);
+  await admin
+    .from("orders")
+    .update({ status: "paid", ...(reference ? { reference } : {}) })
+    .eq("id", orderId);
 
   const { data: inserted } = await admin
     .from("licenses")

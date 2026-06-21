@@ -7,6 +7,7 @@ import { createAdminClient } from "@/lib/supabase/admin";
 import { getCurrentVendor } from "@/lib/auth";
 import { getPayoutSummary } from "@/lib/data";
 import { createPaystackSubaccount, isPaystackConfigured } from "@/lib/paystack";
+import { getSettings } from "@/lib/settings";
 
 export interface PayoutState {
   error?: string;
@@ -39,10 +40,12 @@ export async function connectPayouts(
     return { error: "Choose your bank and enter a valid 10-digit account number." };
   }
 
+  const { commission_percent } = await getSettings();
   const sub = await createPaystackSubaccount({
     businessName: vendor.name,
     bankCode,
     accountNumber,
+    commission: commission_percent,
   });
   if (sub.error || !sub.code) {
     return { error: sub.error ?? "Could not connect your bank." };

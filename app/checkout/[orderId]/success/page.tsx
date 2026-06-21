@@ -32,7 +32,7 @@ export default async function CheckoutSuccessPage({
       const order = await getOrderById(orderId);
       const amountOk = v.ok && (!order || v.amountMinor === order.amount_minor);
       if (v.ok && amountOk) {
-        license = await issueLicenseForOrder(orderId, v.email ?? email ?? "");
+        license = await issueLicenseForOrder(orderId, v.email ?? email ?? "", ref);
         outcome = license ? "issued" : "pending";
       } else {
         outcome = "failed";

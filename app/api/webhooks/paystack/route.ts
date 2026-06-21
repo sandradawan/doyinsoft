@@ -36,7 +36,7 @@ export async function POST(request: Request) {
     const orderId = event.data?.metadata?.order_id;
     const email = event.data?.customer?.email ?? "";
     if (orderId) {
-      await issueLicenseForOrder(orderId, email);
+      await issueLicenseForOrder(orderId, email, event.data?.reference);
     }
   }
 
@@ -54,6 +54,7 @@ function safeEqual(a: string, b: string): boolean {
 interface PaystackEvent {
   event: string;
   data?: {
+    reference?: string;
     customer?: { email?: string };
     metadata?: { order_id?: string; product_slug?: string | null };
   };

@@ -33,11 +33,13 @@ create table if not exists vendors (
   payout_account_name    text,
   payout_account_number  text,
   subaccount_code        text,
+  suspended              boolean not null default false,
   created_at             timestamptz not null default now()
 );
--- For databases created before commission support:
+-- For databases created before these columns existed:
 alter table vendors add column if not exists payout_bank_code text;
 alter table vendors add column if not exists subaccount_code  text;
+alter table vendors add column if not exists suspended        boolean not null default false;
 
 create table if not exists products (
   id                  uuid primary key default gen_random_uuid(),
@@ -85,6 +87,8 @@ create table if not exists orders (
   gateway        gateway not null default 'paystack',
   created_at     timestamptz not null default now()
 );
+
+alter table orders add column if not exists reference text;
 
 create table if not exists licenses (
   id         uuid primary key default gen_random_uuid(),
@@ -238,6 +242,28 @@ create policy "anyone can review" on reviews for insert with check (rating betwe
 -- Note: `licenses` has RLS enabled with no policy on purpose — all license
 -- reads/writes go through the server's service-role client after the app has
 -- verified entitlement, so it is never exposed to anon/authenticated roles.
+
+-- Admin audit log + platform settings (service-role only).
+create table if not exists admin_audit (
+  id          uuid primary key default gen_random_uuid(),
+  admin_email text not null,
+  action      text not null,
+  target_type text,
+  target_id   text,
+  detail      text,
+  created_at  timestamptz not null default now()
+);
+alter table admin_audit enable row level security;
+
+create table if not exists settings (
+  key   text primary key,
+  value text not null
+);
+alter table settings enable row level security;
+insert into settings (key, value) values
+  ('commission_percent', '15'),
+  ('usd_to_ngn', '1600')
+on conflict (key) do nothing;
 
 -- ----------------------------------------------------------------------------
 -- Storage: private bucket for software binaries
