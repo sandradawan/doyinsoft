@@ -54,6 +54,10 @@ export interface Product {
   /** Featured products lead the homepage hero. */
   featured: boolean;
   rejection_reason: string | null;
+  /** When the product launched (for the Launches board). */
+  launched_at?: string | null;
+  /** Upvotes on the Launches board. */
+  upvotes: number;
 }
 
 export type ProductStatus = "pending" | "approved" | "rejected";

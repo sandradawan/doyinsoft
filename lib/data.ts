@@ -76,6 +76,8 @@ interface ProductRow {
   status: "pending" | "approved" | "rejected" | null;
   featured: boolean | null;
   rejection_reason: string | null;
+  launched_at: string | null;
+  upvotes: number | null;
   vendor: VendorRow | VendorRow[] | null;
 }
 
@@ -117,6 +119,8 @@ function mapProduct(row: ProductRow): Product {
     status: row.status ?? "approved",
     featured: row.featured ?? false,
     rejection_reason: row.rejection_reason ?? null,
+    launched_at: row.launched_at ?? null,
+    upvotes: row.upvotes ?? 0,
     vendor: v
       ? mapVendor(v)
       : { id: "", slug: "", name: "Unknown vendor", initials: "?", verified: false },
@@ -124,7 +128,7 @@ function mapProduct(row: ProductRow): Product {
 }
 
 const PRODUCT_SELECT =
-  "id, slug, name, price_minor, currency, platform, category, tagline, description, system_requirements, os_badges, version, file_path, file_name, file_size, download_count, rating_avg, rating_count, icon_url, screenshots, status, featured, rejection_reason, vendor:vendors(id, slug, name, initials, verified, suspended, whatsapp)";
+  "id, slug, name, price_minor, currency, platform, category, tagline, description, system_requirements, os_badges, version, file_path, file_name, file_size, download_count, rating_avg, rating_count, icon_url, screenshots, status, featured, rejection_reason, launched_at, upvotes, vendor:vendors(id, slug, name, initials, verified, suspended, whatsapp)";
 
 // ---- Public queries ----------------------------------------------------------
 
@@ -676,6 +680,45 @@ export async function getPayoutDetails(
     account_name: data?.payout_account_name ?? "",
     account_number: data?.payout_account_number ?? "",
   };
+}
+
+// ---- Launches ----------------------------------------------------------------
+
+export type LaunchPeriod = "today" | "week" | "all";
+
+export async function getLaunches(period: LaunchPeriod = "week"): Promise<Product[]> {
+  if (!isSupabaseConfigured) {
+    return [...seedProducts]
+      .filter((p) => p.status === "approved")
+      .sort((a, b) => b.upvotes - a.upvotes);
+  }
+
+  const since = new Date();
+  if (period === "today") since.setHours(0, 0, 0, 0);
+  else if (period === "week") since.setDate(since.getDate() - 7);
+
+  const supabase = await createClient();
+  let query = supabase
+    .from("products")
+    .select(PRODUCT_SELECT)
+    .eq("status", "approved")
+    .not("launched_at", "is", null)
+    .order("upvotes", { ascending: false })
+    .order("launched_at", { ascending: false })
+    .limit(50);
+  if (period !== "all") query = query.gte("launched_at", since.toISOString());
+
+  const { data, error } = await query;
+  if (error || !data) return [];
+  return (data as unknown as ProductRow[]).map(mapProduct).filter((p) => !p.vendor.suspended);
+}
+
+/** Product ids the given voter has already upvoted (to highlight the button). */
+export async function getMyUpvotes(voter: string): Promise<Set<string>> {
+  if (!hasServiceRole || !voter) return new Set();
+  const admin = createAdminClient();
+  const { data } = await admin.from("upvotes").select("product_id").eq("voter", voter);
+  return new Set(((data as { product_id: string }[]) ?? []).map((r) => r.product_id));
 }
 
 // ---- Reviews -----------------------------------------------------------------

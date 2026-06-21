@@ -29,6 +29,15 @@ async function setProductStatus(
     .select("name, vendor_id")
     .single();
 
+  // First approval = launch date (powers the Launches board).
+  if (status === "approved") {
+    await admin
+      .from("products")
+      .update({ launched_at: new Date().toISOString() })
+      .eq("id", id)
+      .is("launched_at", null);
+  }
+
   const row = data as { name: string; vendor_id: string } | null;
   if (row?.vendor_id) {
     const email = await getVendorOwnerEmail(row.vendor_id);

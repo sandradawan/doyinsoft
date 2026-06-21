@@ -66,6 +66,8 @@ create table if not exists products (
   status              product_status not null default 'pending',
   featured            boolean not null default false,
   rejection_reason    text,
+  launched_at         timestamptz,
+  upvotes             integer not null default 0,
   created_at          timestamptz not null default now()
 );
 -- For databases created before these columns existed:
@@ -74,6 +76,8 @@ alter table products add column if not exists screenshots      text[] not null d
 alter table products add column if not exists status           product_status not null default 'pending';
 alter table products add column if not exists featured         boolean not null default false;
 alter table products add column if not exists rejection_reason text;
+alter table products add column if not exists launched_at      timestamptz;
+alter table products add column if not exists upvotes          integer not null default 0;
 
 create table if not exists orders (
   id             uuid primary key default gen_random_uuid(),
@@ -388,7 +392,19 @@ on conflict (slug) do nothing;
 update products set status = 'approved'
   where slug in ('vectorforge','pulsedesk','fieldtrack','kobokeep','naijafonts','marketmesh');
 update products set featured = true where slug in ('vectorforge','fieldtrack');
+update products set launched_at = coalesce(launched_at, now()) where status = 'approved';
+update products set upvotes = rating_count where upvotes = 0;
 create index if not exists products_status_idx on products (status);
+
+create table if not exists upvotes (
+  id         uuid primary key default gen_random_uuid(),
+  product_id uuid not null references products (id) on delete cascade,
+  voter      text not null,
+  created_at timestamptz not null default now(),
+  unique (product_id, voter)
+);
+alter table upvotes enable row level security;
+create index if not exists upvotes_product_idx on upvotes (product_id);
 
 -- A few orders for Studio Adeyemi so a connected dashboard has sample data.
 insert into orders (product_id, vendor_id, buyer_name, buyer_initials, amount_minor, currency, status, gateway)

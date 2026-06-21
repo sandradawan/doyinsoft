@@ -26,10 +26,10 @@ export async function TopNav({ defaultQuery = "" }: { defaultQuery?: string }) {
       </form>
 
       <Link
-        href="/"
+        href="/launches"
         className="hidden sm:inline text-[13px] text-ink-soft no-underline hover:text-ink"
       >
-        Categories
+        Launches
       </Link>
       <Link
         href="/downloads"
