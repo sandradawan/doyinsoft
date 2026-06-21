@@ -24,7 +24,9 @@ interface CheckoutInput {
  * - Other gateways or missing keys: falls back to the mock success page
  *   so the flow is demoable end-to-end without real credentials.
  */
-export async function startCheckout(input: CheckoutInput) {
+export async function startCheckout(
+  input: CheckoutInput
+): Promise<{ error: string } | void> {
   let orderId = input.orderId;
 
   // Persist a real pending order via the service role (buyers aren't logged in,
@@ -51,28 +53,45 @@ export async function startCheckout(input: CheckoutInput) {
     }
   }
 
-  // Paystack hosted checkout (only path that takes a real payment here).
+  // Paystack hosted checkout — the only path that takes a real payment.
   if (input.gateway === "paystack" && PAYSTACK_SECRET) {
-    const res = await fetch("https://api.paystack.co/transaction/initialize", {
-      method: "POST",
-      headers: {
-        Authorization: `Bearer ${PAYSTACK_SECRET}`,
-        "Content-Type": "application/json",
-      },
-      body: JSON.stringify({
-        email: input.email,
-        amount: input.amountMinor, // already in kobo/cents
-        currency: input.currency,
-        callback_url: `${SITE_URL}/checkout/${orderId}/success`,
-        metadata: { order_id: orderId, product_slug: input.productSlug },
-      }),
-    });
-    const json = await res.json();
-    const url = json?.data?.authorization_url as string | undefined;
-    if (url) redirect(url);
+    let url: string | undefined;
+    let message = "";
+    try {
+      const res = await fetch("https://api.paystack.co/transaction/initialize", {
+        method: "POST",
+        headers: {
+          Authorization: `Bearer ${PAYSTACK_SECRET}`,
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          email: input.email,
+          amount: input.amountMinor, // already in kobo/cents
+          currency: input.currency,
+          callback_url: `${SITE_URL}/checkout/${orderId}/success`,
+          metadata: { order_id: orderId, product_slug: input.productSlug },
+        }),
+      });
+      const json = await res.json();
+      url = json?.data?.authorization_url as string | undefined;
+      message = json?.message ?? "";
+    } catch {
+      message = "Could not reach Paystack. Check your network and try again.";
+    }
+
+    if (url) redirect(url); // success → go to Paystack's hosted page
+
+    // Paystack rejected the request — surface why instead of a silent fallback.
+    return {
+      error:
+        `Paystack couldn't start this payment: ${message || "unknown error"}. ` +
+        `Common causes: the secret key is wrong (must be the SECRET key, sk_…), ` +
+        `or your Paystack account doesn't support ${input.currency} ` +
+        `(Nigerian accounts only accept NGN).`,
+    };
   }
 
-  // Fallback: mock confirmation so the demo always completes.
+  // Non-Paystack gateway, or Paystack not configured: demo confirmation.
   redirect(`/checkout/${orderId}/success?email=${encodeURIComponent(input.email)}`);
 }
 

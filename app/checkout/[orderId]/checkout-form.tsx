@@ -24,17 +24,34 @@ export function CheckoutForm({
 }) {
   const [gateway, setGateway] = useState<Gateway>("paystack");
   const [email, setEmail] = useState("");
+  const [error, setError] = useState<string | null>(null);
   const [pending, startTransition] = useTransition();
 
   function submit(e: React.FormEvent) {
     e.preventDefault();
-    startTransition(() =>
-      startCheckout({ orderId, productSlug, gateway, email, amountMinor, currency })
-    );
+    setError(null);
+    startTransition(async () => {
+      const res = await startCheckout({
+        orderId,
+        productSlug,
+        gateway,
+        email,
+        amountMinor,
+        currency,
+      });
+      // A successful start redirects; only failures return here.
+      if (res?.error) setError(res.error);
+    });
   }
 
   return (
     <form onSubmit={submit}>
+      {error && (
+        <p className="text-[12px] text-info bg-info-bg rounded-md px-3 py-2 mb-4">
+          {error}
+        </p>
+      )}
+
       {/* Email — required by the payment gateway to send the receipt + key. */}
       <label className="block text-[12px] font-medium m-0 mb-2">Email address</label>
       <input
