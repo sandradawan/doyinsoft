@@ -33,6 +33,7 @@ import type {
   Platform,
   Product,
   ProductStatus,
+  ProductType,
   Review,
   Vendor,
 } from "./types";
@@ -142,7 +143,8 @@ const CORE_SELECT =
 export async function getProducts(
   platform?: Platform,
   search?: string,
-  category?: string
+  category?: string,
+  productType?: ProductType
 ): Promise<Product[]> {
   const q = search?.trim().toLowerCase();
   const cat = category?.trim();
@@ -151,6 +153,7 @@ export async function getProducts(
     let list = (platform ? seedProducts.filter((p) => p.platform === platform) : seedProducts)
       .filter((p) => p.status === "approved");
     if (cat) list = list.filter((p) => p.category === cat);
+    if (productType) list = list.filter((p) => p.product_type === productType);
     if (q) {
       list = list.filter((p) =>
         [p.name, p.tagline, p.category, p.vendor.name]
@@ -170,6 +173,7 @@ export async function getProducts(
     .order("name");
   if (platform) query = query.eq("platform", platform);
   if (cat) query = query.eq("category", cat);
+  if (productType) query = query.eq("product_type", productType);
   if (q) {
     const like = `%${q}%`;
     query = query.or(`name.ilike.${like},tagline.ilike.${like},category.ilike.${like}`);

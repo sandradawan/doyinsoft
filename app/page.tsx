@@ -5,26 +5,36 @@ import { ProductCard } from "@/components/product-card";
 import { HeroCarousel } from "@/components/hero-carousel";
 import { Footer } from "@/components/footer";
 import { getCategories, getProducts } from "@/lib/data";
-import type { Platform } from "@/lib/types";
+import type { Platform, ProductType } from "@/lib/types";
 
 const PLATFORMS: Platform[] = ["desktop", "mobile", "web"];
+const TYPES: { label: string; value: ProductType | "all" }[] = [
+  { label: "All", value: "all" },
+  { label: "Digital", value: "digital" },
+  { label: "Physical", value: "physical" },
+  { label: "Services", value: "service" },
+];
 
 export default async function HomePage({
   searchParams,
 }: {
-  searchParams: Promise<{ platform?: string; q?: string; category?: string }>;
+  searchParams: Promise<{ platform?: string; q?: string; category?: string; type?: string }>;
 }) {
-  const { platform, q, category } = await searchParams;
+  const { platform, q, category, type } = await searchParams;
   const active = (platform as Platform | "all") ?? "all";
   const query = q?.trim() ?? "";
   const activeCategory = category?.trim() ?? "";
+  const activeType = (["digital", "physical", "service"].includes(type ?? "")
+    ? type
+    : "all") as ProductType | "all";
 
   // "Free" is a price filter, not a platform; everything else filters by platform.
   const [all, categories] = await Promise.all([
     getProducts(
       PLATFORMS.includes(active as Platform) ? (active as Platform) : undefined,
       query,
-      activeCategory || undefined
+      activeCategory || undefined,
+      activeType === "all" ? undefined : activeType
     ),
     getCategories(),
   ]);
@@ -32,13 +42,23 @@ export default async function HomePage({
     active === "free" ? all.filter((p) => p.price_minor === 0) : all;
 
   // Show the slideshow only on the default storefront view.
-  const showHero = active === "all" && !query && !activeCategory;
+  const showHero = active === "all" && !query && !activeCategory && activeType === "all";
+
+  const typeHref = (t: string) => {
+    const params = new URLSearchParams();
+    if (query) params.set("q", query);
+    if (activeCategory) params.set("category", activeCategory);
+    if (t !== "all") params.set("type", t);
+    const qs = params.toString();
+    return qs ? `/?${qs}` : "/";
+  };
 
   // Preserve other filters when switching category.
   const catHref = (c: string) => {
     const params = new URLSearchParams();
     if (active !== "all") params.set("platform", active);
     if (query) params.set("q", query);
+    if (activeType !== "all") params.set("type", activeType);
     if (c) params.set("category", c);
     const qs = params.toString();
     return qs ? `/?${qs}` : "/";
@@ -71,6 +91,24 @@ export default async function HomePage({
           </p>
         </section>
       )}
+
+      {/* Browse by type */}
+      <div className="flex gap-2 flex-wrap mb-3">
+        {TYPES.map((t) => (
+          <Link
+            key={t.value}
+            href={typeHref(t.value)}
+            className={[
+              "text-[12px] px-3 py-[5px] rounded-md no-underline border transition-colors",
+              activeType === t.value
+                ? "border-brand text-brand bg-brand-tint font-medium"
+                : "border-line text-ink-soft hover:border-line-strong hover:text-ink",
+            ].join(" ")}
+          >
+            {t.label}
+          </Link>
+        ))}
+      </div>
 
       <FilterPills active={active === "free" ? "free" : active} />
 
