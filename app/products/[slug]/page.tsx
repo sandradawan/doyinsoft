@@ -1,6 +1,8 @@
+import type { Metadata } from "next";
 import Link from "next/link";
 import { notFound } from "next/navigation";
-import { getProductBySlug, getReviews } from "@/lib/data";
+import { getProductBySlug, getProducts, getReviews } from "@/lib/data";
+import { ProductCard } from "@/components/product-card";
 import { Stars } from "@/components/stars";
 import { formatBytes, formatPrice } from "@/lib/format";
 import { ReviewForm } from "./review-form";
@@ -8,6 +10,37 @@ import { ReviewForm } from "./review-form";
 function shortDate(iso: string): string {
   if (!iso) return "";
   return new Date(iso).toLocaleDateString("en-NG", { day: "2-digit", month: "short", year: "numeric" });
+}
+
+export async function generateMetadata({
+  params,
+}: {
+  params: Promise<{ slug: string }>;
+}): Promise<Metadata> {
+  const { slug } = await params;
+  const product = await getProductBySlug(slug);
+  if (!product) return { title: "Software not found — DoyinSoft" };
+
+  const title = `${product.name} — ${formatPrice(product.price_minor, product.currency)} | DoyinSoft`;
+  const description = product.tagline || product.description || `${product.name} on DoyinSoft.`;
+  const image = product.icon_url || product.screenshots[0];
+
+  return {
+    title,
+    description,
+    openGraph: {
+      title,
+      description,
+      type: "website",
+      images: image ? [{ url: image }] : undefined,
+    },
+    twitter: {
+      card: image ? "summary_large_image" : "summary",
+      title,
+      description,
+      images: image ? [image] : undefined,
+    },
+  };
 }
 
 export default async function ProductDetailPage({
@@ -19,7 +52,11 @@ export default async function ProductDetailPage({
   const product = await getProductBySlug(slug);
   if (!product) notFound();
 
-  const reviews = await getReviews(product.id);
+  const [reviews, related] = await Promise.all([
+    getReviews(product.id),
+    getProducts(undefined, undefined, product.category),
+  ]);
+  const relatedProducts = related.filter((p) => p.id !== product.id).slice(0, 4);
 
   return (
     <main className="max-w-5xl mx-auto px-5 py-6">
@@ -183,6 +220,21 @@ export default async function ProductDetailPage({
           </Link>
         </div>
       </div>
+
+      {/* Related products */}
+      {relatedProducts.length > 0 && (
+        <section className="mt-10">
+          <p className="text-[14px] font-medium m-0 mb-3">More in {product.category}</p>
+          <div
+            className="grid gap-3"
+            style={{ gridTemplateColumns: "repeat(auto-fit, minmax(140px, 1fr))" }}
+          >
+            {relatedProducts.map((p) => (
+              <ProductCard key={p.id} product={p} />
+            ))}
+          </div>
+        </section>
+      )}
     </main>
   );
 }
