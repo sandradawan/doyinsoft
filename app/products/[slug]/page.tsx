@@ -1,7 +1,8 @@
 import type { Metadata } from "next";
 import Link from "next/link";
 import { notFound } from "next/navigation";
-import { getProductBySlug, getProducts, getReviews } from "@/lib/data";
+import { getProductBySlug, getProducts, getReviews, hasPurchased } from "@/lib/data";
+import { getCurrentUser } from "@/lib/auth";
 import { ProductCard } from "@/components/product-card";
 import { Stars } from "@/components/stars";
 import { WhatsAppButton } from "@/components/whatsapp-button";
@@ -55,11 +56,13 @@ export default async function ProductDetailPage({
   const product = await getProductBySlug(slug);
   if (!product) notFound();
 
-  const [reviews, related] = await Promise.all([
+  const [reviews, related, user] = await Promise.all([
     getReviews(product.id),
     getProducts(undefined, undefined, product.category),
+    getCurrentUser(),
   ]);
   const relatedProducts = related.filter((p) => p.id !== product.id).slice(0, 4);
+  const canReview = user ? await hasPurchased(product.id, user.email) : false;
 
   return (
     <main className="max-w-5xl mx-auto px-5 py-6">
@@ -173,8 +176,25 @@ export default async function ProductDetailPage({
               </div>
             )}
 
-            <p className="text-[13px] font-medium m-0 mb-2">Write a review</p>
-            <ReviewForm productId={product.id} slug={product.slug} />
+            {canReview ? (
+              <>
+                <p className="text-[13px] font-medium m-0 mb-2">Write a review</p>
+                <ReviewForm productId={product.id} slug={product.slug} />
+              </>
+            ) : (
+              <p className="text-[12px] text-ink-soft m-0">
+                {user ? (
+                  "Only verified buyers can review this product."
+                ) : (
+                  <>
+                    <Link href="/sign-in?next=/products/" className="text-brand hover:underline">
+                      Sign in
+                    </Link>{" "}
+                    after purchasing to leave a review.
+                  </>
+                )}
+              </p>
+            )}
           </div>
         </div>
 

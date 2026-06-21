@@ -865,6 +865,20 @@ export async function getLicensesByEmail(email: string): Promise<License[]> {
   return ((data as unknown as LicenseRow[]) ?? []).map(mapLicense);
 }
 
+/** Has this email got an active license for the product? (verified-purchase) */
+export async function hasPurchased(productId: string, email: string): Promise<boolean> {
+  if (!hasServiceRole) return true; // demo mode: allow reviewing
+  if (!email) return false;
+  const admin = createAdminClient();
+  const { count } = await admin
+    .from("licenses")
+    .select("id", { count: "exact", head: true })
+    .eq("product_id", productId)
+    .eq("email", email)
+    .eq("status", "active");
+  return (count ?? 0) > 0;
+}
+
 /**
  * Issue (or return the existing) license for an order. Idempotent.
  * Called by the Paystack webhook in production and by the success page in the

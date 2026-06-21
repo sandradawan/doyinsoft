@@ -1,15 +1,19 @@
 import Link from "next/link";
 import { Logo } from "@/components/logo";
-import { getCurrentVendor } from "@/lib/auth";
+import { getCurrentUser, getCurrentVendor } from "@/lib/auth";
 import { isAdmin } from "@/lib/admin";
 import { signOut } from "@/app/(auth)/actions";
 
 /**
  * Storefront top nav — wordmark, search, text links, and an auth-aware action
- * area: signed-in vendors see their name + sign out; guests see sign in / up.
+ * area: vendors see Dashboard, buyers see Account, guests see sign in / up.
  */
 export async function TopNav({ defaultQuery = "" }: { defaultQuery?: string }) {
-  const [vendor, admin] = await Promise.all([getCurrentVendor(), isAdmin()]);
+  const [vendor, admin, user] = await Promise.all([
+    getCurrentVendor(),
+    isAdmin(),
+    getCurrentUser(),
+  ]);
 
   return (
     <header className="flex items-center gap-4 border-b border-line pb-[14px] mb-5">
@@ -46,13 +50,13 @@ export async function TopNav({ defaultQuery = "" }: { defaultQuery?: string }) {
         </Link>
       )}
 
-      {vendor ? (
+      {vendor || user ? (
         <div className="flex items-center gap-3 ml-auto sm:ml-0">
           <Link
-            href="/vendor/dashboard"
+            href={vendor ? "/vendor/dashboard" : "/account"}
             className="hidden sm:inline text-[13px] text-ink-soft no-underline hover:text-ink"
           >
-            Dashboard
+            {vendor ? "Dashboard" : "Account"}
           </Link>
           <form action={signOut}>
             <button

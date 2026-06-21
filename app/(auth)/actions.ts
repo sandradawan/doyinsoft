@@ -91,6 +91,28 @@ export async function signUp(_prev: AuthState, formData: FormData): Promise<Auth
   redirect("/sign-in?notice=confirm-email");
 }
 
+/** Buyer sign-up — creates an auth account only (no vendor profile). */
+export async function signUpBuyer(_prev: AuthState, formData: FormData): Promise<AuthState> {
+  if (!isSupabaseConfigured) return { error: DEMO_MSG };
+
+  const email = String(formData.get("email") ?? "").trim();
+  const password = String(formData.get("password") ?? "");
+  const next = safeNext(formData.get("next"));
+
+  if (password.length < 6) return { error: "Password must be at least 6 characters." };
+
+  const supabase = await createClient();
+  const { data, error } = await supabase.auth.signUp({
+    email,
+    password,
+    options: { emailRedirectTo: `${SITE_URL}/auth/callback?next=${encodeURIComponent(next)}` },
+  });
+  if (error) return { error: error.message };
+
+  if (data.session) redirect(next);
+  redirect("/sign-in?notice=confirm-email");
+}
+
 export async function signOut() {
   if (isSupabaseConfigured) {
     const supabase = await createClient();

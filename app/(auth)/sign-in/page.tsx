@@ -30,9 +30,15 @@ export default async function SignInPage({
       <SignInForm next={next ?? "/vendor/dashboard"} />
 
       <p className="text-[12px] text-ink-soft text-center mt-5 mb-0">
-        New vendor?{" "}
-        <Link href="/sign-up" className="text-brand no-underline hover:underline">
+        New here?{" "}
+        <Link href="/register" className="text-brand no-underline hover:underline">
           Create an account
+        </Link>
+      </p>
+      <p className="text-[12px] text-ink-soft text-center mt-2 mb-0">
+        Want to sell?{" "}
+        <Link href="/sign-up" className="text-brand no-underline hover:underline">
+          Become a vendor
         </Link>
       </p>
     </div>
