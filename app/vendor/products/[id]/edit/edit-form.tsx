@@ -1,6 +1,6 @@
 "use client";
 
-import { useActionState, useState } from "react";
+import { startTransition, useActionState, useState } from "react";
 import { createClient } from "@/lib/supabase/client";
 import { formatBytes } from "@/lib/format";
 import type { Product } from "@/lib/types";
@@ -54,7 +54,7 @@ export function EditProductForm({
       setUploading(false);
     }
 
-    formAction(fd);
+    startTransition(() => formAction(fd));
   }
 
   const busy = uploading || isPending;
