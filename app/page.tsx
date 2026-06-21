@@ -2,6 +2,7 @@ import Link from "next/link";
 import { TopNav } from "@/components/top-nav";
 import { FilterPills } from "@/components/filter-pills";
 import { ProductCard } from "@/components/product-card";
+import { HeroCarousel } from "@/components/hero-carousel";
 import { getProducts } from "@/lib/data";
 import type { Platform } from "@/lib/types";
 
@@ -24,20 +25,32 @@ export default async function HomePage({
   const products =
     active === "free" ? all.filter((p) => p.price_minor === 0) : all;
 
+  // Show the slideshow only on the default storefront view.
+  const showHero = active === "all" && !query;
+  const featured = [...all].sort(
+    (a, b) => b.rating_avg * b.rating_count - a.rating_avg * a.rating_count
+  );
+
   return (
     <main className="max-w-5xl mx-auto px-5 py-6">
       <TopNav defaultQuery={query} />
 
-      {/* Hero */}
-      <section className="mb-5">
-        <h1 className="text-[22px] font-medium m-0 mb-1">
-          Software built for African markets
-        </h1>
-        <p className="text-[14px] text-ink-soft m-0 mb-3">
-          Desktop, mobile and web apps from independent developers
-        </p>
-        <button className="btn-primary px-4 py-2">Browse software</button>
-      </section>
+      <h1 className="sr-only">
+        DoyinSoft — software built for African markets
+      </h1>
+
+      {showHero ? (
+        <HeroCarousel products={featured} />
+      ) : (
+        <section className="mb-5">
+          <p className="text-[22px] font-medium m-0 mb-1">
+            Software built for African markets
+          </p>
+          <p className="text-[14px] text-ink-soft m-0">
+            Desktop, mobile and web apps from independent developers
+          </p>
+        </section>
+      )}
 
       <FilterPills active={active === "free" ? "free" : active} />
 

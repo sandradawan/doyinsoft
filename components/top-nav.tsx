@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { Logo } from "@/components/logo";
 import { getCurrentVendor } from "@/lib/auth";
 import { signOut } from "@/app/(auth)/actions";
 
@@ -11,9 +12,7 @@ export async function TopNav({ defaultQuery = "" }: { defaultQuery?: string }) {
 
   return (
     <header className="flex items-center gap-4 border-b border-line pb-[14px] mb-5">
-      <Link href="/" className="text-[16px] font-medium text-ink no-underline">
-        DoyinSoft
-      </Link>
+      <Logo />
 
       <form action="/" method="get" className="flex-1 max-w-[320px]">
         <input
