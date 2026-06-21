@@ -345,27 +345,68 @@ export async function vendorTopProducts(
     .slice(0, 5);
 }
 
-// ---- Admin queries (service role) --------------------------------------------
+// ---- Categories --------------------------------------------------------------
 
-export async function adminProducts(status?: ProductStatus): Promise<Product[]> {
-  if (!hasServiceRole) {
-    return status ? seedProducts.filter((p) => p.status === status) : seedProducts;
-  }
+const DEFAULT_CATEGORIES = [
+  "Design tools", "Support", "Logistics", "Finance", "Commerce",
+  "Productivity", "Developer tools", "Security", "Education", "Media",
+];
+
+export async function getCategories(): Promise<string[]> {
+  if (!hasServiceRole) return DEFAULT_CATEGORIES;
   const admin = createAdminClient();
-  let q = admin.from("products").select(PRODUCT_SELECT).order("created_at", { ascending: false });
-  if (status) q = q.eq("status", status);
-  const { data, error } = await q;
-  if (error || !data) return [];
-  return (data as unknown as ProductRow[]).map(mapProduct);
+  const { data } = await admin.from("categories").select("name").order("name");
+  const names = ((data as { name: string }[]) ?? []).map((c) => c.name);
+  return names.length ? names : DEFAULT_CATEGORIES;
 }
 
-export async function adminVendors(): Promise<Vendor[]> {
-  if (!hasServiceRole) return seedVendors;
+export async function adminCategories(): Promise<{ id: string; name: string }[]> {
+  if (!hasServiceRole) return DEFAULT_CATEGORIES.map((name, i) => ({ id: String(i), name }));
   const admin = createAdminClient();
-  const { data } = await admin
+  const { data } = await admin.from("categories").select("id, name").order("name");
+  return (data as { id: string; name: string }[]) ?? [];
+}
+
+// ---- Admin queries (service role) --------------------------------------------
+
+export const ADMIN_PAGE_SIZE = 15;
+
+export async function adminProducts(
+  status?: ProductStatus,
+  page = 1
+): Promise<{ items: Product[]; total: number }> {
+  if (!hasServiceRole) {
+    const all = status ? seedProducts.filter((p) => p.status === status) : seedProducts;
+    const start = (page - 1) * ADMIN_PAGE_SIZE;
+    return { items: all.slice(start, start + ADMIN_PAGE_SIZE), total: all.length };
+  }
+  const admin = createAdminClient();
+  const from = (page - 1) * ADMIN_PAGE_SIZE;
+  let q = admin
+    .from("products")
+    .select(PRODUCT_SELECT, { count: "exact" })
+    .order("created_at", { ascending: false })
+    .range(from, from + ADMIN_PAGE_SIZE - 1);
+  if (status) q = q.eq("status", status);
+  const { data, error, count } = await q;
+  if (error || !data) return { items: [], total: 0 };
+  return { items: (data as unknown as ProductRow[]).map(mapProduct), total: count ?? 0 };
+}
+
+export async function adminVendors(search?: string): Promise<Vendor[]> {
+  const q = search?.trim().toLowerCase();
+  if (!hasServiceRole) {
+    return q
+      ? seedVendors.filter((v) => `${v.name} ${v.slug}`.toLowerCase().includes(q))
+      : seedVendors;
+  }
+  const admin = createAdminClient();
+  let query = admin
     .from("vendors")
     .select("id, slug, name, initials, verified, suspended")
     .order("created_at", { ascending: false });
+  if (q) query = query.or(`name.ilike.%${q}%,slug.ilike.%${q}%`);
+  const { data } = await query;
   return (data as Vendor[]) ?? [];
 }
 

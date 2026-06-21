@@ -175,6 +175,27 @@ export async function resendLicense(formData: FormData) {
   revalidatePath("/admin/orders");
 }
 
+// ---- Categories --------------------------------------------------------------
+
+export async function addCategory(formData: FormData) {
+  const adminEmail = await requireAdmin();
+  if (!hasServiceRole) return;
+  const name = String(formData.get("name") ?? "").trim();
+  if (!name) return;
+  await createAdminClient().from("categories").upsert({ name }, { onConflict: "name" });
+  await logAudit(adminEmail, "add_category", "category", undefined, name);
+  revalidatePath("/admin/categories");
+}
+
+export async function deleteCategory(formData: FormData) {
+  const adminEmail = await requireAdmin();
+  if (!hasServiceRole) return;
+  const id = String(formData.get("id") ?? "");
+  await createAdminClient().from("categories").delete().eq("id", id);
+  await logAudit(adminEmail, "delete_category", "category", id);
+  revalidatePath("/admin/categories");
+}
+
 // ---- Settings ----------------------------------------------------------------
 
 export interface SettingsState {

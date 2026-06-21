@@ -29,7 +29,15 @@ export default async function AdminOrdersPage({
 
   return (
     <div>
-      <h1 className="text-[22px] font-medium m-0 mb-4">Orders</h1>
+      <div className="flex items-center justify-between mb-4">
+        <h1 className="text-[22px] font-medium m-0">Orders</h1>
+        <a
+          href={`/admin/orders/export?status=${active}`}
+          className="text-[12px] border border-line rounded-md px-3 py-[6px] no-underline text-ink-soft hover:border-brand hover:text-brand"
+        >
+          Export CSV
+        </a>
+      </div>
 
       <div className="flex gap-2 flex-wrap mb-5">
         {FILTERS.map((f) => (

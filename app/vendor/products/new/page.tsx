@@ -2,10 +2,12 @@ import Link from "next/link";
 import { ChevronLeft } from "lucide-react";
 import { VendorShell } from "@/components/vendor-shell";
 import { requireVendor } from "@/lib/auth";
+import { getCategories } from "@/lib/data";
 import { ProductForm } from "./product-form";
 
 export default async function NewProductPage() {
   await requireVendor();
+  const categories = await getCategories();
   return (
     <VendorShell active="products">
       <Link
@@ -19,7 +21,7 @@ export default async function NewProductPage() {
         Upload your software and set how it sells. A license key is minted for each buyer
         automatically.
       </p>
-      <ProductForm />
+      <ProductForm categories={categories} />
     </VendorShell>
   );
 }

@@ -17,7 +17,7 @@ function slugify(input: string): string {
     .replace(/^-+|-+$/g, "");
 }
 
-export function ProductForm() {
+export function ProductForm({ categories = [] }: { categories?: string[] }) {
   const [state, formAction, isPending] = useActionState<CreateProductState, FormData>(
     createProduct,
     {}
@@ -141,7 +141,17 @@ export function ProductForm() {
         </div>
         <div>
           <label className={labelCls}>Category</label>
-          <input name="category" className="field w-full" placeholder="Design tools" />
+          <input
+            name="category"
+            list="category-list"
+            className="field w-full"
+            placeholder="Design tools"
+          />
+          <datalist id="category-list">
+            {categories.map((c) => (
+              <option key={c} value={c} />
+            ))}
+          </datalist>
         </div>
       </div>
 

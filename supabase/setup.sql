@@ -265,6 +265,19 @@ insert into settings (key, value) values
   ('usd_to_ngn', '1600')
 on conflict (key) do nothing;
 
+create table if not exists categories (
+  id         uuid primary key default gen_random_uuid(),
+  name       text unique not null,
+  created_at timestamptz not null default now()
+);
+alter table categories enable row level security;
+drop policy if exists "categories public read" on categories;
+create policy "categories public read" on categories for select using (true);
+insert into categories (name) values
+  ('Design tools'), ('Support'), ('Logistics'), ('Finance'), ('Commerce'),
+  ('Productivity'), ('Developer tools'), ('Security'), ('Education'), ('Media')
+on conflict (name) do nothing;
+
 -- ----------------------------------------------------------------------------
 -- Storage: private bucket for software binaries
 -- ----------------------------------------------------------------------------

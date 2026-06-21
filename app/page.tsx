@@ -3,6 +3,7 @@ import { TopNav } from "@/components/top-nav";
 import { FilterPills } from "@/components/filter-pills";
 import { ProductCard } from "@/components/product-card";
 import { HeroCarousel } from "@/components/hero-carousel";
+import { Footer } from "@/components/footer";
 import { getProducts } from "@/lib/data";
 import type { Platform } from "@/lib/types";
 
@@ -84,6 +85,8 @@ export default async function HomePage({
             : "No software in this category yet."}
         </p>
       )}
+
+      <Footer />
     </main>
   );
 }

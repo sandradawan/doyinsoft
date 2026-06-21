@@ -10,7 +10,13 @@ const hintCls = "text-[11px] text-ink-faint mt-1";
 const fileCls =
   "field w-full text-[12px] file:mr-3 file:border-0 file:bg-muted file:text-ink file:rounded-md file:px-3 file:py-1 file:text-[12px]";
 
-export function EditProductForm({ product }: { product: Product }) {
+export function EditProductForm({
+  product,
+  categories = [],
+}: {
+  product: Product;
+  categories?: string[];
+}) {
   const [state, formAction, isPending] = useActionState<EditProductState, FormData>(
     updateProduct,
     {}
@@ -161,7 +167,17 @@ export function EditProductForm({ product }: { product: Product }) {
           </div>
           <div>
             <label className={labelCls}>Category</label>
-            <input name="category" defaultValue={product.category} className="field w-full" />
+            <input
+              name="category"
+              list="category-list"
+              defaultValue={product.category}
+              className="field w-full"
+            />
+            <datalist id="category-list">
+              {categories.map((c) => (
+                <option key={c} value={c} />
+              ))}
+            </datalist>
           </div>
         </div>
 

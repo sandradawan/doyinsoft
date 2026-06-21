@@ -2,12 +2,27 @@ import { BadgeCheck } from "lucide-react";
 import { adminVendors } from "@/lib/data";
 import { toggleSuspended, toggleVerified } from "../actions";
 
-export default async function AdminVendorsPage() {
-  const vendors = await adminVendors();
+export default async function AdminVendorsPage({
+  searchParams,
+}: {
+  searchParams: Promise<{ q?: string }>;
+}) {
+  const { q } = await searchParams;
+  const vendors = await adminVendors(q);
 
   return (
     <div>
       <h1 className="text-[22px] font-medium m-0 mb-4">Vendors</h1>
+
+      <form method="get" className="flex gap-2 mb-5 max-w-sm">
+        <input
+          name="q"
+          defaultValue={q ?? ""}
+          placeholder="Search vendors by name…"
+          className="field flex-1"
+        />
+        <button className="btn-primary px-4 py-2">Search</button>
+      </form>
 
       {vendors.length === 0 ? (
         <p className="text-[13px] text-ink-soft">No vendors yet.</p>

@@ -3,7 +3,7 @@ import { notFound } from "next/navigation";
 import { ChevronLeft } from "lucide-react";
 import { VendorShell } from "@/components/vendor-shell";
 import { requireVendor } from "@/lib/auth";
-import { getVendorProductById } from "@/lib/data";
+import { getCategories, getVendorProductById } from "@/lib/data";
 import { EditProductForm } from "./edit-form";
 
 export default async function EditProductPage({
@@ -13,7 +13,10 @@ export default async function EditProductPage({
 }) {
   const vendor = await requireVendor();
   const { id } = await params;
-  const product = await getVendorProductById(id, vendor.id);
+  const [product, categories] = await Promise.all([
+    getVendorProductById(id, vendor.id),
+    getCategories(),
+  ]);
   if (!product) notFound();
 
   return (
@@ -28,7 +31,7 @@ export default async function EditProductPage({
       <p className="text-[13px] text-ink-soft m-0 mb-6">
         Update details, publish a new version, or remove the product.
       </p>
-      <EditProductForm product={product} />
+      <EditProductForm product={product} categories={categories} />
     </VendorShell>
   );
 }

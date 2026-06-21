@@ -1,6 +1,6 @@
 import Link from "next/link";
 import { Star } from "lucide-react";
-import { adminProducts } from "@/lib/data";
+import { ADMIN_PAGE_SIZE, adminProducts } from "@/lib/data";
 import { formatPrice } from "@/lib/format";
 import type { ProductStatus } from "@/lib/types";
 import { approveProduct, rejectProduct, toggleFeatured } from "../actions";
@@ -21,12 +21,14 @@ const STATUS_BADGE: Record<ProductStatus, string> = {
 export default async function AdminProductsPage({
   searchParams,
 }: {
-  searchParams: Promise<{ status?: string }>;
+  searchParams: Promise<{ status?: string; page?: string }>;
 }) {
-  const { status } = await searchParams;
+  const { status, page: pageParam } = await searchParams;
   const active = (status as ProductStatus | "all") ?? "pending";
   const filter = active === "all" ? undefined : (active as ProductStatus);
-  const products = await adminProducts(filter);
+  const page = Math.max(1, Number(pageParam) || 1);
+  const { items: products, total } = await adminProducts(filter, page);
+  const totalPages = Math.max(1, Math.ceil(total / ADMIN_PAGE_SIZE));
 
   return (
     <div>
@@ -134,6 +136,32 @@ export default async function AdminProductsPage({
               </div>
             </div>
           ))}
+        </div>
+      )}
+
+      {totalPages > 1 && (
+        <div className="flex items-center justify-between mt-5 text-[12px]">
+          <span className="text-ink-faint">
+            Page {page} of {totalPages} · {total} total
+          </span>
+          <div className="flex gap-2">
+            {page > 1 && (
+              <Link
+                href={`/admin/products?status=${active}&page=${page - 1}`}
+                className="border border-line rounded-md px-3 py-[5px] no-underline text-ink-soft hover:border-line-strong"
+              >
+                ← Prev
+              </Link>
+            )}
+            {page < totalPages && (
+              <Link
+                href={`/admin/products?status=${active}&page=${page + 1}`}
+                className="border border-line rounded-md px-3 py-[5px] no-underline text-ink-soft hover:border-line-strong"
+              >
+                Next →
+              </Link>
+            )}
+          </div>
         </div>
       )}
     </div>
