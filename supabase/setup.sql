@@ -107,6 +107,7 @@ create index if not exists products_vendor_idx on products (vendor_id);
 create index if not exists orders_vendor_idx    on orders (vendor_id);
 create index if not exists licenses_email_idx   on licenses (email);
 create index if not exists licenses_key_idx     on licenses (key);
+create unique index if not exists licenses_order_unique on licenses (order_id);
 create index if not exists payouts_vendor_idx   on payouts (vendor_id);
 create index if not exists reviews_product_idx  on reviews (product_id);
 create unique index if not exists vendors_owner_unique on vendors (owner) where owner is not null;

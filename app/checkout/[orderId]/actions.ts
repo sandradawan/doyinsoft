@@ -1,8 +1,8 @@
 "use server";
 
 import { redirect } from "next/navigation";
-import { isSupabaseConfigured } from "@/lib/supabase/env";
-import { createClient } from "@/lib/supabase/server";
+import { hasServiceRole } from "@/lib/supabase/env";
+import { createAdminClient } from "@/lib/supabase/admin";
 import { getOrderById, getProductBySlug } from "@/lib/data";
 import type { Currency, Gateway } from "@/lib/types";
 
@@ -27,28 +27,27 @@ interface CheckoutInput {
 export async function startCheckout(input: CheckoutInput) {
   let orderId = input.orderId;
 
-  // Persist a real order when Supabase is configured.
-  if (isSupabaseConfigured) {
-    const supabase = await createClient();
-    if (orderId === "new" && input.productSlug) {
-      const product = await getProductBySlug(input.productSlug);
-      if (product) {
-        const { data } = await supabase
-          .from("orders")
-          .insert({
-            product_id: product.id,
-            vendor_id: product.vendor.id,
-            buyer_name: input.email.split("@")[0] || "Guest",
-            buyer_initials: (input.email[0] ?? "G").toUpperCase(),
-            amount_minor: input.amountMinor,
-            currency: input.currency,
-            status: "pending",
-            gateway: input.gateway,
-          })
-          .select("id")
-          .single();
-        if (data?.id) orderId = data.id;
-      }
+  // Persist a real pending order via the service role (buyers aren't logged in,
+  // so this trusted server action creates the order, not the anon client).
+  if (hasServiceRole && orderId === "new" && input.productSlug) {
+    const product = await getProductBySlug(input.productSlug);
+    if (product) {
+      const admin = createAdminClient();
+      const { data } = await admin
+        .from("orders")
+        .insert({
+          product_id: product.id,
+          vendor_id: product.vendor.id,
+          buyer_name: input.email.split("@")[0] || "Guest",
+          buyer_initials: (input.email[0] ?? "G").toUpperCase(),
+          amount_minor: input.amountMinor,
+          currency: input.currency,
+          status: "pending",
+          gateway: input.gateway,
+        })
+        .select("id")
+        .single();
+      if (data?.id) orderId = data.id;
     }
   }
 
