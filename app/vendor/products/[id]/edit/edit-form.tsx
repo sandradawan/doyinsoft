@@ -1,7 +1,7 @@
 "use client";
 
-import { useActionState } from "react";
-import { useFormStatus } from "react-dom";
+import { useActionState, useState } from "react";
+import { createClient } from "@/lib/supabase/client";
 import { formatBytes } from "@/lib/format";
 import type { Product } from "@/lib/types";
 import { deleteProduct, updateProduct, type EditProductState } from "./actions";
@@ -9,24 +9,62 @@ import { deleteProduct, updateProduct, type EditProductState } from "./actions";
 const labelCls = "block text-[12px] font-medium m-0 mb-[6px]";
 const hintCls = "text-[11px] text-ink-faint mt-1";
 
-function SaveButton() {
-  const { pending } = useFormStatus();
-  return (
-    <button type="submit" disabled={pending} className="btn-primary px-4 py-2">
-      {pending ? "Saving…" : "Save changes"}
-    </button>
+export function EditProductForm({
+  product,
+  vendorId,
+}: {
+  product: Product;
+  vendorId: string;
+}) {
+  const [state, formAction, isPending] = useActionState<EditProductState, FormData>(
+    updateProduct,
+    {}
   );
-}
+  const [uploading, setUploading] = useState(false);
+  const [uploadError, setUploadError] = useState<string | null>(null);
 
-export function EditProductForm({ product }: { product: Product }) {
-  const [state, action] = useActionState<EditProductState, FormData>(updateProduct, {});
+  async function onSubmit(e: React.FormEvent<HTMLFormElement>) {
+    e.preventDefault();
+    const fd = new FormData(e.currentTarget);
+    const file = fd.get("file");
+    fd.delete("file");
+
+    if (file instanceof File && file.size > 0) {
+      setUploading(true);
+      setUploadError(null);
+      try {
+        const supabase = createClient();
+        const path = `${vendorId}/${product.slug}/${Date.now()}-${file.name}`;
+        const { error } = await supabase.storage
+          .from("software")
+          .upload(path, file, { upsert: false, contentType: file.type || undefined });
+        if (error) {
+          setUploading(false);
+          setUploadError(`Upload failed: ${error.message}`);
+          return;
+        }
+        fd.set("file_path", path);
+        fd.set("file_name", file.name);
+        fd.set("file_size", String(file.size));
+      } catch (err) {
+        setUploading(false);
+        setUploadError(err instanceof Error ? err.message : "Upload failed.");
+        return;
+      }
+      setUploading(false);
+    }
+
+    formAction(fd);
+  }
+
+  const busy = uploading || isPending;
 
   return (
     <div className="max-w-xl">
-      <form action={action}>
-        {state.error && (
+      <form onSubmit={onSubmit}>
+        {(state.error || uploadError) && (
           <p className="text-[12px] text-info bg-info-bg rounded-md px-3 py-2 mb-4">
-            {state.error}
+            {uploadError ?? state.error}
           </p>
         )}
 
@@ -127,7 +165,9 @@ export function EditProductForm({ product }: { product: Product }) {
           </p>
         </div>
 
-        <SaveButton />
+        <button type="submit" disabled={busy} className="btn-primary px-4 py-2">
+          {uploading ? "Uploading file…" : isPending ? "Saving…" : "Save changes"}
+        </button>
       </form>
 
       {/* Delete — separate form, with a confirm guard. */}

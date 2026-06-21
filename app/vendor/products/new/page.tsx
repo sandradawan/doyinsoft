@@ -5,7 +5,7 @@ import { requireVendor } from "@/lib/auth";
 import { ProductForm } from "./product-form";
 
 export default async function NewProductPage() {
-  await requireVendor();
+  const vendor = await requireVendor();
   return (
     <VendorShell active="products">
       <Link
@@ -19,7 +19,7 @@ export default async function NewProductPage() {
         Upload your software and set how it sells. A license key is minted for each buyer
         automatically.
       </p>
-      <ProductForm />
+      <ProductForm vendorId={vendor.id} />
     </VendorShell>
   );
 }

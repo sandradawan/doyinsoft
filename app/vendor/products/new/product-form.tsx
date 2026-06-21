@@ -1,32 +1,75 @@
 "use client";
 
-import { useActionState } from "react";
-import { useFormStatus } from "react-dom";
+import { useActionState, useState } from "react";
+import { createClient } from "@/lib/supabase/client";
 import { createProduct, type CreateProductState } from "./actions";
 
 const labelCls = "block text-[12px] font-medium m-0 mb-[6px]";
 const hintCls = "text-[11px] text-ink-faint mt-1";
 
-function SubmitButton() {
-  const { pending } = useFormStatus();
-  return (
-    <button type="submit" disabled={pending} className="btn-primary px-4 py-2">
-      {pending ? "Saving…" : "Publish product"}
-    </button>
-  );
+function slugify(input: string): string {
+  return input
+    .toLowerCase()
+    .trim()
+    .replace(/[^a-z0-9]+/g, "-")
+    .replace(/^-+|-+$/g, "");
 }
 
-export function ProductForm() {
-  const [state, action] = useActionState<CreateProductState, FormData>(
+export function ProductForm({ vendorId }: { vendorId: string }) {
+  const [state, formAction, isPending] = useActionState<CreateProductState, FormData>(
     createProduct,
     {}
   );
+  const [uploading, setUploading] = useState(false);
+  const [uploadError, setUploadError] = useState<string | null>(null);
+
+  async function onSubmit(e: React.FormEvent<HTMLFormElement>) {
+    e.preventDefault();
+    const form = e.currentTarget;
+    const fd = new FormData(form);
+    const file = fd.get("file");
+    fd.delete("file"); // never send the binary through the server action
+
+    const name = String(fd.get("name") ?? "").trim();
+    const slug = slugify(String(fd.get("slug") || name));
+    fd.set("slug", slug);
+
+    // Upload the binary straight to Storage from the browser (no 1MB limit).
+    if (file instanceof File && file.size > 0) {
+      setUploading(true);
+      setUploadError(null);
+      try {
+        const supabase = createClient();
+        const path = `${vendorId}/${slug}/${Date.now()}-${file.name}`;
+        const { error } = await supabase.storage
+          .from("software")
+          .upload(path, file, { upsert: false, contentType: file.type || undefined });
+        if (error) {
+          setUploading(false);
+          setUploadError(`Upload failed: ${error.message}`);
+          return;
+        }
+        fd.set("file_path", path);
+        fd.set("file_name", file.name);
+        fd.set("file_size", String(file.size));
+      } catch (err) {
+        setUploading(false);
+        setUploadError(err instanceof Error ? err.message : "Upload failed.");
+        return;
+      }
+      setUploading(false);
+    }
+
+    formAction(fd);
+  }
+
+  const busy = uploading || isPending;
 
   return (
-    <form action={action} className="max-w-xl">
-      {state.error && (
+    <form onSubmit={onSubmit} className="max-w-xl">
+      {(state.error || uploadError) && (
         <p className="text-[12px] text-info bg-info-bg rounded-md px-3 py-2 mb-4">
-          {state.error}
+          {uploadError ?? state.error}
         </p>
       )}
 
@@ -126,12 +169,14 @@ export function ProductForm() {
           className="field w-full text-[12px] file:mr-3 file:border-0 file:bg-muted file:text-ink file:rounded-md file:px-3 file:py-1 file:text-[12px]"
         />
         <p className={hintCls}>
-          The installer or archive buyers download. Stored privately; delivered via a
-          signed link only after purchase.
+          The installer or archive buyers download. Uploaded directly and stored
+          privately; delivered via a signed link only after purchase. Large files are fine.
         </p>
       </div>
 
-      <SubmitButton />
+      <button type="submit" disabled={busy} className="btn-primary px-4 py-2">
+        {uploading ? "Uploading file…" : isPending ? "Saving…" : "Publish product"}
+      </button>
     </form>
   );
 }

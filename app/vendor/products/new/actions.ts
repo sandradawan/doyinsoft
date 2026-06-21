@@ -4,7 +4,6 @@ import { redirect } from "next/navigation";
 import { revalidatePath } from "next/cache";
 import { hasServiceRole, isSupabaseConfigured } from "@/lib/supabase/env";
 import { createAdminClient } from "@/lib/supabase/admin";
-import { SOFTWARE_BUCKET } from "@/lib/storage";
 import { getCurrentVendor } from "@/lib/auth";
 import type { Currency, Platform } from "@/lib/types";
 
@@ -21,9 +20,9 @@ function slugify(input: string): string {
 }
 
 /**
- * Create a product and upload its binary to the private Storage bucket.
- * Uses the service-role client (trusted server action) so it works before
- * vendor auth is wired; swap to the session client once auth is in place.
+ * Create a product. The binary is uploaded to Storage from the browser first
+ * (see product-form.tsx) — here we only receive the resulting file metadata,
+ * so the server action body stays tiny and the 1MB limit never applies.
  */
 export async function createProduct(
   _prev: CreateProductState,
@@ -36,7 +35,6 @@ export async function createProduct(
     };
   }
 
-  // Attribute the product to the signed-in vendor.
   const vendor = await getCurrentVendor();
   if (!vendor) return { error: "Please sign in as a vendor first." };
   const vendorId = vendor.id;
@@ -53,27 +51,13 @@ export async function createProduct(
     .map((s) => s.trim())
     .filter(Boolean);
 
-  const file = formData.get("file");
+  // File was already uploaded client-side; we just store its metadata.
+  const filePath = (formData.get("file_path") as string) || null;
+  const fileName = (formData.get("file_name") as string) || null;
+  const fileSizeRaw = formData.get("file_size");
+  const fileSize = fileSizeRaw ? Number(fileSizeRaw) : null;
+
   const admin = createAdminClient();
-
-  // 1) Upload the binary, if provided, into software/{vendorId}/{slug}/...
-  let filePath: string | null = null;
-  let fileName: string | null = null;
-  let fileSize: number | null = null;
-
-  if (file instanceof File && file.size > 0) {
-    fileName = file.name;
-    fileSize = file.size;
-    filePath = `${vendorId}/${slug}/${file.name}`;
-    const { error: uploadError } = await admin.storage
-      .from(SOFTWARE_BUCKET)
-      .upload(filePath, file, { upsert: true, contentType: file.type || undefined });
-    if (uploadError) {
-      return { error: `Upload failed: ${uploadError.message}` };
-    }
-  }
-
-  // 2) Insert the product row.
   const { error: insertError } = await admin.from("products").insert({
     slug,
     name,

@@ -4,7 +4,6 @@ import { redirect } from "next/navigation";
 import { revalidatePath } from "next/cache";
 import { hasServiceRole, isSupabaseConfigured } from "@/lib/supabase/env";
 import { createAdminClient } from "@/lib/supabase/admin";
-import { SOFTWARE_BUCKET } from "@/lib/storage";
 import { getCurrentVendor, requireVendor } from "@/lib/auth";
 import { getVendorProductById } from "@/lib/data";
 import type { Currency, Platform } from "@/lib/types";
@@ -31,16 +30,16 @@ export async function updateProduct(
 
   const admin = createAdminClient();
 
-  // Optional: replace the binary (new version upload).
+  // The new-version binary (if any) was uploaded to Storage from the browser;
+  // here we only persist its metadata.
   let filePatch: Record<string, unknown> = {};
-  const file = formData.get("file");
-  if (file instanceof File && file.size > 0) {
-    const filePath = `${vendor.id}/${existing.slug}/${file.name}`;
-    const { error: uploadError } = await admin.storage
-      .from(SOFTWARE_BUCKET)
-      .upload(filePath, file, { upsert: true, contentType: file.type || undefined });
-    if (uploadError) return { error: `Upload failed: ${uploadError.message}` };
-    filePatch = { file_path: filePath, file_name: file.name, file_size: file.size };
+  const filePath = (formData.get("file_path") as string) || "";
+  if (filePath) {
+    filePatch = {
+      file_path: filePath,
+      file_name: (formData.get("file_name") as string) || existing.file_name,
+      file_size: formData.get("file_size") ? Number(formData.get("file_size")) : existing.file_size,
+    };
   }
 
   const osBadges = String(formData.get("os_badges") ?? "")
@@ -83,7 +82,7 @@ export async function deleteProduct(formData: FormData) {
 
   const admin = createAdminClient();
   if (existing.file_path) {
-    await admin.storage.from(SOFTWARE_BUCKET).remove([existing.file_path]);
+    await admin.storage.from("software").remove([existing.file_path]);
   }
   await admin.from("products").delete().eq("id", id).eq("vendor_id", vendor.id);
 
