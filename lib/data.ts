@@ -127,13 +127,16 @@ const PRODUCT_SELECT =
 
 export async function getProducts(
   platform?: Platform,
-  search?: string
+  search?: string,
+  category?: string
 ): Promise<Product[]> {
   const q = search?.trim().toLowerCase();
+  const cat = category?.trim();
 
   if (!isSupabaseConfigured) {
     let list = (platform ? seedProducts.filter((p) => p.platform === platform) : seedProducts)
       .filter((p) => p.status === "approved");
+    if (cat) list = list.filter((p) => p.category === cat);
     if (q) {
       list = list.filter((p) =>
         [p.name, p.tagline, p.category, p.vendor.name]
@@ -152,6 +155,7 @@ export async function getProducts(
     .eq("status", "approved")
     .order("name");
   if (platform) query = query.eq("platform", platform);
+  if (cat) query = query.eq("category", cat);
   if (q) {
     const like = `%${q}%`;
     query = query.or(`name.ilike.${like},tagline.ilike.${like},category.ilike.${like}`);

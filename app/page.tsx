@@ -4,7 +4,7 @@ import { FilterPills } from "@/components/filter-pills";
 import { ProductCard } from "@/components/product-card";
 import { HeroCarousel } from "@/components/hero-carousel";
 import { Footer } from "@/components/footer";
-import { getProducts } from "@/lib/data";
+import { getCategories, getProducts } from "@/lib/data";
 import type { Platform } from "@/lib/types";
 
 const PLATFORMS: Platform[] = ["desktop", "mobile", "web"];
@@ -12,22 +12,37 @@ const PLATFORMS: Platform[] = ["desktop", "mobile", "web"];
 export default async function HomePage({
   searchParams,
 }: {
-  searchParams: Promise<{ platform?: string; q?: string }>;
+  searchParams: Promise<{ platform?: string; q?: string; category?: string }>;
 }) {
-  const { platform, q } = await searchParams;
+  const { platform, q, category } = await searchParams;
   const active = (platform as Platform | "all") ?? "all";
   const query = q?.trim() ?? "";
+  const activeCategory = category?.trim() ?? "";
 
   // "Free" is a price filter, not a platform; everything else filters by platform.
-  const all = await getProducts(
-    PLATFORMS.includes(active as Platform) ? (active as Platform) : undefined,
-    query
-  );
+  const [all, categories] = await Promise.all([
+    getProducts(
+      PLATFORMS.includes(active as Platform) ? (active as Platform) : undefined,
+      query,
+      activeCategory || undefined
+    ),
+    getCategories(),
+  ]);
   const products =
     active === "free" ? all.filter((p) => p.price_minor === 0) : all;
 
   // Show the slideshow only on the default storefront view.
-  const showHero = active === "all" && !query;
+  const showHero = active === "all" && !query && !activeCategory;
+
+  // Preserve other filters when switching category.
+  const catHref = (c: string) => {
+    const params = new URLSearchParams();
+    if (active !== "all") params.set("platform", active);
+    if (query) params.set("q", query);
+    if (c) params.set("category", c);
+    const qs = params.toString();
+    return qs ? `/?${qs}` : "/";
+  };
   // Prefer admin-featured products; fall back to top-rated if none are featured.
   const featuredFlagged = all.filter((p) => p.featured);
   const featured = (
@@ -59,9 +74,42 @@ export default async function HomePage({
 
       <FilterPills active={active === "free" ? "free" : active} />
 
-      {query && (
+      {/* Category filter */}
+      {categories.length > 0 && (
+        <div className="flex gap-2 flex-wrap mb-4 -mt-1">
+          <Link
+            href={catHref("")}
+            className={[
+              "text-[12px] px-3 py-[5px] rounded-md no-underline border transition-colors",
+              !activeCategory
+                ? "border-brand text-brand bg-brand-tint font-medium"
+                : "border-line text-ink-soft hover:border-line-strong hover:text-ink",
+            ].join(" ")}
+          >
+            All categories
+          </Link>
+          {categories.map((c) => (
+            <Link
+              key={c}
+              href={catHref(c)}
+              className={[
+                "text-[12px] px-3 py-[5px] rounded-md no-underline border transition-colors",
+                activeCategory === c
+                  ? "border-brand text-brand bg-brand-tint font-medium"
+                  : "border-line text-ink-soft hover:border-line-strong hover:text-ink",
+              ].join(" ")}
+            >
+              {c}
+            </Link>
+          ))}
+        </div>
+      )}
+
+      {(query || activeCategory) && (
         <p className="text-[12px] text-ink-soft mb-3">
-          {products.length} result{products.length === 1 ? "" : "s"} for &ldquo;{query}&rdquo; ·{" "}
+          {products.length} result{products.length === 1 ? "" : "s"}
+          {query ? ` for “${query}”` : ""}
+          {activeCategory ? ` in ${activeCategory}` : ""} ·{" "}
           <Link href="/" className="text-brand no-underline hover:underline">
             Clear
           </Link>
