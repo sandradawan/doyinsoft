@@ -12,6 +12,15 @@ export interface EditProductState {
   error?: string;
 }
 
+function fileNameFromUrl(url: string): string | null {
+  try {
+    const last = new URL(url).pathname.split("/").filter(Boolean).pop();
+    return last && last.includes(".") ? decodeURIComponent(last) : null;
+  } catch {
+    return null;
+  }
+}
+
 const NEED_SUPABASE =
   "Editing products needs a connected Supabase project with a service-role key.";
 
@@ -30,17 +39,17 @@ export async function updateProduct(
 
   const admin = createAdminClient();
 
-  // The new-version binary (if any) was uploaded to Storage from the browser;
-  // here we only persist its metadata.
-  let filePatch: Record<string, unknown> = {};
-  const filePath = (formData.get("file_path") as string) || "";
-  if (filePath) {
-    filePatch = {
-      file_path: filePath,
-      file_name: (formData.get("file_name") as string) || existing.file_name,
-      file_size: formData.get("file_size") ? Number(formData.get("file_size")) : existing.file_size,
-    };
+  // External download link (vendor-hosted).
+  const downloadUrl = String(formData.get("download_url") ?? "").trim();
+  if (downloadUrl && !/^https?:\/\//i.test(downloadUrl)) {
+    return { error: "The download link must start with http:// or https://" };
   }
+  const fileSizeMb = formData.get("file_size_mb");
+  const filePatch: Record<string, unknown> = {
+    file_path: downloadUrl || null,
+    file_name: downloadUrl ? fileNameFromUrl(downloadUrl) ?? existing.file_name : null,
+    file_size: fileSizeMb ? Math.round(Number(fileSizeMb) * 1024 * 1024) : null,
+  };
 
   const osBadges = String(formData.get("os_badges") ?? "")
     .split(",")
@@ -81,7 +90,8 @@ export async function deleteProduct(formData: FormData) {
   if (!existing) redirect("/vendor/products");
 
   const admin = createAdminClient();
-  if (existing.file_path) {
+  // Only remove from Storage if it was a stored file (legacy), not an external link.
+  if (existing.file_path && !/^https?:\/\//i.test(existing.file_path)) {
     await admin.storage.from("software").remove([existing.file_path]);
   }
   await admin.from("products").delete().eq("id", id).eq("vendor_id", vendor.id);

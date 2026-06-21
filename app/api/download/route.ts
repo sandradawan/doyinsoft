@@ -33,18 +33,28 @@ export async function GET(request: Request) {
 
   const product = await getProductBySlug(license.product.slug);
 
-  // Real file in private storage → mint a signed URL and redirect to it.
+  async function countDownload() {
+    if (product && hasServiceRole) {
+      await createAdminClient()
+        .rpc("increment_download", { p_product_id: product.id })
+        .then(() => undefined, () => undefined);
+    }
+  }
+
+  // External vendor-hosted link → redirect to it (gated by the license above).
+  if (product?.file_path && /^https?:\/\//i.test(product.file_path)) {
+    await countDownload();
+    return NextResponse.redirect(product.file_path);
+  }
+
+  // Legacy: real file in private storage → mint a signed URL and redirect.
   if (product?.file_path) {
     const signed = await getSignedDownloadUrl(
       product.file_path,
       product.file_name ?? undefined
     );
     if (signed) {
-      if (hasServiceRole) {
-        await createAdminClient()
-          .rpc("increment_download", { p_product_id: product.id })
-          .then(() => undefined, () => undefined);
-      }
+      await countDownload();
       return NextResponse.redirect(signed);
     }
   }

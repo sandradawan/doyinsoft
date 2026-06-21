@@ -19,6 +19,16 @@ function slugify(input: string): string {
     .replace(/^-+|-+$/g, "");
 }
 
+/** Best-effort display filename from a download URL. */
+function fileNameFromUrl(url: string): string | null {
+  try {
+    const last = new URL(url).pathname.split("/").filter(Boolean).pop();
+    return last && last.includes(".") ? decodeURIComponent(last) : null;
+  } catch {
+    return null;
+  }
+}
+
 /**
  * Create a product. The binary is uploaded to Storage from the browser first
  * (see product-form.tsx) — here we only receive the resulting file metadata,
@@ -51,11 +61,15 @@ export async function createProduct(
     .map((s) => s.trim())
     .filter(Boolean);
 
-  // File was already uploaded client-side; we just store its metadata.
-  const filePath = (formData.get("file_path") as string) || null;
-  const fileName = (formData.get("file_name") as string) || null;
-  const fileSizeRaw = formData.get("file_size");
-  const fileSize = fileSizeRaw ? Number(fileSizeRaw) : null;
+  // External download link (vendor-hosted). Stored in file_path.
+  const downloadUrl = String(formData.get("download_url") ?? "").trim();
+  if (downloadUrl && !/^https?:\/\//i.test(downloadUrl)) {
+    return { error: "The download link must start with http:// or https://" };
+  }
+  const filePath = downloadUrl || null;
+  const fileName = downloadUrl ? fileNameFromUrl(downloadUrl) : null;
+  const fileSizeMb = formData.get("file_size_mb");
+  const fileSize = fileSizeMb ? Math.round(Number(fileSizeMb) * 1024 * 1024) : null;
 
   const admin = createAdminClient();
   const { error: insertError } = await admin.from("products").insert({

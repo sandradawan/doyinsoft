@@ -28,7 +28,7 @@ export default async function EditProductPage({
       <p className="text-[13px] text-ink-soft m-0 mb-6">
         Update details, publish a new version, or remove the product.
       </p>
-      <EditProductForm product={product} vendorId={vendor.id} />
+      <EditProductForm product={product} />
     </VendorShell>
   );
 }

@@ -1,65 +1,38 @@
 "use client";
 
-import { startTransition, useActionState, useState } from "react";
-import { resumableUpload } from "@/lib/resumable-upload";
-import { formatBytes } from "@/lib/format";
+import { useActionState } from "react";
+import { useFormStatus } from "react-dom";
 import type { Product } from "@/lib/types";
 import { deleteProduct, updateProduct, type EditProductState } from "./actions";
 
 const labelCls = "block text-[12px] font-medium m-0 mb-[6px]";
 const hintCls = "text-[11px] text-ink-faint mt-1";
 
-export function EditProductForm({
-  product,
-  vendorId,
-}: {
-  product: Product;
-  vendorId: string;
-}) {
-  const [state, formAction, isPending] = useActionState<EditProductState, FormData>(
-    updateProduct,
-    {}
+function SaveButton() {
+  const { pending } = useFormStatus();
+  return (
+    <button type="submit" disabled={pending} className="btn-primary px-4 py-2">
+      {pending ? "Saving…" : "Save changes"}
+    </button>
   );
-  const [uploading, setUploading] = useState(false);
-  const [progress, setProgress] = useState(0);
-  const [uploadError, setUploadError] = useState<string | null>(null);
+}
 
-  async function onSubmit(e: React.FormEvent<HTMLFormElement>) {
-    e.preventDefault();
-    const fd = new FormData(e.currentTarget);
-    const file = fd.get("file");
-    fd.delete("file");
+export function EditProductForm({ product }: { product: Product }) {
+  const [state, action] = useActionState<EditProductState, FormData>(updateProduct, {});
 
-    if (file instanceof File && file.size > 0) {
-      setUploading(true);
-      setProgress(0);
-      setUploadError(null);
-      const safe = file.name.replace(/[^a-zA-Z0-9._-]/g, "_");
-      const path = `${vendorId}/${product.slug}/${Date.now()}-${safe}`;
-      try {
-        await resumableUpload({ path, file, onProgress: setProgress });
-        fd.set("file_path", path);
-        fd.set("file_name", file.name);
-        fd.set("file_size", String(file.size));
-      } catch (err) {
-        setUploading(false);
-        setUploadError(err instanceof Error ? err.message : "Upload failed.");
-        return;
-      }
-      setUploading(false);
-    }
-
-    startTransition(() => formAction(fd));
-  }
-
-  const busy = uploading || isPending;
+  const currentUrl = product.file_path && /^https?:\/\//i.test(product.file_path)
+    ? product.file_path
+    : "";
+  const currentSizeMb = product.file_size
+    ? Math.round(product.file_size / (1024 * 1024))
+    : "";
 
   return (
     <div className="max-w-xl">
-      <form onSubmit={onSubmit}>
-        {(state.error || uploadError) && (
+      <form action={action}>
+        {state.error && (
           <p className="text-[12px] text-info bg-info-bg rounded-md px-3 py-2 mb-4">
-            {uploadError ?? state.error}
+            {state.error}
           </p>
         )}
 
@@ -146,35 +119,35 @@ export function EditProductForm({
           />
         </div>
 
-        <div className="mb-6">
-          <label className={labelCls}>Replace software file (optional)</label>
+        <div className="mb-2">
+          <label className={labelCls}>Download link</label>
           <input
-            name="file"
-            type="file"
-            className="field w-full text-[12px] file:mr-3 file:border-0 file:bg-muted file:text-ink file:rounded-md file:px-3 file:py-1 file:text-[12px]"
+            name="download_url"
+            type="url"
+            defaultValue={currentUrl}
+            className="field w-full"
+            placeholder="https://…"
           />
           <p className={hintCls}>
-            {product.file_name
-              ? `Current: ${product.file_name} (${formatBytes(product.file_size)}). Upload to publish a new version.`
-              : "No file uploaded yet. Add one so buyers can download."}
+            Direct-download link to your installer. Buyers see it only after purchase.
           </p>
         </div>
 
-        <button type="submit" disabled={busy} className="btn-primary px-4 py-2">
-          {uploading
-            ? `Uploading… ${progress}%`
-            : isPending
-              ? "Saving…"
-              : "Save changes"}
-        </button>
-        {uploading && (
-          <div className="mt-3 h-1.5 w-full max-w-xs rounded-full bg-muted overflow-hidden">
-            <div
-              className="h-full bg-brand transition-all"
-              style={{ width: `${progress}%` }}
-            />
-          </div>
-        )}
+        <div className="mb-6 max-w-[200px]">
+          <label className={labelCls}>File size (MB)</label>
+          <input
+            name="file_size_mb"
+            type="number"
+            min="0"
+            step="1"
+            defaultValue={currentSizeMb}
+            className="field w-full"
+            placeholder="700"
+          />
+          <p className={hintCls}>Optional — shown to buyers.</p>
+        </div>
+
+        <SaveButton />
       </form>
 
       {/* Delete — separate form, with a confirm guard. */}
@@ -186,9 +159,7 @@ export function EditProductForm({
         }}
       >
         <input type="hidden" name="id" value={product.id} />
-        <p className="text-[12px] text-ink-soft m-0 mb-2">
-          Remove this product and its file permanently.
-        </p>
+        <p className="text-[12px] text-ink-soft m-0 mb-2">Remove this product permanently.</p>
         <button
           type="submit"
           className="text-[13px] text-info bg-info-bg rounded-md px-3 py-2 border-0 cursor-pointer hover:opacity-90"

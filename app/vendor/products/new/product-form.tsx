@@ -1,70 +1,29 @@
 "use client";
 
-import { startTransition, useActionState, useState } from "react";
-import { resumableUpload } from "@/lib/resumable-upload";
+import { useActionState } from "react";
+import { useFormStatus } from "react-dom";
 import { createProduct, type CreateProductState } from "./actions";
 
 const labelCls = "block text-[12px] font-medium m-0 mb-[6px]";
 const hintCls = "text-[11px] text-ink-faint mt-1";
 
-function slugify(input: string): string {
-  return input
-    .toLowerCase()
-    .trim()
-    .replace(/[^a-z0-9]+/g, "-")
-    .replace(/^-+|-+$/g, "");
+function SubmitButton() {
+  const { pending } = useFormStatus();
+  return (
+    <button type="submit" disabled={pending} className="btn-primary px-4 py-2">
+      {pending ? "Saving…" : "Publish product"}
+    </button>
+  );
 }
 
-export function ProductForm({ vendorId }: { vendorId: string }) {
-  const [state, formAction, isPending] = useActionState<CreateProductState, FormData>(
-    createProduct,
-    {}
-  );
-  const [uploading, setUploading] = useState(false);
-  const [progress, setProgress] = useState(0);
-  const [uploadError, setUploadError] = useState<string | null>(null);
-
-  async function onSubmit(e: React.FormEvent<HTMLFormElement>) {
-    e.preventDefault();
-    const form = e.currentTarget;
-    const fd = new FormData(form);
-    const file = fd.get("file");
-    fd.delete("file"); // never send the binary through the server action
-
-    const name = String(fd.get("name") ?? "").trim();
-    const slug = slugify(String(fd.get("slug") || name));
-    fd.set("slug", slug);
-
-    // Resumable (chunked) upload — handles large files reliably with progress.
-    if (file instanceof File && file.size > 0) {
-      setUploading(true);
-      setProgress(0);
-      setUploadError(null);
-      const safe = file.name.replace(/[^a-zA-Z0-9._-]/g, "_");
-      const path = `${vendorId}/${slug}/${Date.now()}-${safe}`;
-      try {
-        await resumableUpload({ path, file, onProgress: setProgress });
-        fd.set("file_path", path);
-        fd.set("file_name", file.name);
-        fd.set("file_size", String(file.size));
-      } catch (err) {
-        setUploading(false);
-        setUploadError(err instanceof Error ? err.message : "Upload failed.");
-        return;
-      }
-      setUploading(false);
-    }
-
-    startTransition(() => formAction(fd));
-  }
-
-  const busy = uploading || isPending;
+export function ProductForm() {
+  const [state, action] = useActionState<CreateProductState, FormData>(createProduct, {});
 
   return (
-    <form onSubmit={onSubmit} className="max-w-xl">
-      {(state.error || uploadError) && (
+    <form action={action} className="max-w-xl">
+      {state.error && (
         <p className="text-[12px] text-info bg-info-bg rounded-md px-3 py-2 mb-4">
-          {uploadError ?? state.error}
+          {state.error}
         </p>
       )}
 
@@ -156,34 +115,36 @@ export function ProductForm({ vendorId }: { vendorId: string }) {
         />
       </div>
 
-      <div className="mb-6">
-        <label className={labelCls}>Software file</label>
+      {/* Download link instead of an upload — handles any file size, free. */}
+      <div className="mb-2">
+        <label className={labelCls}>Download link</label>
         <input
-          name="file"
-          type="file"
-          className="field w-full text-[12px] file:mr-3 file:border-0 file:bg-muted file:text-ink file:rounded-md file:px-3 file:py-1 file:text-[12px]"
+          name="download_url"
+          type="url"
+          className="field w-full"
+          placeholder="https://drive.google.com/uc?export=download&id=…"
         />
         <p className={hintCls}>
-          The installer or archive buyers download. Uploaded directly and stored
-          privately; delivered via a signed link only after purchase. Large files are fine.
+          A direct-download link to your installer — Google Drive, Dropbox, GitHub release,
+          etc. Buyers only see it after purchase. Use a &ldquo;direct download&rdquo; link
+          (not a preview page) so the file downloads on click.
         </p>
       </div>
 
-      <button type="submit" disabled={busy} className="btn-primary px-4 py-2">
-        {uploading
-          ? `Uploading… ${progress}%`
-          : isPending
-            ? "Saving…"
-            : "Publish product"}
-      </button>
-      {uploading && (
-        <div className="mt-3 h-1.5 w-full max-w-xs rounded-full bg-muted overflow-hidden">
-          <div
-            className="h-full bg-brand transition-all"
-            style={{ width: `${progress}%` }}
-          />
-        </div>
-      )}
+      <div className="mb-6 max-w-[200px]">
+        <label className={labelCls}>File size (MB)</label>
+        <input
+          name="file_size_mb"
+          type="number"
+          min="0"
+          step="1"
+          className="field w-full"
+          placeholder="700"
+        />
+        <p className={hintCls}>Optional — shown to buyers.</p>
+      </div>
+
+      <SubmitButton />
     </form>
   );
 }
