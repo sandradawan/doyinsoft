@@ -9,6 +9,7 @@ import { createAdminClient } from "./supabase/admin";
 import { hasServiceRole, isSupabaseConfigured } from "./supabase/env";
 import { deterministicLicenseKey, generateLicenseKey } from "./license";
 import { emailLayout, sendEmail } from "./email";
+import { getSettings } from "./settings";
 
 const SITE_URL = process.env.NEXT_PUBLIC_SITE_URL ?? "http://localhost:3000";
 import {
@@ -48,6 +49,7 @@ interface VendorRow {
   initials: string;
   verified: boolean;
   suspended?: boolean;
+  whatsapp?: string | null;
 }
 
 interface ProductRow {
@@ -85,6 +87,7 @@ function mapVendor(v: VendorRow): Vendor {
     initials: v.initials,
     verified: v.verified,
     suspended: v.suspended ?? false,
+    whatsapp: v.whatsapp ?? null,
   };
 }
 
@@ -121,7 +124,7 @@ function mapProduct(row: ProductRow): Product {
 }
 
 const PRODUCT_SELECT =
-  "id, slug, name, price_minor, currency, platform, category, tagline, description, system_requirements, os_badges, version, file_path, file_name, file_size, download_count, rating_avg, rating_count, icon_url, screenshots, status, featured, rejection_reason, vendor:vendors(id, slug, name, initials, verified, suspended)";
+  "id, slug, name, price_minor, currency, platform, category, tagline, description, system_requirements, os_badges, version, file_path, file_name, file_size, download_count, rating_avg, rating_count, icon_url, screenshots, status, featured, rejection_reason, vendor:vendors(id, slug, name, initials, verified, suspended, whatsapp)";
 
 // ---- Public queries ----------------------------------------------------------
 
@@ -814,7 +817,7 @@ export async function issueLicenseForOrder(
   // Look up the order to get the product, then mark it paid and mint the key.
   const { data: order } = await admin
     .from("orders")
-    .select("id, product_id")
+    .select("id, product_id, amount_minor, affiliate_id")
     .eq("id", orderId)
     .maybeSingle();
   if (!order) return null;
@@ -823,6 +826,17 @@ export async function issueLicenseForOrder(
     .from("orders")
     .update({ status: "paid", ...(reference ? { reference } : {}) })
     .eq("id", orderId);
+
+  // Credit the referring affiliate (idempotent via unique index on order_id).
+  const o = order as { amount_minor: number; affiliate_id: string | null };
+  if (o.affiliate_id) {
+    const { affiliate_percent } = await getSettings();
+    const commission = Math.round((o.amount_minor * affiliate_percent) / 100);
+    await admin
+      .from("referrals")
+      .insert({ affiliate_id: o.affiliate_id, order_id: orderId, amount_minor: commission })
+      .then(() => undefined, () => undefined);
+  }
 
   const { data: inserted } = await admin
     .from("licenses")

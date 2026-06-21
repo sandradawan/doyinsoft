@@ -21,6 +21,9 @@ export function Footer() {
           <Link href="/downloads" className="text-ink-soft no-underline hover:text-ink">
             Downloads
           </Link>
+          <Link href="/affiliate" className="text-brand no-underline hover:underline">
+            Earn (affiliate)
+          </Link>
         </nav>
       </div>
       <p className="text-[11px] text-ink-faint mt-4 m-0">

@@ -4,8 +4,11 @@ import { notFound } from "next/navigation";
 import { getProductBySlug, getProducts, getReviews } from "@/lib/data";
 import { ProductCard } from "@/components/product-card";
 import { Stars } from "@/components/stars";
+import { WhatsAppButton } from "@/components/whatsapp-button";
 import { formatBytes, formatPrice } from "@/lib/format";
 import { ReviewForm } from "./review-form";
+
+const SITE_URL = process.env.NEXT_PUBLIC_SITE_URL ?? "http://localhost:3000";
 
 function shortDate(iso: string): string {
   if (!iso) return "";
@@ -218,6 +221,21 @@ export default async function ProductDetailPage({
               </p>
             </div>
           </Link>
+
+          {/* Share + contact */}
+          <div className="flex flex-wrap gap-2 mt-3">
+            <WhatsAppButton
+              text={`${product.name} on DoyinSoft — ${SITE_URL}/products/${product.slug}`}
+              label="Share"
+            />
+            {product.vendor.whatsapp && (
+              <WhatsAppButton
+                phone={product.vendor.whatsapp}
+                text={`Hi, I'm interested in ${product.name} on DoyinSoft.`}
+                label="Chat vendor"
+              />
+            )}
+          </div>
         </div>
       </div>
 

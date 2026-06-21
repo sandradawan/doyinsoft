@@ -211,10 +211,12 @@ export async function updateSettingsAction(
   if (!hasServiceRole) return { error: "Settings need a connected Supabase project." };
   const commission = Number(formData.get("commission_percent"));
   const usd = Number(formData.get("usd_to_ngn"));
+  const affiliate = Number(formData.get("affiliate_percent"));
   if (!(commission >= 0 && commission < 100)) return { error: "Commission must be 0–99%." };
   if (!(usd > 0)) return { error: "USD→NGN rate must be greater than 0." };
-  await saveSettings({ commission_percent: commission, usd_to_ngn: usd });
-  await logAudit(adminEmail, "update_settings", "settings", undefined, `commission=${commission} usd=${usd}`);
+  if (!(affiliate >= 0 && affiliate < 100)) return { error: "Affiliate % must be 0–99%." };
+  await saveSettings({ commission_percent: commission, usd_to_ngn: usd, affiliate_percent: affiliate });
+  await logAudit(adminEmail, "update_settings", "settings", undefined, `commission=${commission} usd=${usd} affiliate=${affiliate}`);
   revalidatePath("/admin/settings");
   return { success: "Settings saved." };
 }

@@ -1,10 +1,12 @@
 "use server";
 
 import { redirect } from "next/navigation";
+import { cookies } from "next/headers";
 import { hasServiceRole } from "@/lib/supabase/env";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { getOrderById, getProductBySlug, getVendorSubaccountCode } from "@/lib/data";
 import { getSettings } from "@/lib/settings";
+import { resolveAffiliateId } from "@/lib/affiliate";
 import type { Currency, Gateway } from "@/lib/types";
 
 const PAYSTACK_SECRET = process.env.PAYSTACK_SECRET_KEY ?? "";
@@ -43,6 +45,10 @@ export async function startCheckout(
     ? await getVendorSubaccountCode(product.vendor.id)
     : null;
 
+  // Affiliate attribution from the ?ref cookie.
+  const refCode = (await cookies()).get("ref")?.value;
+  const affiliateId = refCode ? await resolveAffiliateId(refCode) : null;
+
   // Persist a real pending order via the service role (buyers aren't logged in,
   // so this trusted server action creates the order, not the anon client).
   if (hasServiceRole && orderId === "new" && product) {
@@ -58,6 +64,7 @@ export async function startCheckout(
         currency: chargeCurrency,
         status: "pending",
         gateway: input.gateway,
+        affiliate_id: affiliateId,
       })
       .select("id")
       .single();

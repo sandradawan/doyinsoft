@@ -50,6 +50,19 @@ export function SettingsForm({ vendor }: { vendor: SessionVendor }) {
         <p className={hintCls}>Up to 2 letters. Leave blank to derive from the name.</p>
       </div>
 
+      <div className="mb-4">
+        <label className={labelCls}>WhatsApp number</label>
+        <input
+          name="whatsapp"
+          defaultValue={vendor.whatsapp ?? ""}
+          className="field w-full"
+          placeholder="+234 801 234 5678"
+        />
+        <p className={hintCls}>
+          Shown as a &ldquo;Chat vendor&rdquo; button on your products. Include the country code.
+        </p>
+      </div>
+
       <div className="mb-5">
         <label className={labelCls}>Email</label>
         <input value={vendor.email} disabled className="field w-full opacity-70" />

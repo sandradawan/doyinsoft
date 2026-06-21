@@ -30,7 +30,7 @@ export async function getCurrentVendor(): Promise<SessionVendor | null> {
 
   const { data } = await supabase
     .from("vendors")
-    .select("id, slug, name, initials, verified")
+    .select("id, slug, name, initials, verified, whatsapp")
     .eq("owner", user.id)
     .maybeSingle();
   if (!data) return null;
@@ -43,4 +43,27 @@ export async function requireVendor(): Promise<SessionVendor> {
   const vendor = await getCurrentVendor();
   if (!vendor) redirect("/sign-in?next=/vendor/dashboard");
   return vendor;
+}
+
+export interface SessionUser {
+  id: string;
+  email: string;
+}
+
+/** Any signed-in user (vendor or not) — used for affiliate accounts. */
+export async function getCurrentUser(): Promise<SessionUser | null> {
+  if (!isSupabaseConfigured) {
+    return { id: "demo-user", email: "demo@doyinsoft.dev" };
+  }
+  const supabase = await createClient();
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+  return user ? { id: user.id, email: user.email ?? "" } : null;
+}
+
+export async function requireUser(next = "/affiliate"): Promise<SessionUser> {
+  const user = await getCurrentUser();
+  if (!user) redirect(`/sign-in?next=${next}`);
+  return user;
 }

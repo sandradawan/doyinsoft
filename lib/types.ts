@@ -14,6 +14,8 @@ export interface Vendor {
   verified: boolean;
   /** Banned vendors: their products are hidden and they can't publish. */
   suspended?: boolean;
+  /** WhatsApp number (digits, intl) for buyer contact. */
+  whatsapp?: string | null;
 }
 
 export interface Product {

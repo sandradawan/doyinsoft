@@ -19,9 +19,11 @@ function SaveButton() {
 export function SettingsForm({
   commission,
   usd,
+  affiliate,
 }: {
   commission: number;
   usd: number;
+  affiliate: number;
 }) {
   const [state, action] = useActionState<SettingsState, FormData>(updateSettingsAction, {});
 
@@ -50,7 +52,7 @@ export function SettingsForm({
         <p className={hintCls}>Applies to vendors who connect their bank after this change.</p>
       </div>
 
-      <div className="mb-5">
+      <div className="mb-4">
         <label className={labelCls}>USD → NGN rate</label>
         <input
           name="usd_to_ngn"
@@ -61,6 +63,20 @@ export function SettingsForm({
           className="field w-32"
         />
         <p className={hintCls}>Used to charge USD-priced products in NGN at checkout.</p>
+      </div>
+
+      <div className="mb-5">
+        <label className={labelCls}>Affiliate commission (%)</label>
+        <input
+          name="affiliate_percent"
+          type="number"
+          min="0"
+          max="99"
+          step="1"
+          defaultValue={affiliate}
+          className="field w-32"
+        />
+        <p className={hintCls}>Share of each referred sale paid to the affiliate.</p>
       </div>
 
       <SaveButton />

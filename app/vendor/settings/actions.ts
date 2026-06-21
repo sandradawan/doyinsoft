@@ -27,10 +27,12 @@ export async function updateVendor(
   const initialsInput = String(formData.get("initials") ?? "").trim().toUpperCase();
   const initials = (initialsInput || initialsOf(name) || "V").slice(0, 2);
 
+  const whatsapp = String(formData.get("whatsapp") ?? "").trim();
+
   const supabase = await createClient();
   const { error } = await supabase
     .from("vendors")
-    .update({ name, initials })
+    .update({ name, initials, whatsapp: whatsapp || null })
     .eq("id", vendor.id);
   if (error) return { error: error.message };
 
