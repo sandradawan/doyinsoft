@@ -28,10 +28,15 @@ create table if not exists vendors (
   verified               boolean not null default false,
   owner                  uuid references auth.users (id) on delete set null,
   payout_bank            text,
+  payout_bank_code       text,
   payout_account_name    text,
   payout_account_number  text,
+  subaccount_code        text,
   created_at             timestamptz not null default now()
 );
+-- For databases created before commission support:
+alter table vendors add column if not exists payout_bank_code text;
+alter table vendors add column if not exists subaccount_code  text;
 
 create table if not exists products (
   id                  uuid primary key default gen_random_uuid(),

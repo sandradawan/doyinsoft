@@ -1,9 +1,10 @@
 import { VendorShell } from "@/components/vendor-shell";
-import { getPayoutDetails, getPayouts, getPayoutSummary } from "@/lib/data";
+import { getPayouts, getPayoutSummary, getVendorSubaccount } from "@/lib/data";
 import { requireVendor } from "@/lib/auth";
 import { formatPrice } from "@/lib/format";
+import { listPaystackBanks, PLATFORM_COMMISSION_PERCENT } from "@/lib/paystack";
 import type { PayoutStatus } from "@/lib/types";
-import { PayoutDetailsForm, RequestPayoutButton } from "./payouts-client";
+import { ConnectPayoutsForm } from "./payouts-client";
 
 function shortDate(iso: string): string {
   if (!iso) return "—";
@@ -22,10 +23,11 @@ const PAYOUT_BADGE: Record<PayoutStatus, string> = {
 
 export default async function VendorPayoutsPage() {
   const vendor = await requireVendor();
-  const [summary, payouts, details] = await Promise.all([
+  const [summary, payouts, subaccount, banks] = await Promise.all([
     getPayoutSummary(vendor.id),
     getPayouts(vendor.id),
-    getPayoutDetails(vendor.id),
+    getVendorSubaccount(vendor.id),
+    listPaystackBanks(),
   ]);
 
   const cards = [
@@ -39,7 +41,7 @@ export default async function VendorPayoutsPage() {
       <p className="text-[13px] font-medium m-0 mb-3">Payouts</p>
 
       {/* Balance cards */}
-      <div className="grid [grid-template-columns:repeat(3,1fr)] gap-3 mb-4">
+      <div className="grid [grid-template-columns:repeat(3,1fr)] gap-3 mb-3">
         {cards.map((c) => (
           <div key={c.label} className="bg-muted rounded-md p-4">
             <p className="text-[13px] text-ink-soft m-0 mb-[6px]">{c.label}</p>
@@ -48,11 +50,24 @@ export default async function VendorPayoutsPage() {
         ))}
       </div>
 
+      <p className="text-[11px] text-ink-faint mb-8">
+        DoyinSoft keeps {PLATFORM_COMMISSION_PERCENT}% commission per sale. The rest is settled
+        to your connected bank automatically by Paystack — no manual withdrawals needed.
+      </p>
+
+      {/* Payout account (Paystack subaccount) */}
+      <p className="text-[13px] font-medium m-0 mb-1">Payout account</p>
+      <p className="text-[12px] text-ink-soft m-0 mb-3">
+        Connect the bank where your earnings should land.
+      </p>
       <div className="mb-8">
-        <RequestPayoutButton canWithdraw={summary.available_minor > 0} />
-        <p className="text-[11px] text-ink-faint mt-2 mb-0">
-          Cleared funds are sent to the bank account below, usually within 1–2 business days.
-        </p>
+        <ConnectPayoutsForm
+          banks={banks}
+          connected={subaccount.connected}
+          accountNumber={subaccount.account_number}
+          bankCode={subaccount.bank_code}
+          commission={PLATFORM_COMMISSION_PERCENT}
+        />
       </div>
 
       {/* Payout history */}
@@ -83,10 +98,6 @@ export default async function VendorPayoutsPage() {
           ))}
         </div>
       )}
-
-      {/* Withdrawal details */}
-      <p className="text-[13px] font-medium m-0 mb-2">Withdrawal account</p>
-      <PayoutDetailsForm details={details} />
     </VendorShell>
   );
 }

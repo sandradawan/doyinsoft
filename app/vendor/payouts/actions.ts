@@ -2,13 +2,67 @@
 
 import { revalidatePath } from "next/cache";
 import { createClient } from "@/lib/supabase/server";
-import { isSupabaseConfigured } from "@/lib/supabase/env";
+import { hasServiceRole, isSupabaseConfigured } from "@/lib/supabase/env";
+import { createAdminClient } from "@/lib/supabase/admin";
 import { getCurrentVendor } from "@/lib/auth";
 import { getPayoutSummary } from "@/lib/data";
+import { createPaystackSubaccount, isPaystackConfigured } from "@/lib/paystack";
 
 export interface PayoutState {
   error?: string;
   success?: string;
+}
+
+/**
+ * Connect the vendor's bank by creating a Paystack subaccount. Once connected,
+ * each sale is split automatically — the vendor's share settles to this bank.
+ */
+export async function connectPayouts(
+  _prev: PayoutState,
+  formData: FormData
+): Promise<PayoutState> {
+  if (!isPaystackConfigured || !hasServiceRole) {
+    return {
+      error:
+        "Connecting payouts needs Paystack keys and a Supabase service-role key in the environment.",
+    };
+  }
+  const vendor = await getCurrentVendor();
+  if (!vendor) return { error: "Please sign in first." };
+
+  const bankCode = String(formData.get("bank_code") ?? "").trim();
+  const bankName = String(formData.get("bank_name") ?? "").trim();
+  const accountNumber = String(formData.get("account_number") ?? "").trim();
+  const accountName = String(formData.get("account_name") ?? "").trim();
+
+  if (!bankCode || accountNumber.length < 10) {
+    return { error: "Choose your bank and enter a valid 10-digit account number." };
+  }
+
+  const sub = await createPaystackSubaccount({
+    businessName: vendor.name,
+    bankCode,
+    accountNumber,
+  });
+  if (sub.error || !sub.code) {
+    return { error: sub.error ?? "Could not connect your bank." };
+  }
+
+  const admin = createAdminClient();
+  const { error } = await admin
+    .from("vendors")
+    .update({
+      subaccount_code: sub.code,
+      payout_bank: bankName,
+      payout_bank_code: bankCode,
+      payout_account_name: accountName,
+      payout_account_number: accountNumber,
+    })
+    .eq("id", vendor.id);
+  if (error) return { error: error.message };
+
+  revalidatePath("/vendor/payouts");
+  return { success: "Bank connected — your sales now settle automatically." };
 }
 
 export async function updatePayoutDetails(

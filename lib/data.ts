@@ -325,6 +325,35 @@ export async function getPayouts(vendorId = DEMO_VENDOR_ID): Promise<Payout[]> {
   return data as unknown as Payout[];
 }
 
+export async function getVendorSubaccount(
+  vendorId = DEMO_VENDOR_ID
+): Promise<{ connected: boolean; account_number: string | null; bank_code: string | null }> {
+  if (!hasServiceRole) return { connected: false, account_number: null, bank_code: null };
+  const admin = createAdminClient();
+  const { data } = await admin
+    .from("vendors")
+    .select("subaccount_code, payout_account_number, payout_bank_code")
+    .eq("id", vendorId)
+    .maybeSingle();
+  return {
+    connected: Boolean(data?.subaccount_code),
+    account_number: data?.payout_account_number ?? null,
+    bank_code: data?.payout_bank_code ?? null,
+  };
+}
+
+/** Subaccount code used to split a checkout payment to the vendor. */
+export async function getVendorSubaccountCode(vendorId: string): Promise<string | null> {
+  if (!hasServiceRole) return null;
+  const admin = createAdminClient();
+  const { data } = await admin
+    .from("vendors")
+    .select("subaccount_code")
+    .eq("id", vendorId)
+    .maybeSingle();
+  return (data?.subaccount_code as string | null) ?? null;
+}
+
 export async function getPayoutDetails(
   vendorId = DEMO_VENDOR_ID
 ): Promise<PayoutDetails> {

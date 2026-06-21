@@ -3,7 +3,7 @@
 import { redirect } from "next/navigation";
 import { hasServiceRole } from "@/lib/supabase/env";
 import { createAdminClient } from "@/lib/supabase/admin";
-import { getOrderById, getProductBySlug } from "@/lib/data";
+import { getOrderById, getProductBySlug, getVendorSubaccountCode } from "@/lib/data";
 import { toNgnCharge } from "@/lib/money";
 import type { Currency, Gateway } from "@/lib/types";
 
@@ -34,28 +34,32 @@ export async function startCheckout(
   const chargeMinor = toNgnCharge(input.amountMinor, input.currency);
   const chargeCurrency: Currency = "NGN";
 
+  const product = input.productSlug ? await getProductBySlug(input.productSlug) : null;
+
+  // The vendor's Paystack subaccount → enables automatic commission split.
+  const subaccountCode = product
+    ? await getVendorSubaccountCode(product.vendor.id)
+    : null;
+
   // Persist a real pending order via the service role (buyers aren't logged in,
   // so this trusted server action creates the order, not the anon client).
-  if (hasServiceRole && orderId === "new" && input.productSlug) {
-    const product = await getProductBySlug(input.productSlug);
-    if (product) {
-      const admin = createAdminClient();
-      const { data } = await admin
-        .from("orders")
-        .insert({
-          product_id: product.id,
-          vendor_id: product.vendor.id,
-          buyer_name: input.email.split("@")[0] || "Guest",
-          buyer_initials: (input.email[0] ?? "G").toUpperCase(),
-          amount_minor: chargeMinor,
-          currency: chargeCurrency,
-          status: "pending",
-          gateway: input.gateway,
-        })
-        .select("id")
-        .single();
-      if (data?.id) orderId = data.id;
-    }
+  if (hasServiceRole && orderId === "new" && product) {
+    const admin = createAdminClient();
+    const { data } = await admin
+      .from("orders")
+      .insert({
+        product_id: product.id,
+        vendor_id: product.vendor.id,
+        buyer_name: input.email.split("@")[0] || "Guest",
+        buyer_initials: (input.email[0] ?? "G").toUpperCase(),
+        amount_minor: chargeMinor,
+        currency: chargeCurrency,
+        status: "pending",
+        gateway: input.gateway,
+      })
+      .select("id")
+      .single();
+    if (data?.id) orderId = data.id;
   }
 
   // Paystack hosted checkout — the only path that takes a real payment.
@@ -75,6 +79,8 @@ export async function startCheckout(
           currency: chargeCurrency,
           callback_url: `${SITE_URL}/checkout/${orderId}/success`,
           metadata: { order_id: orderId, product_slug: input.productSlug },
+          // Split to the vendor's subaccount (platform keeps its commission %).
+          ...(subaccountCode ? { subaccount: subaccountCode } : {}),
         }),
       });
       const json = await res.json();
