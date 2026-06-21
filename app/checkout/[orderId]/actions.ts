@@ -4,6 +4,7 @@ import { redirect } from "next/navigation";
 import { hasServiceRole } from "@/lib/supabase/env";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { getOrderById, getProductBySlug } from "@/lib/data";
+import { toNgnCharge } from "@/lib/money";
 import type { Currency, Gateway } from "@/lib/types";
 
 const PAYSTACK_SECRET = process.env.PAYSTACK_SECRET_KEY ?? "";
@@ -29,6 +30,10 @@ export async function startCheckout(
 ): Promise<{ error: string } | void> {
   let orderId = input.orderId;
 
+  // Always charge NGN (Paystack NG accounts can't take USD). Convert if needed.
+  const chargeMinor = toNgnCharge(input.amountMinor, input.currency);
+  const chargeCurrency: Currency = "NGN";
+
   // Persist a real pending order via the service role (buyers aren't logged in,
   // so this trusted server action creates the order, not the anon client).
   if (hasServiceRole && orderId === "new" && input.productSlug) {
@@ -42,8 +47,8 @@ export async function startCheckout(
           vendor_id: product.vendor.id,
           buyer_name: input.email.split("@")[0] || "Guest",
           buyer_initials: (input.email[0] ?? "G").toUpperCase(),
-          amount_minor: input.amountMinor,
-          currency: input.currency,
+          amount_minor: chargeMinor,
+          currency: chargeCurrency,
           status: "pending",
           gateway: input.gateway,
         })
@@ -66,8 +71,8 @@ export async function startCheckout(
         },
         body: JSON.stringify({
           email: input.email,
-          amount: input.amountMinor, // already in kobo/cents
-          currency: input.currency,
+          amount: chargeMinor, // NGN kobo
+          currency: chargeCurrency,
           callback_url: `${SITE_URL}/checkout/${orderId}/success`,
           metadata: { order_id: orderId, product_slug: input.productSlug },
         }),
@@ -85,9 +90,8 @@ export async function startCheckout(
     return {
       error:
         `Paystack couldn't start this payment: ${message || "unknown error"}. ` +
-        `Common causes: the secret key is wrong (must be the SECRET key, sk_…), ` +
-        `or your Paystack account doesn't support ${input.currency} ` +
-        `(Nigerian accounts only accept NGN).`,
+        `Most likely the secret key is wrong — it must be the SECRET key (sk_test_… or sk_live_…), ` +
+        `set as PAYSTACK_SECRET_KEY in your deployment, then redeploy.`,
     };
   }
 

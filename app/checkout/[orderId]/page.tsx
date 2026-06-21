@@ -1,5 +1,6 @@
 import { notFound } from "next/navigation";
 import { formatPrice } from "@/lib/format";
+import { toNgnCharge, USD_TO_NGN } from "@/lib/money";
 import { resolveCheckoutOrder } from "./actions";
 import { CheckoutForm } from "./checkout-form";
 
@@ -16,10 +17,14 @@ export default async function CheckoutPage({
   const order = await resolveCheckoutOrder(orderId, productSlug);
   if (!order) notFound();
 
+  // Paystack (NGN account) is charged in NGN; convert USD-priced items.
+  const chargeMinor = toNgnCharge(order.amount_minor, order.currency);
+  const converted = order.currency !== "NGN";
+
   return (
     <main className="max-w-[460px] mx-auto px-5 py-8">
       {/* Order summary */}
-      <div className="flex justify-between items-center pb-3 mb-3 border-b border-line">
+      <div className="flex justify-between items-center pb-3 mb-1 border-b border-line">
         <div className="flex items-center gap-[10px]">
           <div className="w-8 h-8 bg-muted rounded-md" />
           <span className="text-[13px]">{order.product.name} license</span>
@@ -29,11 +34,18 @@ export default async function CheckoutPage({
         </span>
       </div>
 
+      {converted && (
+        <p className="text-[11px] text-ink-faint mb-3">
+          Charged in NGN: {formatPrice(chargeMinor, "NGN")} (at ₦{USD_TO_NGN.toLocaleString()}/$)
+        </p>
+      )}
+      {!converted && <div className="mb-3" />}
+
       <CheckoutForm
         orderId={order.id}
         productSlug={order.product.slug}
-        amountMinor={order.amount_minor}
-        currency={order.currency}
+        amountMinor={chargeMinor}
+        currency="NGN"
       />
     </main>
   );
