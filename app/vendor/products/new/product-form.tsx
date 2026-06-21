@@ -2,6 +2,7 @@
 
 import { startTransition, useActionState, useState } from "react";
 import { createClient } from "@/lib/supabase/client";
+import { createSignedUpload } from "../upload";
 import { createProduct, type CreateProductState } from "./actions";
 
 const labelCls = "block text-[12px] font-medium m-0 mb-[6px]";
@@ -34,22 +35,30 @@ export function ProductForm({ vendorId }: { vendorId: string }) {
     const slug = slugify(String(fd.get("slug") || name));
     fd.set("slug", slug);
 
-    // Upload the binary straight to Storage from the browser (no 1MB limit).
+    // Upload the binary straight to Storage via a server-issued signed URL
+    // (no 1MB limit, no dependency on the browser auth session).
     if (file instanceof File && file.size > 0) {
       setUploading(true);
       setUploadError(null);
       try {
+        const signed = await createSignedUpload(file.name);
+        if (signed.error || !signed.path || !signed.token) {
+          setUploading(false);
+          setUploadError(signed.error ?? "Could not start the upload.");
+          return;
+        }
         const supabase = createClient();
-        const path = `${vendorId}/${slug}/${Date.now()}-${file.name}`;
         const { error } = await supabase.storage
           .from("software")
-          .upload(path, file, { upsert: false, contentType: file.type || undefined });
+          .uploadToSignedUrl(signed.path, signed.token, file, {
+            contentType: file.type || undefined,
+          });
         if (error) {
           setUploading(false);
           setUploadError(`Upload failed: ${error.message}`);
           return;
         }
-        fd.set("file_path", path);
+        fd.set("file_path", signed.path);
         fd.set("file_name", file.name);
         fd.set("file_size", String(file.size));
       } catch (err) {
