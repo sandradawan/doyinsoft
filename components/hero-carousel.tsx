@@ -90,10 +90,19 @@ export function HeroCarousel({ products }: { products: Product[] }) {
 
               {/* Visual */}
               <div className="hidden sm:flex items-center justify-center">
-                <div className="w-full max-w-[220px] aspect-[4/3] rounded-lg bg-white/10 border border-white/15 flex flex-col items-center justify-center gap-3">
-                  <div className="w-16 h-16 rounded-lg bg-white/90 text-brand flex items-center justify-center text-[24px] font-medium">
-                    {markFor(p.name)}
-                  </div>
+                <div className="w-full max-w-[220px] aspect-[4/3] rounded-lg bg-white/10 border border-white/15 flex flex-col items-center justify-center gap-3 overflow-hidden">
+                  {p.icon_url ? (
+                    // eslint-disable-next-line @next/next/no-img-element
+                    <img
+                      src={p.icon_url}
+                      alt=""
+                      className="w-16 h-16 rounded-lg object-cover bg-white/90"
+                    />
+                  ) : (
+                    <div className="w-16 h-16 rounded-lg bg-white/90 text-brand flex items-center justify-center text-[24px] font-medium">
+                      {markFor(p.name)}
+                    </div>
+                  )}
                   <div className="flex gap-1 flex-wrap justify-center px-3">
                     {p.os_badges.slice(0, 3).map((b) => (
                       <span

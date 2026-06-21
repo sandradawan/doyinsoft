@@ -1,38 +1,74 @@
 "use client";
 
-import { useActionState } from "react";
-import { useFormStatus } from "react-dom";
+import { startTransition, useActionState, useState } from "react";
+import { uploadImage } from "@/lib/upload-media";
 import type { Product } from "@/lib/types";
 import { deleteProduct, updateProduct, type EditProductState } from "./actions";
 
 const labelCls = "block text-[12px] font-medium m-0 mb-[6px]";
 const hintCls = "text-[11px] text-ink-faint mt-1";
-
-function SaveButton() {
-  const { pending } = useFormStatus();
-  return (
-    <button type="submit" disabled={pending} className="btn-primary px-4 py-2">
-      {pending ? "Saving…" : "Save changes"}
-    </button>
-  );
-}
+const fileCls =
+  "field w-full text-[12px] file:mr-3 file:border-0 file:bg-muted file:text-ink file:rounded-md file:px-3 file:py-1 file:text-[12px]";
 
 export function EditProductForm({ product }: { product: Product }) {
-  const [state, action] = useActionState<EditProductState, FormData>(updateProduct, {});
+  const [state, formAction, isPending] = useActionState<EditProductState, FormData>(
+    updateProduct,
+    {}
+  );
+  const [uploading, setUploading] = useState(false);
+  const [uploadError, setUploadError] = useState<string | null>(null);
 
-  const currentUrl = product.file_path && /^https?:\/\//i.test(product.file_path)
-    ? product.file_path
-    : "";
+  const currentUrl =
+    product.file_path && /^https?:\/\//i.test(product.file_path) ? product.file_path : "";
   const currentSizeMb = product.file_size
     ? Math.round(product.file_size / (1024 * 1024))
     : "";
 
+  async function onSubmit(e: React.FormEvent<HTMLFormElement>) {
+    e.preventDefault();
+    const fd = new FormData(e.currentTarget);
+
+    const iconFile = fd.get("icon");
+    const shotFiles = fd.getAll("screenshots");
+    fd.delete("icon");
+    fd.delete("screenshots");
+
+    try {
+      setUploadError(null);
+      const hasIcon = iconFile instanceof File && iconFile.size > 0;
+      const shots = (shotFiles as unknown[]).filter(
+        (f): f is File => f instanceof File && f.size > 0
+      );
+
+      if (hasIcon || shots.length) setUploading(true);
+      // Icon: new upload replaces, else keep existing.
+      fd.set("icon_url", hasIcon ? await uploadImage(iconFile as File) : product.icon_url ?? "");
+      // Screenshots: new uploads replace the set, else keep existing.
+      if (shots.length) {
+        const urls: string[] = [];
+        for (const s of shots.slice(0, 6)) urls.push(await uploadImage(s));
+        fd.set("screenshots", urls.join("\n"));
+      } else {
+        fd.set("screenshots", product.screenshots.join("\n"));
+      }
+      setUploading(false);
+    } catch (err) {
+      setUploading(false);
+      setUploadError(err instanceof Error ? err.message : "Image upload failed.");
+      return;
+    }
+
+    startTransition(() => formAction(fd));
+  }
+
+  const busy = uploading || isPending;
+
   return (
     <div className="max-w-xl">
-      <form action={action}>
-        {state.error && (
+      <form onSubmit={onSubmit}>
+        {(state.error || uploadError) && (
           <p className="text-[12px] text-info bg-info-bg rounded-md px-3 py-2 mb-4">
-            {state.error}
+            {uploadError ?? state.error}
           </p>
         )}
 
@@ -41,6 +77,41 @@ export function EditProductForm({ product }: { product: Product }) {
         <div className="mb-4">
           <label className={labelCls}>Product name</label>
           <input name="name" required defaultValue={product.name} className="field w-full" />
+        </div>
+
+        {/* App icon */}
+        <div className="mb-4">
+          <label className={labelCls}>App icon</label>
+          {product.icon_url && (
+            // eslint-disable-next-line @next/next/no-img-element
+            <img
+              src={product.icon_url}
+              alt=""
+              className="w-12 h-12 rounded-md object-cover border border-line mb-2"
+            />
+          )}
+          <input name="icon" type="file" accept="image/*" className={fileCls} />
+          <p className={hintCls}>Upload to replace the current icon.</p>
+        </div>
+
+        {/* Screenshots */}
+        <div className="mb-4">
+          <label className={labelCls}>Screenshots</label>
+          {product.screenshots.length > 0 && (
+            <div className="flex gap-2 flex-wrap mb-2">
+              {product.screenshots.map((s) => (
+                // eslint-disable-next-line @next/next/no-img-element
+                <img
+                  key={s}
+                  src={s}
+                  alt=""
+                  className="w-20 h-14 rounded-md object-cover border border-line"
+                />
+              ))}
+            </div>
+          )}
+          <input name="screenshots" type="file" accept="image/*" multiple className={fileCls} />
+          <p className={hintCls}>Uploading new images replaces the current set (up to 6).</p>
         </div>
 
         <div className="mb-4">
@@ -128,9 +199,7 @@ export function EditProductForm({ product }: { product: Product }) {
             className="field w-full"
             placeholder="https://…"
           />
-          <p className={hintCls}>
-            Direct-download link to your installer. Buyers see it only after purchase.
-          </p>
+          <p className={hintCls}>Direct-download link. Buyers see it only after purchase.</p>
         </div>
 
         <div className="mb-6 max-w-[200px]">
@@ -144,10 +213,11 @@ export function EditProductForm({ product }: { product: Product }) {
             className="field w-full"
             placeholder="700"
           />
-          <p className={hintCls}>Optional — shown to buyers.</p>
         </div>
 
-        <SaveButton />
+        <button type="submit" disabled={busy} className="btn-primary px-4 py-2">
+          {uploading ? "Uploading images…" : isPending ? "Saving…" : "Save changes"}
+        </button>
       </form>
 
       {/* Delete — separate form, with a confirm guard. */}

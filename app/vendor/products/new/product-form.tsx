@@ -1,29 +1,73 @@
 "use client";
 
-import { useActionState } from "react";
-import { useFormStatus } from "react-dom";
+import { startTransition, useActionState, useState } from "react";
+import { uploadImage } from "@/lib/upload-media";
 import { createProduct, type CreateProductState } from "./actions";
 
 const labelCls = "block text-[12px] font-medium m-0 mb-[6px]";
 const hintCls = "text-[11px] text-ink-faint mt-1";
+const fileCls =
+  "field w-full text-[12px] file:mr-3 file:border-0 file:bg-muted file:text-ink file:rounded-md file:px-3 file:py-1 file:text-[12px]";
 
-function SubmitButton() {
-  const { pending } = useFormStatus();
-  return (
-    <button type="submit" disabled={pending} className="btn-primary px-4 py-2">
-      {pending ? "Saving…" : "Publish product"}
-    </button>
-  );
+function slugify(input: string): string {
+  return input
+    .toLowerCase()
+    .trim()
+    .replace(/[^a-z0-9]+/g, "-")
+    .replace(/^-+|-+$/g, "");
 }
 
 export function ProductForm() {
-  const [state, action] = useActionState<CreateProductState, FormData>(createProduct, {});
+  const [state, formAction, isPending] = useActionState<CreateProductState, FormData>(
+    createProduct,
+    {}
+  );
+  const [uploading, setUploading] = useState(false);
+  const [uploadError, setUploadError] = useState<string | null>(null);
+
+  async function onSubmit(e: React.FormEvent<HTMLFormElement>) {
+    e.preventDefault();
+    const fd = new FormData(e.currentTarget);
+
+    const name = String(fd.get("name") ?? "").trim();
+    fd.set("slug", slugify(String(fd.get("slug") || name)));
+
+    const iconFile = fd.get("icon");
+    const shotFiles = fd.getAll("screenshots");
+    fd.delete("icon");
+    fd.delete("screenshots");
+
+    try {
+      setUploadError(null);
+      const hasIcon = iconFile instanceof File && iconFile.size > 0;
+      const shots = (shotFiles as unknown[]).filter(
+        (f): f is File => f instanceof File && f.size > 0
+      );
+
+      if (hasIcon || shots.length) {
+        setUploading(true);
+        if (hasIcon) fd.set("icon_url", await uploadImage(iconFile as File));
+        const urls: string[] = [];
+        for (const s of shots.slice(0, 6)) urls.push(await uploadImage(s));
+        if (urls.length) fd.set("screenshots", urls.join("\n"));
+        setUploading(false);
+      }
+    } catch (err) {
+      setUploading(false);
+      setUploadError(err instanceof Error ? err.message : "Image upload failed.");
+      return;
+    }
+
+    startTransition(() => formAction(fd));
+  }
+
+  const busy = uploading || isPending;
 
   return (
-    <form action={action} className="max-w-xl">
-      {state.error && (
+    <form onSubmit={onSubmit} className="max-w-xl">
+      {(state.error || uploadError) && (
         <p className="text-[12px] text-info bg-info-bg rounded-md px-3 py-2 mb-4">
-          {state.error}
+          {uploadError ?? state.error}
         </p>
       )}
 
@@ -36,6 +80,20 @@ export function ProductForm() {
         <label className={labelCls}>Slug</label>
         <input name="slug" className="field w-full" placeholder="vectorforge" />
         <p className={hintCls}>Used in the URL. Leave blank to generate from the name.</p>
+      </div>
+
+      {/* App icon */}
+      <div className="mb-4">
+        <label className={labelCls}>App icon</label>
+        <input name="icon" type="file" accept="image/*" className={fileCls} />
+        <p className={hintCls}>Square image (PNG/JPG/SVG). Shown on cards and the product page.</p>
+      </div>
+
+      {/* Screenshots */}
+      <div className="mb-4">
+        <label className={labelCls}>Screenshots</label>
+        <input name="screenshots" type="file" accept="image/*" multiple className={fileCls} />
+        <p className={hintCls}>Up to 6 images. The first is shown large on the product page.</p>
       </div>
 
       <div className="mb-4">
@@ -60,14 +118,7 @@ export function ProductForm() {
       <div className="grid grid-cols-2 gap-3 mb-4">
         <div>
           <label className={labelCls}>Price</label>
-          <input
-            name="price"
-            type="number"
-            min="0"
-            step="0.01"
-            defaultValue="0"
-            className="field w-full"
-          />
+          <input name="price" type="number" min="0" step="0.01" defaultValue="0" className="field w-full" />
           <p className={hintCls}>0 = free.</p>
         </div>
         <div>
@@ -115,7 +166,6 @@ export function ProductForm() {
         />
       </div>
 
-      {/* Download link instead of an upload — handles any file size, free. */}
       <div className="mb-2">
         <label className={labelCls}>Download link</label>
         <input
@@ -125,26 +175,20 @@ export function ProductForm() {
           placeholder="https://drive.google.com/uc?export=download&id=…"
         />
         <p className={hintCls}>
-          A direct-download link to your installer — Google Drive, Dropbox, GitHub release,
-          etc. Buyers only see it after purchase. Use a &ldquo;direct download&rdquo; link
-          (not a preview page) so the file downloads on click.
+          Direct-download link to your installer (Drive, Dropbox, GitHub release…). Buyers
+          only see it after purchase.
         </p>
       </div>
 
       <div className="mb-6 max-w-[200px]">
         <label className={labelCls}>File size (MB)</label>
-        <input
-          name="file_size_mb"
-          type="number"
-          min="0"
-          step="1"
-          className="field w-full"
-          placeholder="700"
-        />
+        <input name="file_size_mb" type="number" min="0" step="1" className="field w-full" placeholder="700" />
         <p className={hintCls}>Optional — shown to buyers.</p>
       </div>
 
-      <SubmitButton />
+      <button type="submit" disabled={busy} className="btn-primary px-4 py-2">
+        {uploading ? "Uploading images…" : isPending ? "Saving…" : "Publish product"}
+      </button>
     </form>
   );
 }

@@ -53,8 +53,13 @@ create table if not exists products (
   download_count      integer not null default 0,
   rating_avg          numeric(2,1) not null default 0,
   rating_count        integer not null default 0,
+  icon_url            text,
+  screenshots         text[] not null default '{}',
   created_at          timestamptz not null default now()
 );
+-- For databases created before media support:
+alter table products add column if not exists icon_url    text;
+alter table products add column if not exists screenshots text[] not null default '{}';
 
 create table if not exists orders (
   id             uuid primary key default gen_random_uuid(),
@@ -229,6 +234,11 @@ create policy "anyone can review" on reviews for insert with check (rating betwe
 insert into storage.buckets (id, name, public, file_size_limit)
 values ('software', 'software', false, 734003200)
 on conflict (id) do update set file_size_limit = excluded.file_size_limit;
+
+-- Public bucket for product images (icons + screenshots).
+insert into storage.buckets (id, name, public)
+values ('media', 'media', true)
+on conflict (id) do update set public = true;
 
 -- A vendor may upload only into their own folder: software/{vendor_id}/...
 drop policy if exists "vendor uploads own software" on storage.objects;

@@ -43,6 +43,8 @@ export const products: Product[] = [
     download_count: 312,
     rating_avg: 4.6,
     rating_count: 38,
+    icon_url: null,
+    screenshots: [],
   },
   {
     id: "p_pulsedesk",
@@ -65,6 +67,8 @@ export const products: Product[] = [
     download_count: 87,
     rating_avg: 4.2,
     rating_count: 11,
+    icon_url: null,
+    screenshots: [],
   },
   {
     id: "p_fieldtrack",
@@ -87,6 +91,8 @@ export const products: Product[] = [
     download_count: 1204,
     rating_avg: 4.8,
     rating_count: 92,
+    icon_url: null,
+    screenshots: [],
   },
   {
     id: "p_kobokeep",
@@ -109,6 +115,8 @@ export const products: Product[] = [
     download_count: 56,
     rating_avg: 4.0,
     rating_count: 7,
+    icon_url: null,
+    screenshots: [],
   },
   {
     id: "p_naijafonts",
@@ -131,6 +139,8 @@ export const products: Product[] = [
     download_count: 143,
     rating_avg: 4.5,
     rating_count: 19,
+    icon_url: null,
+    screenshots: [],
   },
   {
     id: "p_marketmesh",
@@ -153,6 +163,8 @@ export const products: Product[] = [
     download_count: 22,
     rating_avg: 3.8,
     rating_count: 4,
+    icon_url: null,
+    screenshots: [],
   },
 ];
 

@@ -71,6 +71,13 @@ export async function createProduct(
   const fileSizeMb = formData.get("file_size_mb");
   const fileSize = fileSizeMb ? Math.round(Number(fileSizeMb) * 1024 * 1024) : null;
 
+  // Product images (uploaded client-side to the public media bucket).
+  const iconUrl = String(formData.get("icon_url") ?? "").trim() || null;
+  const screenshots = String(formData.get("screenshots") ?? "")
+    .split("\n")
+    .map((s) => s.trim())
+    .filter(Boolean);
+
   const admin = createAdminClient();
   const { error: insertError } = await admin.from("products").insert({
     slug,
@@ -88,6 +95,8 @@ export async function createProduct(
     file_path: filePath,
     file_name: fileName,
     file_size: fileSize,
+    icon_url: iconUrl,
+    screenshots,
   });
 
   if (insertError) {

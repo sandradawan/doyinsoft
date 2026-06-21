@@ -13,7 +13,16 @@ export function ProductCard({ product }: { product: Product }) {
       href={`/products/${product.slug}`}
       className="block border border-line rounded-lg p-3 no-underline text-ink hover:border-brand transition-colors"
     >
-      <div className="w-9 h-9 bg-muted rounded-md mb-[10px]" />
+      {product.icon_url ? (
+        // eslint-disable-next-line @next/next/no-img-element
+        <img
+          src={product.icon_url}
+          alt=""
+          className="w-9 h-9 rounded-md mb-[10px] object-cover bg-muted"
+        />
+      ) : (
+        <div className="w-9 h-9 bg-muted rounded-md mb-[10px]" />
+      )}
       <p className="text-[13px] font-medium m-0 mb-[2px]">{product.name}</p>
       <p className="text-[11px] text-ink-soft m-0 mb-[6px]">
         by {product.vendor.name}

@@ -45,10 +45,16 @@ export async function updateProduct(
     return { error: "The download link must start with http:// or https://" };
   }
   const fileSizeMb = formData.get("file_size_mb");
+  const screenshots = String(formData.get("screenshots") ?? "")
+    .split("\n")
+    .map((s) => s.trim())
+    .filter(Boolean);
   const filePatch: Record<string, unknown> = {
     file_path: downloadUrl || null,
     file_name: downloadUrl ? fileNameFromUrl(downloadUrl) ?? existing.file_name : null,
     file_size: fileSizeMb ? Math.round(Number(fileSizeMb) * 1024 * 1024) : null,
+    icon_url: String(formData.get("icon_url") ?? "").trim() || null,
+    screenshots,
   };
 
   const osBadges = String(formData.get("os_badges") ?? "")

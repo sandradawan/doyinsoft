@@ -33,21 +33,60 @@ export default async function ProductDetailPage({
             / {product.name}
           </p>
 
-          {product.rating_count > 0 && (
-            <div className="mb-3">
-              <Stars value={product.rating_avg} count={product.rating_count} />
+          {/* App icon + name */}
+          <div className="flex items-center gap-3 mb-3">
+            {product.icon_url ? (
+              // eslint-disable-next-line @next/next/no-img-element
+              <img
+                src={product.icon_url}
+                alt=""
+                className="w-12 h-12 rounded-lg object-cover bg-muted shrink-0"
+              />
+            ) : (
+              <div className="w-12 h-12 rounded-lg bg-muted shrink-0" />
+            )}
+            <div>
+              <p className="text-[16px] font-medium m-0">{product.name}</p>
+              {product.rating_count > 0 && (
+                <Stars value={product.rating_avg} count={product.rating_count} size={12} />
+              )}
             </div>
+          </div>
+
+          {/* Main screenshot */}
+          {product.screenshots[0] ? (
+            // eslint-disable-next-line @next/next/no-img-element
+            <img
+              src={product.screenshots[0]}
+              alt={`${product.name} screenshot`}
+              className="w-full rounded-lg mb-2 object-cover bg-muted max-h-[320px]"
+            />
+          ) : (
+            <div className="bg-muted rounded-lg h-[140px] mb-2" />
           )}
 
-          {/* Screenshot placeholder */}
-          <div className="bg-muted rounded-lg h-[140px] mb-2" />
-
           {/* Thumbnail row */}
-          <div className="flex gap-2 mb-4">
-            <div className="bg-muted rounded-md w-12 h-9" />
-            <div className="bg-muted rounded-md w-12 h-9" />
-            <div className="bg-muted rounded-md w-12 h-9" />
-          </div>
+          {product.screenshots.length > 1 ? (
+            <div className="flex gap-2 mb-4 flex-wrap">
+              {product.screenshots.slice(1, 6).map((s) => (
+                // eslint-disable-next-line @next/next/no-img-element
+                <img
+                  key={s}
+                  src={s}
+                  alt=""
+                  className="rounded-md w-20 h-14 object-cover bg-muted border border-line"
+                />
+              ))}
+            </div>
+          ) : (
+            !product.screenshots.length && (
+              <div className="flex gap-2 mb-4">
+                <div className="bg-muted rounded-md w-12 h-9" />
+                <div className="bg-muted rounded-md w-12 h-9" />
+                <div className="bg-muted rounded-md w-12 h-9" />
+              </div>
+            )
+          )}
 
           <p className="text-[13px] text-ink-soft leading-[1.7] m-0 mb-3">
             {product.description}

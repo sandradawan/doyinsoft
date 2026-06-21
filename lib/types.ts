@@ -41,6 +41,10 @@ export interface Product {
   /** Average rating 0–5 (1 decimal) and number of reviews. */
   rating_avg: number;
   rating_count: number;
+  /** App icon URL (public). Null until uploaded. */
+  icon_url: string | null;
+  /** Screenshot URLs (public). */
+  screenshots: string[];
 }
 
 export interface Review {

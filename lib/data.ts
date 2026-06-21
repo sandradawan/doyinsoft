@@ -63,6 +63,8 @@ interface ProductRow {
   download_count: number;
   rating_avg: number | null;
   rating_count: number | null;
+  icon_url: string | null;
+  screenshots: string[] | null;
   vendor: VendorRow | VendorRow[] | null;
 }
 
@@ -97,6 +99,8 @@ function mapProduct(row: ProductRow): Product {
     download_count: row.download_count ?? 0,
     rating_avg: Number(row.rating_avg ?? 0),
     rating_count: row.rating_count ?? 0,
+    icon_url: row.icon_url ?? null,
+    screenshots: row.screenshots ?? [],
     vendor: v
       ? mapVendor(v)
       : { id: "", slug: "", name: "Unknown vendor", initials: "?", verified: false },
@@ -104,7 +108,7 @@ function mapProduct(row: ProductRow): Product {
 }
 
 const PRODUCT_SELECT =
-  "id, slug, name, price_minor, currency, platform, category, tagline, description, system_requirements, os_badges, version, file_path, file_name, file_size, download_count, rating_avg, rating_count, vendor:vendors(id, slug, name, initials, verified)";
+  "id, slug, name, price_minor, currency, platform, category, tagline, description, system_requirements, os_badges, version, file_path, file_name, file_size, download_count, rating_avg, rating_count, icon_url, screenshots, vendor:vendors(id, slug, name, initials, verified)";
 
 // ---- Public queries ----------------------------------------------------------
 
