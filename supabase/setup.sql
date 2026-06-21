@@ -224,9 +224,10 @@ create policy "anyone can review" on reviews for insert with check (rating betwe
 -- ----------------------------------------------------------------------------
 -- Storage: private bucket for software binaries
 -- ----------------------------------------------------------------------------
-insert into storage.buckets (id, name, public)
-values ('software', 'software', false)
-on conflict (id) do nothing;
+-- Private bucket with a 700 MB per-file limit (700 * 1024 * 1024 bytes).
+insert into storage.buckets (id, name, public, file_size_limit)
+values ('software', 'software', false, 734003200)
+on conflict (id) do update set file_size_limit = excluded.file_size_limit;
 
 -- A vendor may upload only into their own folder: software/{vendor_id}/...
 drop policy if exists "vendor uploads own software" on storage.objects;

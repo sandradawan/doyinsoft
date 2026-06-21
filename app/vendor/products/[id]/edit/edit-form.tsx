@@ -1,8 +1,7 @@
 "use client";
 
 import { startTransition, useActionState, useState } from "react";
-import { createClient } from "@/lib/supabase/client";
-import { createSignedUpload } from "../../upload";
+import { resumableUpload } from "@/lib/resumable-upload";
 import { formatBytes } from "@/lib/format";
 import type { Product } from "@/lib/types";
 import { deleteProduct, updateProduct, type EditProductState } from "./actions";
@@ -22,6 +21,7 @@ export function EditProductForm({
     {}
   );
   const [uploading, setUploading] = useState(false);
+  const [progress, setProgress] = useState(0);
   const [uploadError, setUploadError] = useState<string | null>(null);
 
   async function onSubmit(e: React.FormEvent<HTMLFormElement>) {
@@ -32,26 +32,13 @@ export function EditProductForm({
 
     if (file instanceof File && file.size > 0) {
       setUploading(true);
+      setProgress(0);
       setUploadError(null);
+      const safe = file.name.replace(/[^a-zA-Z0-9._-]/g, "_");
+      const path = `${vendorId}/${product.slug}/${Date.now()}-${safe}`;
       try {
-        const signed = await createSignedUpload(file.name);
-        if (signed.error || !signed.path || !signed.token) {
-          setUploading(false);
-          setUploadError(signed.error ?? "Could not start the upload.");
-          return;
-        }
-        const supabase = createClient();
-        const { error } = await supabase.storage
-          .from("software")
-          .uploadToSignedUrl(signed.path, signed.token, file, {
-            contentType: file.type || undefined,
-          });
-        if (error) {
-          setUploading(false);
-          setUploadError(`Upload failed: ${error.message}`);
-          return;
-        }
-        fd.set("file_path", signed.path);
+        await resumableUpload({ path, file, onProgress: setProgress });
+        fd.set("file_path", path);
         fd.set("file_name", file.name);
         fd.set("file_size", String(file.size));
       } catch (err) {
@@ -174,8 +161,20 @@ export function EditProductForm({
         </div>
 
         <button type="submit" disabled={busy} className="btn-primary px-4 py-2">
-          {uploading ? "Uploading file…" : isPending ? "Saving…" : "Save changes"}
+          {uploading
+            ? `Uploading… ${progress}%`
+            : isPending
+              ? "Saving…"
+              : "Save changes"}
         </button>
+        {uploading && (
+          <div className="mt-3 h-1.5 w-full max-w-xs rounded-full bg-muted overflow-hidden">
+            <div
+              className="h-full bg-brand transition-all"
+              style={{ width: `${progress}%` }}
+            />
+          </div>
+        )}
       </form>
 
       {/* Delete — separate form, with a confirm guard. */}
