@@ -1,15 +1,28 @@
+import { TrendingUp, TrendingDown } from "lucide-react";
 import { VendorShell } from "@/components/vendor-shell";
 import { StatusBadge } from "@/components/status-badge";
-import { getDashboardMetrics, getRecentOrders } from "@/lib/data";
+import { BarChart, LineChart } from "@/components/charts";
+import {
+  getDashboardMetrics,
+  getRecentOrders,
+  vendorMonthlyStats,
+  vendorTopProducts,
+} from "@/lib/data";
 import { requireVendor } from "@/lib/auth";
 import { formatPrice } from "@/lib/format";
 
 export default async function VendorDashboardPage() {
   const vendor = await requireVendor();
-  const [metrics, orders] = await Promise.all([
+  const [metrics, orders, monthly, topProducts] = await Promise.all([
     getDashboardMetrics(vendor.id),
     getRecentOrders(vendor.id),
+    vendorMonthlyStats(vendor.id),
+    vendorTopProducts(vendor.id),
   ]);
+
+  const last = monthly[monthly.length - 1]?.revenue_minor ?? 0;
+  const prev = monthly[monthly.length - 2]?.revenue_minor ?? 0;
+  const growth = prev === 0 ? (last > 0 ? 100 : 0) : Math.round(((last - prev) / prev) * 100);
 
   const cards = [
     { label: "Revenue (30d)", value: formatPrice(metrics.revenue_minor, metrics.currency) },
@@ -40,6 +53,32 @@ export default async function VendorDashboardPage() {
             <p className="text-[22px] font-medium m-0">{c.value}</p>
           </div>
         ))}
+      </div>
+
+      {/* Growth charts */}
+      <div className="grid gap-4 mb-6 md:grid-cols-2">
+        <div className="border border-line rounded-lg p-4">
+          <div className="flex items-center justify-between mb-3">
+            <p className="text-[13px] font-medium m-0">Revenue (6 months)</p>
+            <span
+              className={`inline-flex items-center gap-1 text-[11px] ${growth >= 0 ? "text-success" : "text-info"}`}
+            >
+              {growth >= 0 ? <TrendingUp size={12} /> : <TrendingDown size={12} />}
+              {growth >= 0 ? "+" : ""}
+              {growth}% MoM
+            </span>
+          </div>
+          <LineChart data={monthly.map((m) => ({ label: m.label, value: m.revenue_minor }))} />
+        </div>
+
+        <div className="border border-line rounded-lg p-4">
+          <p className="text-[13px] font-medium m-0 mb-3">Top products by revenue</p>
+          {topProducts.length ? (
+            <BarChart data={topProducts.map((p) => ({ label: p.label, value: p.value }))} />
+          ) : (
+            <p className="text-[12px] text-ink-soft">No sales yet.</p>
+          )}
+        </div>
       </div>
 
       {/* Recent orders */}

@@ -1,9 +1,20 @@
 import Link from "next/link";
-import { adminStats } from "@/lib/data";
+import { TrendingUp, TrendingDown } from "lucide-react";
+import { adminMonthlyStats, adminStats } from "@/lib/data";
 import { formatPrice } from "@/lib/format";
+import { BarChart, LineChart } from "@/components/charts";
+
+function growth(series: { revenue_minor: number }[]): number {
+  if (series.length < 2) return 0;
+  const last = series[series.length - 1].revenue_minor;
+  const prev = series[series.length - 2].revenue_minor;
+  if (prev === 0) return last > 0 ? 100 : 0;
+  return Math.round(((last - prev) / prev) * 100);
+}
 
 export default async function AdminOverview() {
-  const s = await adminStats();
+  const [s, monthly] = await Promise.all([adminStats(), adminMonthlyStats()]);
+  const g = growth(monthly);
 
   const cards = [
     { label: "Pending review", value: String(s.pending), highlight: s.pending > 0 },
@@ -31,6 +42,28 @@ export default async function AdminOverview() {
             </p>
           </div>
         ))}
+      </div>
+
+      {/* Growth charts */}
+      <div className="grid gap-4 mb-6 md:grid-cols-2">
+        <div className="border border-line rounded-lg p-4">
+          <div className="flex items-center justify-between mb-3">
+            <p className="text-[13px] font-medium m-0">Revenue (6 months)</p>
+            <span
+              className={`inline-flex items-center gap-1 text-[11px] ${g >= 0 ? "text-success" : "text-info"}`}
+            >
+              {g >= 0 ? <TrendingUp size={12} /> : <TrendingDown size={12} />}
+              {g >= 0 ? "+" : ""}
+              {g}% MoM
+            </span>
+          </div>
+          <LineChart data={monthly.map((m) => ({ label: m.label, value: m.revenue_minor }))} />
+        </div>
+
+        <div className="border border-line rounded-lg p-4">
+          <p className="text-[13px] font-medium m-0 mb-3">Orders (6 months)</p>
+          <BarChart data={monthly.map((m) => ({ label: m.label, value: m.orders }))} />
+        </div>
       </div>
 
       {s.pending > 0 ? (

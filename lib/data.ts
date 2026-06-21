@@ -236,6 +236,109 @@ export async function getOrderById(orderId: string): Promise<Order | null> {
   return data as unknown as Order;
 }
 
+// ---- Analytics ---------------------------------------------------------------
+
+export interface MonthPoint {
+  label: string;
+  revenue_minor: number;
+  orders: number;
+}
+
+function lastMonths(n: number): { key: string; label: string }[] {
+  const out: { key: string; label: string }[] = [];
+  const now = new Date();
+  for (let i = n - 1; i >= 0; i--) {
+    const d = new Date(now.getFullYear(), now.getMonth() - i, 1);
+    out.push({
+      key: `${d.getFullYear()}-${d.getMonth()}`,
+      label: d.toLocaleDateString("en-NG", { month: "short" }),
+    });
+  }
+  return out;
+}
+
+function bucketOrders(
+  months: { key: string; label: string }[],
+  rows: { created_at: string; amount_minor: number }[]
+): MonthPoint[] {
+  const rev = new Map<string, number>();
+  const cnt = new Map<string, number>();
+  for (const o of rows) {
+    const d = new Date(o.created_at);
+    const k = `${d.getFullYear()}-${d.getMonth()}`;
+    rev.set(k, (rev.get(k) ?? 0) + (o.amount_minor || 0));
+    cnt.set(k, (cnt.get(k) ?? 0) + 1);
+  }
+  return months.map((m) => ({
+    label: m.label,
+    revenue_minor: rev.get(m.key) ?? 0,
+    orders: cnt.get(m.key) ?? 0,
+  }));
+}
+
+function mockMonthly(months: { key: string; label: string }[]): MonthPoint[] {
+  const rev = [5_000_000, 7_500_000, 9_000_000, 12_000_000, 15_500_000, 19_000_000];
+  const ord = [3, 5, 6, 8, 11, 14];
+  return months.map((m, i) => ({
+    label: m.label,
+    revenue_minor: rev[i] ?? 0,
+    orders: ord[i] ?? 0,
+  }));
+}
+
+async function monthlyStats(vendorId?: string): Promise<MonthPoint[]> {
+  const months = lastMonths(6);
+  if (!hasServiceRole) return mockMonthly(months);
+  const admin = createAdminClient();
+  const since = new Date();
+  since.setMonth(since.getMonth() - 5);
+  since.setDate(1);
+  let q = admin
+    .from("orders")
+    .select("created_at, amount_minor")
+    .eq("status", "paid")
+    .gte("created_at", since.toISOString());
+  if (vendorId) q = q.eq("vendor_id", vendorId);
+  const { data } = await q;
+  return bucketOrders(months, (data as { created_at: string; amount_minor: number }[]) ?? []);
+}
+
+export async function adminMonthlyStats(): Promise<MonthPoint[]> {
+  return monthlyStats();
+}
+
+export async function vendorMonthlyStats(vendorId = DEMO_VENDOR_ID): Promise<MonthPoint[]> {
+  return monthlyStats(vendorId);
+}
+
+export async function vendorTopProducts(
+  vendorId = DEMO_VENDOR_ID
+): Promise<{ label: string; value: number }[]> {
+  if (!hasServiceRole) {
+    return seedProducts
+      .filter((p) => p.vendor.id === vendorId)
+      .map((p) => ({ label: p.name, value: p.price_minor * Math.max(1, p.rating_count) }))
+      .sort((a, b) => b.value - a.value)
+      .slice(0, 5);
+  }
+  const admin = createAdminClient();
+  const { data } = await admin
+    .from("orders")
+    .select("amount_minor, product:products(name)")
+    .eq("vendor_id", vendorId)
+    .eq("status", "paid");
+  const totals = new Map<string, number>();
+  for (const row of (data as { amount_minor: number; product: { name: string } | { name: string }[] | null }[]) ?? []) {
+    const p = Array.isArray(row.product) ? row.product[0] : row.product;
+    const name = p?.name ?? "Unknown";
+    totals.set(name, (totals.get(name) ?? 0) + (row.amount_minor || 0));
+  }
+  return [...totals.entries()]
+    .map(([label, value]) => ({ label, value }))
+    .sort((a, b) => b.value - a.value)
+    .slice(0, 5);
+}
+
 // ---- Admin queries (service role) --------------------------------------------
 
 export async function adminProducts(status?: ProductStatus): Promise<Product[]> {
