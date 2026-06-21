@@ -2,7 +2,7 @@
 
 import { useState, useTransition } from "react";
 import { formatPrice } from "@/lib/format";
-import type { Currency, Gateway } from "@/lib/types";
+import type { Currency, Gateway, ProductType } from "@/lib/types";
 import { startCheckout } from "./actions";
 
 const GATEWAYS: { value: Gateway; label: string }[] = [
@@ -16,16 +16,28 @@ export function CheckoutForm({
   productSlug,
   amountMinor,
   currency,
+  productType = "digital",
 }: {
   orderId: string;
   productSlug: string | null;
   amountMinor: number;
   currency: Currency;
+  productType?: ProductType;
 }) {
   const [gateway, setGateway] = useState<Gateway>("paystack");
   const [email, setEmail] = useState("");
+  const [shippingName, setShippingName] = useState("");
+  const [shippingPhone, setShippingPhone] = useState("");
+  const [shippingAddress, setShippingAddress] = useState("");
   const [error, setError] = useState<string | null>(null);
   const [pending, startTransition] = useTransition();
+
+  const isPhysical = productType === "physical";
+  const isService = productType === "service";
+  const needsDetails = isPhysical || isService;
+  const detailsValid = needsDetails
+    ? shippingName.length > 0 && shippingPhone.length > 0 && (!isPhysical || shippingAddress.length > 0)
+    : true;
 
   function submit(e: React.FormEvent) {
     e.preventDefault();
@@ -38,8 +50,10 @@ export function CheckoutForm({
         email,
         amountMinor,
         currency,
+        shippingName,
+        shippingPhone,
+        shippingAddress,
       });
-      // A successful start redirects; only failures return here.
       if (res?.error) setError(res.error);
     });
   }
@@ -52,7 +66,6 @@ export function CheckoutForm({
         </p>
       )}
 
-      {/* Email — required by the payment gateway to send the receipt + key. */}
       <label className="block text-[12px] font-medium m-0 mb-2">Email address</label>
       <input
         type="email"
@@ -62,6 +75,37 @@ export function CheckoutForm({
         placeholder="you@example.com"
         className="field w-full mb-4"
       />
+
+      {needsDetails && (
+        <>
+          <p className="text-[12px] font-medium m-0 mb-2">
+            {isPhysical ? "Delivery details" : "Your details"}
+          </p>
+          <input
+            value={shippingName}
+            onChange={(e) => setShippingName(e.target.value)}
+            placeholder="Full name"
+            className="field w-full mb-2"
+          />
+          <input
+            value={shippingPhone}
+            onChange={(e) => setShippingPhone(e.target.value)}
+            placeholder="Phone (WhatsApp)"
+            inputMode="tel"
+            className="field w-full mb-2"
+          />
+          {isPhysical && (
+            <textarea
+              value={shippingAddress}
+              onChange={(e) => setShippingAddress(e.target.value)}
+              placeholder="Delivery address"
+              rows={2}
+              className="field w-full mb-4 resize-y"
+            />
+          )}
+          {isService && <div className="mb-2" />}
+        </>
+      )}
 
       <p className="text-[12px] font-medium m-0 mb-2">Payment method</p>
       <div className="flex flex-col gap-2 mb-4">
@@ -89,14 +133,18 @@ export function CheckoutForm({
 
       <button
         type="submit"
-        disabled={pending || email.length === 0}
+        disabled={pending || email.length === 0 || !detailsValid}
         className="btn-primary w-full py-[10px]"
       >
         {pending ? "Redirecting…" : `Pay ${formatPrice(amountMinor, currency)}`}
       </button>
 
       <p className="text-[11px] text-ink-faint text-center mt-[10px] mb-0">
-        License key delivered instantly after payment
+        {productType === "digital"
+          ? "License key delivered instantly after payment"
+          : isPhysical
+            ? "The seller ships to your address after payment"
+            : "The seller will contact you to fulfil your order"}
       </p>
     </form>
   );

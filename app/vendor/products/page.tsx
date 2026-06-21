@@ -11,7 +11,7 @@ export default async function VendorProductsPage() {
 
   return (
     <VendorShell active="products">
-      <div className="flex items-center justify-between mb-4">
+      <div className="flex items-center justify-between mb-2">
         <p className="text-[13px] font-medium m-0">Your products</p>
         <Link
           href="/vendor/products/new"
@@ -20,6 +20,13 @@ export default async function VendorProductsPage() {
           <Plus size={14} aria-hidden /> Add product
         </Link>
       </div>
+      <p className="text-[12px] text-ink-soft mb-4">
+        Your store link:{" "}
+        <Link href={`/store/${vendor.slug}`} className="text-brand no-underline hover:underline">
+          /store/{vendor.slug}
+        </Link>{" "}
+        — share it on your WhatsApp status & bio.
+      </p>
 
       {products.length === 0 ? (
         <p className="text-[13px] text-ink-soft">

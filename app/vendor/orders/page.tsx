@@ -5,6 +5,7 @@ import { getVendorOrders } from "@/lib/data";
 import { requireVendor } from "@/lib/auth";
 import { formatPrice } from "@/lib/format";
 import type { OrderStatus } from "@/lib/types";
+import { markFulfilment } from "./actions";
 
 const FILTERS: { label: string; value: OrderStatus | "all" }[] = [
   { label: "All", value: "all" },
@@ -70,19 +71,58 @@ export default async function VendorOrdersPage({
             <span className="w-16 shrink-0 text-center">Status</span>
           </div>
           {orders.map((order) => (
-            <div
-              key={order.id}
-              className="flex items-center gap-3 py-3 border-t border-line text-[13px]"
-            >
-              <span className="flex-1 min-w-0 truncate">{order.product.name}</span>
-              <span className="w-24 shrink-0 text-ink-soft truncate">{order.buyer_name}</span>
-              <span className="w-14 shrink-0 text-right text-ink-faint text-[11px]">
-                {shortDate(order.created_at)}
-              </span>
-              <span className="w-24 shrink-0 text-right">
-                {formatPrice(order.amount_minor, order.currency)}
-              </span>
-              <StatusBadge status={order.status} />
+            <div key={order.id} className="py-3 border-t border-line text-[13px]">
+              <div className="flex items-center gap-3">
+                <span className="flex-1 min-w-0 truncate">{order.product.name}</span>
+                <span className="w-24 shrink-0 text-ink-soft truncate">{order.buyer_name}</span>
+                <span className="w-14 shrink-0 text-right text-ink-faint text-[11px]">
+                  {shortDate(order.created_at)}
+                </span>
+                <span className="w-24 shrink-0 text-right">
+                  {formatPrice(order.amount_minor, order.currency)}
+                </span>
+                <StatusBadge status={order.status} />
+              </div>
+
+              {/* Fulfilment for physical/service orders */}
+              {order.fulfilment_status && order.status === "paid" && (
+                <div className="flex items-center flex-wrap gap-2 mt-2 pl-1">
+                  <span className="text-[11px] text-ink-faint">
+                    Deliver: {order.shipping_name || order.buyer_name}
+                    {order.shipping_phone ? ` · ${order.shipping_phone}` : ""}
+                    {order.shipping_address ? ` · ${order.shipping_address}` : ""}
+                  </span>
+                  <span
+                    className={`text-[11px] px-2 py-[2px] rounded-md ${
+                      order.fulfilment_status === "delivered"
+                        ? "bg-success-bg text-success"
+                        : order.fulfilment_status === "shipped"
+                          ? "bg-info-bg text-info"
+                          : "bg-muted text-ink-soft"
+                    }`}
+                  >
+                    {order.fulfilment_status}
+                  </span>
+                  {order.fulfilment_status !== "shipped" && order.fulfilment_status !== "delivered" && (
+                    <form action={markFulfilment}>
+                      <input type="hidden" name="id" value={order.id} />
+                      <input type="hidden" name="status" value="shipped" />
+                      <button className="text-[11px] text-brand border border-line rounded-md px-2 py-[3px] bg-transparent cursor-pointer hover:border-brand">
+                        Mark shipped
+                      </button>
+                    </form>
+                  )}
+                  {order.fulfilment_status !== "delivered" && (
+                    <form action={markFulfilment}>
+                      <input type="hidden" name="id" value={order.id} />
+                      <input type="hidden" name="status" value="delivered" />
+                      <button className="text-[11px] text-ink-soft border border-line rounded-md px-2 py-[3px] bg-transparent cursor-pointer hover:border-line-strong">
+                        Mark delivered
+                      </button>
+                    </form>
+                  )}
+                </div>
+              )}
             </div>
           ))}
         </div>

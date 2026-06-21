@@ -9,16 +9,16 @@ const SITE_URL = process.env.NEXT_PUBLIC_SITE_URL ?? "http://localhost:3000";
 export const metadata: Metadata = {
   metadataBase: new URL(SITE_URL),
   title: {
-    default: "DoyinSoft — software built for African markets",
+    default: "DoyinSoft — a marketplace built for African markets",
     template: "%s",
   },
   description:
-    "Desktop, mobile and web apps from independent developers. Buy licenses, pay with Paystack, Flutterwave or card.",
+    "Software, digital products, fashion and more from independent African sellers. Pay with Paystack.",
   openGraph: {
     siteName: "DoyinSoft",
     type: "website",
-    title: "DoyinSoft — software built for African markets",
-    description: "Desktop, mobile and web apps from independent developers.",
+    title: "DoyinSoft — a marketplace built for African markets",
+    description: "Software, digital products, fashion and more from independent sellers.",
   },
   twitter: { card: "summary" },
 };

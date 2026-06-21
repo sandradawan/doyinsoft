@@ -19,6 +19,9 @@ interface CheckoutInput {
   email: string;
   amountMinor: number;
   currency: Currency;
+  shippingName?: string;
+  shippingPhone?: string;
+  shippingAddress?: string;
 }
 
 /**
@@ -49,6 +52,9 @@ export async function startCheckout(
   const refCode = (await cookies()).get("ref")?.value;
   const affiliateId = refCode ? await resolveAffiliateId(refCode) : null;
 
+  // Physical/service products need fulfilment + buyer contact.
+  const needsFulfilment = product ? product.product_type !== "digital" : false;
+
   // Persist a real pending order via the service role (buyers aren't logged in,
   // so this trusted server action creates the order, not the anon client).
   if (hasServiceRole && orderId === "new" && product) {
@@ -58,13 +64,18 @@ export async function startCheckout(
       .insert({
         product_id: product.id,
         vendor_id: product.vendor.id,
-        buyer_name: input.email.split("@")[0] || "Guest",
+        buyer_name: input.shippingName || input.email.split("@")[0] || "Guest",
         buyer_initials: (input.email[0] ?? "G").toUpperCase(),
         amount_minor: chargeMinor,
         currency: chargeCurrency,
         status: "pending",
         gateway: input.gateway,
         affiliate_id: affiliateId,
+        buyer_email: input.email,
+        fulfilment_status: needsFulfilment ? "pending" : null,
+        shipping_name: input.shippingName || null,
+        shipping_phone: input.shippingPhone || null,
+        shipping_address: input.shippingAddress || null,
       })
       .select("id")
       .single();
@@ -130,6 +141,7 @@ export async function resolveCheckoutOrder(orderId: string, productSlug?: string
       slug: product.slug,
       price_minor: product.price_minor,
       currency: product.currency,
+      product_type: product.product_type,
     },
     buyer_name: "",
     buyer_initials: "",

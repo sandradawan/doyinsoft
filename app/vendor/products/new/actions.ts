@@ -97,6 +97,9 @@ export async function createProduct(
     file_size: fileSize,
     icon_url: iconUrl,
     screenshots,
+    product_type: ["digital", "physical", "service"].includes(String(formData.get("product_type")))
+      ? String(formData.get("product_type"))
+      : "digital",
   });
 
   if (insertError) {

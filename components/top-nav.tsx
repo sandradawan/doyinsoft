@@ -24,8 +24,8 @@ export async function TopNav({ defaultQuery = "" }: { defaultQuery?: string }) {
           name="q"
           defaultValue={defaultQuery}
           className="field w-full"
-          placeholder="Search software..."
-          aria-label="Search software"
+          placeholder="Search products..."
+          aria-label="Search products"
         />
       </form>
 

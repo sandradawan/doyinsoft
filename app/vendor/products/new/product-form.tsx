@@ -97,6 +97,16 @@ export function ProductForm({ categories = [] }: { categories?: string[] }) {
       </div>
 
       <div className="mb-4">
+        <label className={labelCls}>Product type</label>
+        <select name="product_type" className="field w-full" defaultValue="digital">
+          <option value="digital">Digital — buyers download it / get a license</option>
+          <option value="physical">Physical — you ship it to the buyer</option>
+          <option value="service">Service — you fulfil / contact the buyer</option>
+        </select>
+        <p className={hintCls}>Digital delivers instantly; physical & service collect the buyer’s contact.</p>
+      </div>
+
+      <div className="mb-4">
         <label className={labelCls}>Tagline</label>
         <input
           name="tagline"

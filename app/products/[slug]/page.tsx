@@ -206,13 +206,21 @@ export default async function ProductDetailPage({
               {formatPrice(product.price_minor, product.currency)}
             </p>
             <p className="text-[12px] text-ink-soft m-0 mb-[14px]">
-              One-time purchase, license key included
+              {product.product_type === "digital"
+                ? "One-time purchase, license key included"
+                : product.product_type === "physical"
+                  ? "Shipped to your address after payment"
+                  : "The seller will reach out to fulfil your request"}
             </p>
             <Link
               href={`/checkout/new?product=${product.slug}`}
               className="btn-primary block w-full text-center py-[10px] no-underline"
             >
-              Buy license
+              {product.product_type === "digital"
+                ? "Buy license"
+                : product.product_type === "service"
+                  ? "Book now"
+                  : "Buy now"}
             </Link>
             <div className="flex gap-[6px] mt-3 flex-wrap">
               {product.os_badges.map((badge) => (
@@ -226,9 +234,9 @@ export default async function ProductDetailPage({
             </div>
           </div>
 
-          {/* Vendor mini-card */}
+          {/* Vendor mini-card → their storefront */}
           <Link
-            href="/vendor/dashboard"
+            href={`/store/${product.vendor.slug}`}
             className="border border-line rounded-lg p-[14px] flex items-center gap-[10px] no-underline text-ink hover:border-brand transition-colors"
           >
             <div className="w-8 h-8 rounded-full bg-info-bg flex items-center justify-center text-[12px] font-medium text-info shrink-0">

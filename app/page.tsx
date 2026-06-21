@@ -64,10 +64,10 @@ export default async function HomePage({
       ) : (
         <section className="mb-5">
           <p className="text-[22px] font-medium m-0 mb-1">
-            Software built for African markets
+            Built for African markets
           </p>
           <p className="text-[14px] text-ink-soft m-0">
-            Desktop, mobile and web apps from independent developers
+            Software, digital products, fashion & more from independent sellers
           </p>
         </section>
       )}

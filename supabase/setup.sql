@@ -17,6 +17,7 @@ do $$ begin create type order_status as enum ('paid','pending','refunded'); exce
 do $$ begin create type gateway as enum ('paystack','flutterwave','stripe'); exception when duplicate_object then null; end $$;
 do $$ begin create type payout_status as enum ('requested','paid','failed'); exception when duplicate_object then null; end $$;
 do $$ begin create type product_status as enum ('pending','approved','rejected'); exception when duplicate_object then null; end $$;
+do $$ begin create type product_type as enum ('digital','physical','service'); exception when duplicate_object then null; end $$;
 
 -- ----------------------------------------------------------------------------
 -- Tables
@@ -68,9 +69,11 @@ create table if not exists products (
   rejection_reason    text,
   launched_at         timestamptz,
   upvotes             integer not null default 0,
+  product_type        product_type not null default 'digital',
   created_at          timestamptz not null default now()
 );
 -- For databases created before these columns existed:
+alter table products add column if not exists product_type     product_type not null default 'digital';
 alter table products add column if not exists icon_url         text;
 alter table products add column if not exists screenshots      text[] not null default '{}';
 alter table products add column if not exists status           product_status not null default 'pending';
@@ -94,6 +97,11 @@ create table if not exists orders (
 
 alter table orders add column if not exists reference text;
 alter table orders add column if not exists affiliate_id uuid;
+alter table orders add column if not exists fulfilment_status text;
+alter table orders add column if not exists shipping_name     text;
+alter table orders add column if not exists shipping_phone    text;
+alter table orders add column if not exists shipping_address  text;
+alter table orders add column if not exists buyer_email       text;
 
 create table if not exists licenses (
   id         uuid primary key default gen_random_uuid(),
@@ -280,7 +288,9 @@ drop policy if exists "categories public read" on categories;
 create policy "categories public read" on categories for select using (true);
 insert into categories (name) values
   ('Design tools'), ('Support'), ('Logistics'), ('Finance'), ('Commerce'),
-  ('Productivity'), ('Developer tools'), ('Security'), ('Education'), ('Media')
+  ('Productivity'), ('Developer tools'), ('Security'), ('Education'), ('Media'),
+  ('Fashion'), ('Gadgets'), ('Beauty'), ('Food'), ('Art & prints'),
+  ('Music'), ('E-books'), ('Courses'), ('Templates'), ('Services')
 on conflict (name) do nothing;
 
 -- Affiliate program + WhatsApp.

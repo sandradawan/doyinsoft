@@ -2,6 +2,7 @@
 // These mirror the Supabase schema in supabase/migrations/0001_init.sql.
 
 export type Platform = "desktop" | "mobile" | "web" | "free";
+export type ProductType = "digital" | "physical" | "service";
 export type Currency = "NGN" | "USD";
 export type OrderStatus = "paid" | "pending" | "refunded";
 export type Gateway = "paystack" | "flutterwave" | "stripe";
@@ -58,6 +59,8 @@ export interface Product {
   launched_at?: string | null;
   /** Upvotes on the Launches board. */
   upvotes: number;
+  /** digital = download/license; physical = shipped; service = booking/contact. */
+  product_type: ProductType;
 }
 
 export type ProductStatus = "pending" | "approved" | "rejected";
@@ -91,7 +94,9 @@ export interface License {
 
 export interface Order {
   id: string;
-  product: Pick<Product, "id" | "name" | "slug" | "price_minor" | "currency">;
+  product: Pick<Product, "id" | "name" | "slug" | "price_minor" | "currency"> & {
+    product_type?: ProductType;
+  };
   buyer_name: string;
   buyer_initials: string;
   amount_minor: number;
@@ -99,6 +104,12 @@ export interface Order {
   status: OrderStatus;
   gateway: Gateway;
   created_at: string;
+  /** Set for physical/service orders: 'pending' | 'shipped' | 'delivered'. */
+  fulfilment_status?: string | null;
+  shipping_name?: string | null;
+  shipping_phone?: string | null;
+  shipping_address?: string | null;
+  buyer_email?: string | null;
 }
 
 export interface DashboardMetrics {

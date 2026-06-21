@@ -78,6 +78,7 @@ interface ProductRow {
   rejection_reason: string | null;
   launched_at: string | null;
   upvotes: number | null;
+  product_type: "digital" | "physical" | "service" | null;
   vendor: VendorRow | VendorRow[] | null;
 }
 
@@ -121,6 +122,7 @@ function mapProduct(row: ProductRow): Product {
     rejection_reason: row.rejection_reason ?? null,
     launched_at: row.launched_at ?? null,
     upvotes: row.upvotes ?? 0,
+    product_type: row.product_type ?? "digital",
     vendor: v
       ? mapVendor(v)
       : { id: "", slug: "", name: "Unknown vendor", initials: "?", verified: false },
@@ -128,7 +130,7 @@ function mapProduct(row: ProductRow): Product {
 }
 
 const PRODUCT_SELECT =
-  "id, slug, name, price_minor, currency, platform, category, tagline, description, system_requirements, os_badges, version, file_path, file_name, file_size, download_count, rating_avg, rating_count, icon_url, screenshots, status, featured, rejection_reason, launched_at, upvotes, vendor:vendors(id, slug, name, initials, verified, suspended, whatsapp)";
+  "id, slug, name, price_minor, currency, platform, category, tagline, description, system_requirements, os_badges, version, file_path, file_name, file_size, download_count, rating_avg, rating_count, icon_url, screenshots, status, featured, rejection_reason, launched_at, upvotes, product_type, vendor:vendors(id, slug, name, initials, verified, suspended, whatsapp)";
 
 // Columns guaranteed to exist since the first migration. Used as a fallback so
 // a not-yet-run migration can never empty the storefront.
@@ -228,6 +230,34 @@ export async function getProductBySlug(slug: string): Promise<Product | null> {
   return mapProduct(res.data as unknown as ProductRow);
 }
 
+// ---- Vendor storefronts ------------------------------------------------------
+
+export async function getVendorBySlug(slug: string): Promise<Vendor | null> {
+  if (!isSupabaseConfigured) return seedVendors.find((v) => v.slug === slug) ?? null;
+  const supabase = await createClient();
+  const { data } = await supabase
+    .from("vendors")
+    .select("id, slug, name, initials, verified, suspended, whatsapp")
+    .eq("slug", slug)
+    .maybeSingle();
+  return data ? mapVendor(data as VendorRow) : null;
+}
+
+export async function getStoreProducts(vendorId: string): Promise<Product[]> {
+  if (!isSupabaseConfigured) {
+    return seedProducts.filter((p) => p.vendor.id === vendorId && p.status === "approved");
+  }
+  const supabase = await createClient();
+  const { data, error } = await supabase
+    .from("products")
+    .select(PRODUCT_SELECT)
+    .eq("vendor_id", vendorId)
+    .eq("status", "approved")
+    .order("created_at", { ascending: false });
+  if (error || !data) return [];
+  return (data as unknown as ProductRow[]).map(mapProduct);
+}
+
 export async function getRecentOrders(vendorId = DEMO_VENDOR_ID): Promise<Order[]> {
   if (!isSupabaseConfigured) {
     return seedOrders;
@@ -236,7 +266,7 @@ export async function getRecentOrders(vendorId = DEMO_VENDOR_ID): Promise<Order[
   const { data, error } = await supabase
     .from("orders")
     .select(
-      "id, buyer_name, buyer_initials, amount_minor, currency, status, gateway, created_at, product:products(id, name, slug, price_minor, currency)"
+      "id, buyer_name, buyer_initials, amount_minor, currency, status, gateway, created_at, fulfilment_status, shipping_name, shipping_phone, shipping_address, buyer_email, product:products(id, name, slug, price_minor, currency, product_type)"
     )
     .eq("vendor_id", vendorId)
     .order("created_at", { ascending: false })
@@ -274,7 +304,7 @@ export async function getOrderById(orderId: string): Promise<Order | null> {
   const { data, error } = await supabase
     .from("orders")
     .select(
-      "id, buyer_name, buyer_initials, amount_minor, currency, status, gateway, created_at, product:products(id, name, slug, price_minor, currency)"
+      "id, buyer_name, buyer_initials, amount_minor, currency, status, gateway, created_at, fulfilment_status, shipping_name, shipping_phone, shipping_address, buyer_email, product:products(id, name, slug, price_minor, currency, product_type)"
     )
     .eq("id", orderId)
     .maybeSingle();
@@ -497,7 +527,7 @@ export async function adminOrders(status?: OrderStatus): Promise<Order[]> {
   let q = admin
     .from("orders")
     .select(
-      "id, buyer_name, buyer_initials, amount_minor, currency, status, gateway, created_at, product:products(id, name, slug, price_minor, currency)"
+      "id, buyer_name, buyer_initials, amount_minor, currency, status, gateway, created_at, fulfilment_status, shipping_name, shipping_phone, shipping_address, buyer_email, product:products(id, name, slug, price_minor, currency, product_type)"
     )
     .order("created_at", { ascending: false })
     .limit(100);
@@ -606,7 +636,7 @@ export async function getVendorOrders(
   let query = supabase
     .from("orders")
     .select(
-      "id, buyer_name, buyer_initials, amount_minor, currency, status, gateway, created_at, product:products(id, name, slug, price_minor, currency)"
+      "id, buyer_name, buyer_initials, amount_minor, currency, status, gateway, created_at, fulfilment_status, shipping_name, shipping_phone, shipping_address, buyer_email, product:products(id, name, slug, price_minor, currency, product_type)"
     )
     .eq("vendor_id", vendorId)
     .order("created_at", { ascending: false });
@@ -863,6 +893,34 @@ export async function getLicensesByEmail(email: string): Promise<License[]> {
     .eq("status", "active")
     .order("issued_at", { ascending: false });
   return ((data as unknown as LicenseRow[]) ?? []).map(mapLicense);
+}
+
+/**
+ * Mark a (physical/service) order paid and credit any referring affiliate.
+ * Used for orders that don't get a license. Idempotent on the affiliate credit.
+ */
+export async function markOrderPaid(orderId: string, reference?: string): Promise<boolean> {
+  if (!hasServiceRole) return true;
+  const admin = createAdminClient();
+  const { data: order } = await admin
+    .from("orders")
+    .select("amount_minor, affiliate_id")
+    .eq("id", orderId)
+    .maybeSingle();
+  await admin
+    .from("orders")
+    .update({ status: "paid", ...(reference ? { reference } : {}) })
+    .eq("id", orderId);
+  const o = order as { amount_minor: number; affiliate_id: string | null } | null;
+  if (o?.affiliate_id) {
+    const { affiliate_percent } = await getSettings();
+    const commission = Math.round((o.amount_minor * affiliate_percent) / 100);
+    await admin
+      .from("referrals")
+      .insert({ affiliate_id: o.affiliate_id, order_id: orderId, amount_minor: commission })
+      .then(() => undefined, () => undefined);
+  }
+  return true;
 }
 
 /** Has this email got an active license for the product? (verified-purchase) */

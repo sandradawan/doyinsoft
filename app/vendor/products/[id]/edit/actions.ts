@@ -75,6 +75,9 @@ export async function updateProduct(
       system_requirements: String(formData.get("system_requirements") ?? "").trim(),
       os_badges: osBadges,
       version: String(formData.get("version") || existing.version).trim(),
+      product_type: ["digital", "physical", "service"].includes(String(formData.get("product_type")))
+        ? String(formData.get("product_type"))
+        : existing.product_type,
       ...filePatch,
     })
     .eq("id", id)

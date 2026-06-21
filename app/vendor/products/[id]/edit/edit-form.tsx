@@ -121,6 +121,15 @@ export function EditProductForm({
         </div>
 
         <div className="mb-4">
+          <label className={labelCls}>Product type</label>
+          <select name="product_type" defaultValue={product.product_type} className="field w-full">
+            <option value="digital">Digital — download / license</option>
+            <option value="physical">Physical — shipped</option>
+            <option value="service">Service — you fulfil / contact</option>
+          </select>
+        </div>
+
+        <div className="mb-4">
           <label className={labelCls}>Tagline</label>
           <input name="tagline" defaultValue={product.tagline} className="field w-full" />
         </div>
