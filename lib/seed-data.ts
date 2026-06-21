@@ -45,6 +45,9 @@ export const products: Product[] = [
     rating_count: 38,
     icon_url: null,
     screenshots: [],
+    status: "approved" as const,
+    featured: true,
+    rejection_reason: null,
   },
   {
     id: "p_pulsedesk",
@@ -69,6 +72,9 @@ export const products: Product[] = [
     rating_count: 11,
     icon_url: null,
     screenshots: [],
+    status: "approved" as const,
+    featured: false,
+    rejection_reason: null,
   },
   {
     id: "p_fieldtrack",
@@ -93,6 +99,9 @@ export const products: Product[] = [
     rating_count: 92,
     icon_url: null,
     screenshots: [],
+    status: "approved" as const,
+    featured: true,
+    rejection_reason: null,
   },
   {
     id: "p_kobokeep",
@@ -117,6 +126,9 @@ export const products: Product[] = [
     rating_count: 7,
     icon_url: null,
     screenshots: [],
+    status: "approved" as const,
+    featured: false,
+    rejection_reason: null,
   },
   {
     id: "p_naijafonts",
@@ -141,6 +153,9 @@ export const products: Product[] = [
     rating_count: 19,
     icon_url: null,
     screenshots: [],
+    status: "approved" as const,
+    featured: false,
+    rejection_reason: null,
   },
   {
     id: "p_marketmesh",
@@ -165,6 +180,9 @@ export const products: Product[] = [
     rating_count: 4,
     icon_url: null,
     screenshots: [],
+    status: "approved" as const,
+    featured: false,
+    rejection_reason: null,
   },
 ];
 

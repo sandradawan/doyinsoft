@@ -27,9 +27,13 @@ export default async function HomePage({
 
   // Show the slideshow only on the default storefront view.
   const showHero = active === "all" && !query;
-  const featured = [...all].sort(
-    (a, b) => b.rating_avg * b.rating_count - a.rating_avg * a.rating_count
-  );
+  // Prefer admin-featured products; fall back to top-rated if none are featured.
+  const featuredFlagged = all.filter((p) => p.featured);
+  const featured = (
+    featuredFlagged.length
+      ? featuredFlagged
+      : [...all].sort((a, b) => b.rating_avg * b.rating_count - a.rating_avg * a.rating_count)
+  ).slice(0, 6);
 
   return (
     <main className="max-w-5xl mx-auto px-5 py-6">

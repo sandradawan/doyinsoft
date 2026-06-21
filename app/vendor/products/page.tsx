@@ -43,13 +43,29 @@ export default async function VendorProductsPage() {
               className="flex items-center gap-3 py-3 border-t border-line text-[13px]"
             >
               <div className="flex-1 min-w-0">
-                <Link
-                  href={`/products/${p.slug}`}
-                  className="text-ink no-underline hover:underline"
-                >
-                  {p.name}
-                </Link>
+                <span className="inline-flex items-center gap-2">
+                  <Link
+                    href={`/products/${p.slug}`}
+                    className="text-ink no-underline hover:underline"
+                  >
+                    {p.name}
+                  </Link>
+                  <span
+                    className={`text-[11px] px-2 py-[1px] rounded-md ${
+                      p.status === "approved"
+                        ? "bg-success-bg text-success"
+                        : p.status === "pending"
+                          ? "bg-info-bg text-info"
+                          : "bg-muted text-ink-soft"
+                    }`}
+                  >
+                    {p.status}
+                  </span>
+                </span>
                 <span className="text-ink-faint"> · {p.category}</span>
+                {p.status === "rejected" && p.rejection_reason && (
+                  <p className="text-[11px] text-ink-faint m-0">Reason: {p.rejection_reason}</p>
+                )}
               </div>
               <span className="w-16 shrink-0 text-ink-soft">{p.version}</span>
               <span className="w-20 shrink-0 text-right">

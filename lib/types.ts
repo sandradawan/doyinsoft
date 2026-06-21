@@ -45,7 +45,14 @@ export interface Product {
   icon_url: string | null;
   /** Screenshot URLs (public). */
   screenshots: string[];
+  /** Moderation status — only 'approved' products appear on the storefront. */
+  status: ProductStatus;
+  /** Featured products lead the homepage hero. */
+  featured: boolean;
+  rejection_reason: string | null;
 }
+
+export type ProductStatus = "pending" | "approved" | "rejected";
 
 export interface Review {
   id: string;

@@ -16,6 +16,7 @@ do $$ begin create type currency as enum ('NGN','USD'); exception when duplicate
 do $$ begin create type order_status as enum ('paid','pending','refunded'); exception when duplicate_object then null; end $$;
 do $$ begin create type gateway as enum ('paystack','flutterwave','stripe'); exception when duplicate_object then null; end $$;
 do $$ begin create type payout_status as enum ('requested','paid','failed'); exception when duplicate_object then null; end $$;
+do $$ begin create type product_status as enum ('pending','approved','rejected'); exception when duplicate_object then null; end $$;
 
 -- ----------------------------------------------------------------------------
 -- Tables
@@ -60,11 +61,17 @@ create table if not exists products (
   rating_count        integer not null default 0,
   icon_url            text,
   screenshots         text[] not null default '{}',
+  status              product_status not null default 'pending',
+  featured            boolean not null default false,
+  rejection_reason    text,
   created_at          timestamptz not null default now()
 );
--- For databases created before media support:
-alter table products add column if not exists icon_url    text;
-alter table products add column if not exists screenshots text[] not null default '{}';
+-- For databases created before these columns existed:
+alter table products add column if not exists icon_url         text;
+alter table products add column if not exists screenshots      text[] not null default '{}';
+alter table products add column if not exists status           product_status not null default 'pending';
+alter table products add column if not exists featured         boolean not null default false;
+alter table products add column if not exists rejection_reason text;
 
 create table if not exists orders (
   id             uuid primary key default gen_random_uuid(),
@@ -310,6 +317,12 @@ values
    'Build a hosted storefront with an offline cart that queues orders during outages and syncs on reconnect.',
    'Any modern browser', '{"Web app"}', '0.9.4', 'marketmesh-0.9.4.zip', 15728640, 22, 3.8, 4)
 on conflict (slug) do nothing;
+
+-- Sample products are pre-approved + a couple featured for the hero.
+update products set status = 'approved'
+  where slug in ('vectorforge','pulsedesk','fieldtrack','kobokeep','naijafonts','marketmesh');
+update products set featured = true where slug in ('vectorforge','fieldtrack');
+create index if not exists products_status_idx on products (status);
 
 -- A few orders for Studio Adeyemi so a connected dashboard has sample data.
 insert into orders (product_id, vendor_id, buyer_name, buyer_initials, amount_minor, currency, status, gateway)

@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { Logo } from "@/components/logo";
 import { getCurrentVendor } from "@/lib/auth";
+import { isAdmin } from "@/lib/admin";
 import { signOut } from "@/app/(auth)/actions";
 
 /**
@@ -8,7 +9,7 @@ import { signOut } from "@/app/(auth)/actions";
  * area: signed-in vendors see their name + sign out; guests see sign in / up.
  */
 export async function TopNav({ defaultQuery = "" }: { defaultQuery?: string }) {
-  const vendor = await getCurrentVendor();
+  const [vendor, admin] = await Promise.all([getCurrentVendor(), isAdmin()]);
 
   return (
     <header className="flex items-center gap-4 border-b border-line pb-[14px] mb-5">
@@ -36,6 +37,14 @@ export async function TopNav({ defaultQuery = "" }: { defaultQuery?: string }) {
       >
         Downloads
       </Link>
+      {admin && (
+        <Link
+          href="/admin"
+          className="hidden sm:inline text-[13px] text-brand no-underline hover:underline"
+        >
+          Admin
+        </Link>
+      )}
 
       {vendor ? (
         <div className="flex items-center gap-3 ml-auto sm:ml-0">

@@ -8,6 +8,9 @@ import { createClient } from "./supabase/server";
 import { createAdminClient } from "./supabase/admin";
 import { hasServiceRole, isSupabaseConfigured } from "./supabase/env";
 import { deterministicLicenseKey, generateLicenseKey } from "./license";
+import { emailLayout, sendEmail } from "./email";
+
+const SITE_URL = process.env.NEXT_PUBLIC_SITE_URL ?? "http://localhost:3000";
 import {
   dashboardMetrics as seedMetrics,
   orders as seedOrders,
@@ -16,6 +19,7 @@ import {
   payoutSummary as seedPayoutSummary,
   products as seedProducts,
   reviews as seedReviews,
+  vendors as seedVendors,
 } from "./seed-data";
 import type {
   DashboardMetrics,
@@ -27,6 +31,7 @@ import type {
   PayoutSummary,
   Platform,
   Product,
+  ProductStatus,
   Review,
   Vendor,
 } from "./types";
@@ -65,6 +70,9 @@ interface ProductRow {
   rating_count: number | null;
   icon_url: string | null;
   screenshots: string[] | null;
+  status: "pending" | "approved" | "rejected" | null;
+  featured: boolean | null;
+  rejection_reason: string | null;
   vendor: VendorRow | VendorRow[] | null;
 }
 
@@ -101,6 +109,9 @@ function mapProduct(row: ProductRow): Product {
     rating_count: row.rating_count ?? 0,
     icon_url: row.icon_url ?? null,
     screenshots: row.screenshots ?? [],
+    status: row.status ?? "approved",
+    featured: row.featured ?? false,
+    rejection_reason: row.rejection_reason ?? null,
     vendor: v
       ? mapVendor(v)
       : { id: "", slug: "", name: "Unknown vendor", initials: "?", verified: false },
@@ -108,7 +119,7 @@ function mapProduct(row: ProductRow): Product {
 }
 
 const PRODUCT_SELECT =
-  "id, slug, name, price_minor, currency, platform, category, tagline, description, system_requirements, os_badges, version, file_path, file_name, file_size, download_count, rating_avg, rating_count, icon_url, screenshots, vendor:vendors(id, slug, name, initials, verified)";
+  "id, slug, name, price_minor, currency, platform, category, tagline, description, system_requirements, os_badges, version, file_path, file_name, file_size, download_count, rating_avg, rating_count, icon_url, screenshots, status, featured, rejection_reason, vendor:vendors(id, slug, name, initials, verified)";
 
 // ---- Public queries ----------------------------------------------------------
 
@@ -119,7 +130,8 @@ export async function getProducts(
   const q = search?.trim().toLowerCase();
 
   if (!isSupabaseConfigured) {
-    let list = platform ? seedProducts.filter((p) => p.platform === platform) : seedProducts;
+    let list = (platform ? seedProducts.filter((p) => p.platform === platform) : seedProducts)
+      .filter((p) => p.status === "approved");
     if (q) {
       list = list.filter((p) =>
         [p.name, p.tagline, p.category, p.vendor.name]
@@ -132,7 +144,11 @@ export async function getProducts(
   }
 
   const supabase = await createClient();
-  let query = supabase.from("products").select(PRODUCT_SELECT).order("name");
+  let query = supabase
+    .from("products")
+    .select(PRODUCT_SELECT)
+    .eq("status", "approved")
+    .order("name");
   if (platform) query = query.eq("platform", platform);
   if (q) {
     const like = `%${q}%`;
@@ -149,13 +165,15 @@ export async function getProducts(
 
 export async function getProductBySlug(slug: string): Promise<Product | null> {
   if (!isSupabaseConfigured) {
-    return seedProducts.find((p) => p.slug === slug) ?? null;
+    const p = seedProducts.find((x) => x.slug === slug);
+    return p && p.status === "approved" ? p : null;
   }
   const supabase = await createClient();
   const { data, error } = await supabase
     .from("products")
     .select(PRODUCT_SELECT)
     .eq("slug", slug)
+    .eq("status", "approved")
     .maybeSingle();
   if (error) {
     console.error("getProductBySlug:", error.message);
@@ -216,6 +234,82 @@ export async function getOrderById(orderId: string): Promise<Order | null> {
     .maybeSingle();
   if (error || !data) return null;
   return data as unknown as Order;
+}
+
+// ---- Admin queries (service role) --------------------------------------------
+
+export async function adminProducts(status?: ProductStatus): Promise<Product[]> {
+  if (!hasServiceRole) {
+    return status ? seedProducts.filter((p) => p.status === status) : seedProducts;
+  }
+  const admin = createAdminClient();
+  let q = admin.from("products").select(PRODUCT_SELECT).order("created_at", { ascending: false });
+  if (status) q = q.eq("status", status);
+  const { data, error } = await q;
+  if (error || !data) return [];
+  return (data as unknown as ProductRow[]).map(mapProduct);
+}
+
+export async function adminVendors(): Promise<Vendor[]> {
+  if (!hasServiceRole) return seedVendors;
+  const admin = createAdminClient();
+  const { data } = await admin
+    .from("vendors")
+    .select("id, slug, name, initials, verified")
+    .order("created_at", { ascending: false });
+  return (data as Vendor[]) ?? [];
+}
+
+export async function adminStats(): Promise<{
+  pending: number;
+  products: number;
+  vendors: number;
+  revenue_minor: number;
+  orders: number;
+}> {
+  if (!hasServiceRole) {
+    return {
+      pending: 0,
+      products: seedProducts.length,
+      vendors: seedVendors.length,
+      revenue_minor: seedMetrics.revenue_minor,
+      orders: seedOrders.length,
+    };
+  }
+  const admin = createAdminClient();
+  const [pending, products, vendors, paid, orders] = await Promise.all([
+    admin.from("products").select("id", { count: "exact", head: true }).eq("status", "pending"),
+    admin.from("products").select("id", { count: "exact", head: true }),
+    admin.from("vendors").select("id", { count: "exact", head: true }),
+    admin.from("orders").select("amount_minor").eq("status", "paid"),
+    admin.from("orders").select("id", { count: "exact", head: true }),
+  ]);
+  const revenue = ((paid.data as { amount_minor: number }[]) ?? []).reduce(
+    (t, r) => t + (r.amount_minor || 0),
+    0
+  );
+  return {
+    pending: pending.count ?? 0,
+    products: products.count ?? 0,
+    vendors: vendors.count ?? 0,
+    revenue_minor: revenue,
+    orders: orders.count ?? 0,
+  };
+}
+
+/** The auth email of a vendor's owner — for approval/rejection notifications. */
+export async function getVendorOwnerEmail(vendorId: string): Promise<string | null> {
+  if (!hasServiceRole) return null;
+  const admin = createAdminClient();
+  const { data: vendor } = await admin
+    .from("vendors")
+    .select("owner")
+    .eq("id", vendorId)
+    .maybeSingle();
+  const ownerId = (vendor as { owner?: string } | null)?.owner;
+  if (!ownerId) return null;
+  const { data } = await admin.auth.admin.getUserById(ownerId);
+  return data?.user?.email ?? null;
 }
 
 // ---- Vendor products ---------------------------------------------------------
@@ -528,5 +622,24 @@ export async function issueLicenseForOrder(
     .select(LICENSE_SELECT)
     .single();
 
-  return inserted ? mapLicense(inserted as unknown as LicenseRow) : null;
+  if (!inserted) return null;
+  const license = mapLicense(inserted as unknown as LicenseRow);
+
+  // Email the buyer their key + download link (no-op if email isn't configured).
+  if (license.email) {
+    const dl = `${SITE_URL}/api/download?order=${encodeURIComponent(orderId)}&key=${encodeURIComponent(license.key)}`;
+    await sendEmail({
+      to: license.email,
+      subject: `Your ${license.product.name} license`,
+      html: emailLayout(
+        "Thanks for your purchase 🎉",
+        `<p>Here is your license for <strong>${license.product.name}</strong>:</p>
+         <p style="font-size:15px;font-weight:600;letter-spacing:.5px">${license.key}</p>
+         <p><a href="${dl}" style="background:#047857;color:#fff;text-decoration:none;padding:10px 16px;border-radius:8px;display:inline-block">Download software</a></p>
+         <p style="font-size:12px;color:#737373">Or find it any time on your downloads page.</p>`
+      ),
+    });
+  }
+
+  return license;
 }
