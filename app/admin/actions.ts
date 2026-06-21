@@ -9,6 +9,7 @@ import { emailLayout, sendEmail } from "@/lib/email";
 import { logAudit } from "@/lib/audit";
 import { saveSettings } from "@/lib/settings";
 import { refundPaystackTransaction } from "@/lib/paystack";
+import { markAffiliatePayoutPaid } from "@/lib/affiliate";
 
 const SITE_URL = process.env.NEXT_PUBLIC_SITE_URL ?? "http://localhost:3000";
 
@@ -182,6 +183,17 @@ export async function resendLicense(formData: FormData) {
   }
   await logAudit(adminEmail, "resend_license", "order", orderId);
   revalidatePath("/admin/orders");
+}
+
+// ---- Affiliate payouts -------------------------------------------------------
+
+export async function markAffiliatePaid(formData: FormData) {
+  const adminEmail = await requireAdmin();
+  if (!hasServiceRole) return;
+  const id = String(formData.get("id") ?? "");
+  await markAffiliatePayoutPaid(id);
+  await logAudit(adminEmail, "mark_affiliate_paid", "affiliate_payout", id);
+  revalidatePath("/admin/affiliates");
 }
 
 // ---- Categories --------------------------------------------------------------

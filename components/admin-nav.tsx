@@ -12,6 +12,7 @@ import {
   ScrollText,
   Settings,
   Store,
+  Coins,
 } from "lucide-react";
 
 const NAV = [
@@ -19,6 +20,7 @@ const NAV = [
   { label: "Products", href: "/admin/products", icon: Folder, match: (p: string) => p.startsWith("/admin/products") },
   { label: "Orders", href: "/admin/orders", icon: File, match: (p: string) => p.startsWith("/admin/orders") },
   { label: "Vendors", href: "/admin/vendors", icon: Users, match: (p: string) => p.startsWith("/admin/vendors") },
+  { label: "Affiliates", href: "/admin/affiliates", icon: Coins, match: (p: string) => p.startsWith("/admin/affiliates") },
   { label: "Reviews", href: "/admin/reviews", icon: Star, match: (p: string) => p.startsWith("/admin/reviews") },
   { label: "Categories", href: "/admin/categories", icon: Tag, match: (p: string) => p.startsWith("/admin/categories") },
   { label: "Audit log", href: "/admin/audit", icon: ScrollText, match: (p: string) => p.startsWith("/admin/audit") },

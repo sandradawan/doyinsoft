@@ -2,22 +2,41 @@ import Link from "next/link";
 import { Logo } from "@/components/logo";
 import { ShareLink } from "@/components/share-link";
 import { requireUser } from "@/lib/auth";
-import { getAffiliateStats, getOrCreateAffiliate } from "@/lib/affiliate";
+import {
+  getAffiliateBalance,
+  getAffiliateBank,
+  getAffiliatePayouts,
+  getAffiliateStats,
+  getOrCreateAffiliate,
+} from "@/lib/affiliate";
 import { getSettings } from "@/lib/settings";
+import { listPaystackBanks } from "@/lib/paystack";
 import { formatPrice } from "@/lib/format";
+import { BankForm, WithdrawButton } from "./affiliate-client";
 
 const SITE_URL = process.env.NEXT_PUBLIC_SITE_URL ?? "http://localhost:3000";
+
+function shortDate(iso: string): string {
+  if (!iso) return "—";
+  return new Date(iso).toLocaleDateString("en-NG", { day: "2-digit", month: "short", year: "numeric" });
+}
 
 export default async function AffiliatePage() {
   const user = await requireUser();
   const affiliate = await getOrCreateAffiliate(user.id, user.email);
-  const [stats, settings] = await Promise.all([
+
+  const [stats, settings, balance, bank, payouts, banks] = await Promise.all([
     affiliate ? getAffiliateStats(affiliate.id) : null,
     getSettings(),
+    affiliate ? getAffiliateBalance(affiliate.id) : null,
+    affiliate ? getAffiliateBank(affiliate.id) : null,
+    affiliate ? getAffiliatePayouts(affiliate.id) : [],
+    listPaystackBanks(),
   ]);
 
   const code = affiliate?.code ?? "";
   const link = `${SITE_URL}/?ref=${code}`;
+  const available = balance?.available_minor ?? 0;
 
   return (
     <main className="max-w-2xl mx-auto px-5 py-8">
@@ -34,36 +53,60 @@ export default async function AffiliatePage() {
         <span className="font-medium text-ink">{settings.affiliate_percent}%</span> of the sale.
       </p>
 
-      {/* Earnings */}
-      <div className="grid grid-cols-2 gap-3 mb-6">
+      <div className="grid grid-cols-3 gap-3 mb-6">
         <div className="bg-muted rounded-md p-4">
-          <p className="text-[13px] text-ink-soft m-0 mb-[6px]">Total earned</p>
-          <p className="text-[22px] font-medium m-0">
-            {formatPrice(stats?.earned_minor ?? 0, "NGN")}
-          </p>
+          <p className="text-[12px] text-ink-soft m-0 mb-[6px]">Available</p>
+          <p className="text-[20px] font-medium m-0">{formatPrice(available, "NGN")}</p>
         </div>
         <div className="bg-muted rounded-md p-4">
-          <p className="text-[13px] text-ink-soft m-0 mb-[6px]">Referred sales</p>
-          <p className="text-[22px] font-medium m-0">{stats?.referrals ?? 0}</p>
+          <p className="text-[12px] text-ink-soft m-0 mb-[6px]">Total earned</p>
+          <p className="text-[20px] font-medium m-0">{formatPrice(balance?.earned_minor ?? 0, "NGN")}</p>
+        </div>
+        <div className="bg-muted rounded-md p-4">
+          <p className="text-[12px] text-ink-soft m-0 mb-[6px]">Referred sales</p>
+          <p className="text-[20px] font-medium m-0">{stats?.referrals ?? 0}</p>
         </div>
       </div>
 
-      {/* Referral link */}
       <p className="text-[12px] font-medium m-0 mb-2">Your referral link</p>
-      <ShareLink
-        url={link}
-        message="Check out this software on DoyinSoft —"
-      />
+      <ShareLink url={link} message="Check out this software on DoyinSoft —" />
 
-      <div className="mt-8 border-t border-line pt-5">
-        <p className="text-[13px] font-medium m-0 mb-2">How it works</p>
-        <ol className="text-[13px] text-ink-soft leading-[1.8] pl-4 m-0">
-          <li>Share your link anywhere — WhatsApp, X, groups, your blog.</li>
-          <li>Anyone who clicks it is tagged to you for 30 days.</li>
-          <li>When they buy, you earn {settings.affiliate_percent}% of the sale.</li>
-          <li>Earnings are paid out to your bank (contact support to withdraw).</li>
-        </ol>
+      {/* Withdraw */}
+      <div className="mt-8">
+        <p className="text-[13px] font-medium m-0 mb-2">Withdraw earnings</p>
+        <div className="mb-3">
+          <WithdrawButton canWithdraw={available > 0} />
+        </div>
+        <BankForm
+          banks={banks}
+          bankCode={bank?.bank_code ?? null}
+          accountNumber={bank?.account_number ?? null}
+          accountName={bank?.account_name ?? null}
+        />
       </div>
+
+      {/* History */}
+      {payouts.length > 0 && (
+        <div className="mt-8">
+          <p className="text-[13px] font-medium m-0 mb-2">Payout history</p>
+          {payouts.map((p) => (
+            <div
+              key={p.id}
+              className="flex items-center justify-between py-2 border-t border-line text-[13px]"
+            >
+              <span className="text-ink-soft">{shortDate(p.created_at)}</span>
+              <span>{formatPrice(p.amount_minor, "NGN")}</span>
+              <span
+                className={`text-[11px] px-2 py-[2px] rounded-md ${
+                  p.status === "paid" ? "bg-success-bg text-success" : "bg-info-bg text-info"
+                }`}
+              >
+                {p.status}
+              </span>
+            </div>
+          ))}
+        </div>
+      )}
     </main>
   );
 }
