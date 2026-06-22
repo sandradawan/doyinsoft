@@ -10,6 +10,7 @@ import { logAudit } from "@/lib/audit";
 import { saveSettings } from "@/lib/settings";
 import { refundPaystackTransaction } from "@/lib/paystack";
 import { markAffiliatePayoutPaid } from "@/lib/affiliate";
+import { emailText, isEmailConfigured } from "@/lib/email";
 
 const SITE_URL = process.env.NEXT_PUBLIC_SITE_URL ?? "http://localhost:3000";
 
@@ -215,6 +216,35 @@ export async function deleteCategory(formData: FormData) {
   await createAdminClient().from("categories").delete().eq("id", id);
   await logAudit(adminEmail, "delete_category", "category", id);
   revalidatePath("/admin/categories");
+}
+
+// ---- Email test --------------------------------------------------------------
+
+export interface TestEmailState {
+  error?: string;
+  success?: string;
+}
+
+export async function sendTestEmail(): Promise<TestEmailState> {
+  const adminEmail = await requireAdmin();
+  if (!isEmailConfigured) {
+    return {
+      error:
+        "Email is NOT configured in this environment. Set GMAIL_USER + GMAIL_APP_PASSWORD (or RESEND_API_KEY) in your deployment and redeploy.",
+    };
+  }
+  await sendEmail({
+    to: adminEmail,
+    subject: "DoyinSoft — production email test ✅",
+    html: emailLayout(
+      "Email is working ✅",
+      emailText(
+        "If you can read this, transactional email (receipts, license keys, sale alerts) is working in this environment."
+      )
+    ),
+  });
+  await logAudit(adminEmail, "send_test_email", "email");
+  return { success: `Sent to ${adminEmail}. Check your inbox (and spam folder).` };
 }
 
 // ---- Settings ----------------------------------------------------------------

@@ -15,6 +15,9 @@ export function Footer() {
           <Link href="/" className="text-ink-soft no-underline hover:text-ink">
             Browse
           </Link>
+          <Link href="/stores" className="text-ink-soft no-underline hover:text-ink">
+            Stores
+          </Link>
           <Link href="/sign-up" className="text-ink-soft no-underline hover:text-ink">
             Sell on DoyinSoft
           </Link>
