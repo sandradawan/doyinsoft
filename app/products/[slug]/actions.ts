@@ -6,6 +6,7 @@ import { createAdminClient } from "@/lib/supabase/admin";
 import { hasServiceRole, isSupabaseConfigured } from "@/lib/supabase/env";
 import { getCurrentUser } from "@/lib/auth";
 import { hasPurchased } from "@/lib/data";
+import { clientId, isBot, rateLimit } from "@/lib/ratelimit";
 
 export interface ReviewState {
   error?: string;
@@ -27,6 +28,12 @@ export async function addReview(
 
   if (!productId) return { error: "Missing product." };
   if (!(rating >= 1 && rating <= 5)) return { error: "Please choose a rating from 1 to 5." };
+
+  // Abuse guards: silently drop bots (honeypot) and rate-limit per IP.
+  if (isBot(formData)) return { success: "Thanks — your review has been posted." };
+  if (!rateLimit(`review:${await clientId()}`, 5, 60_000)) {
+    return { error: "You're posting too fast — please try again shortly." };
+  }
 
   // Verified-purchase only.
   const user = await getCurrentUser();

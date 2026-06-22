@@ -35,6 +35,16 @@ export function ReviewForm({ productId, slug }: { productId: string; slug: strin
       <input type="hidden" name="product_id" value={productId} />
       <input type="hidden" name="slug" value={slug} />
       <input type="hidden" name="rating" value={rating} />
+      {/* Honeypot — hidden from humans; bots fill it. */}
+      <input
+        type="text"
+        name="website"
+        tabIndex={-1}
+        autoComplete="off"
+        aria-hidden="true"
+        className="hidden"
+      />
+
 
       {/* Star picker */}
       <div className="flex items-center gap-1 mb-3">

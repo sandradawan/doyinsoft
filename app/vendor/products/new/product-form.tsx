@@ -17,6 +17,14 @@ function slugify(input: string): string {
     .replace(/^-+|-+$/g, "");
 }
 
+type ProductType = "digital" | "physical" | "service";
+
+const TYPE_OPTIONS: { value: ProductType; label: string; hint: string }[] = [
+  { value: "digital", label: "Digital", hint: "Software, files, license keys — delivered instantly on payment." },
+  { value: "physical", label: "Physical", hint: "Goods you ship. Buyer's delivery address is collected at checkout." },
+  { value: "service", label: "Service", hint: "Work you fulfil. Buyer's contact is collected at checkout." },
+];
+
 export function ProductForm({ categories = [] }: { categories?: string[] }) {
   const [state, formAction, isPending] = useActionState<CreateProductState, FormData>(
     createProduct,
@@ -24,6 +32,9 @@ export function ProductForm({ categories = [] }: { categories?: string[] }) {
   );
   const [uploading, setUploading] = useState(false);
   const [uploadError, setUploadError] = useState<string | null>(null);
+  const [type, setType] = useState<ProductType>("digital");
+
+  const isDigital = type === "digital";
 
   async function onSubmit(e: React.FormEvent<HTMLFormElement>) {
     e.preventDefault();
@@ -62,6 +73,7 @@ export function ProductForm({ categories = [] }: { categories?: string[] }) {
   }
 
   const busy = uploading || isPending;
+  const typeMeta = TYPE_OPTIONS.find((t) => t.value === type)!;
 
   return (
     <form onSubmit={onSubmit} className="max-w-xl">
@@ -71,39 +83,50 @@ export function ProductForm({ categories = [] }: { categories?: string[] }) {
         </p>
       )}
 
+      {/* What are you selling? — drives the rest of the form */}
+      <div className="mb-5">
+        <label className={labelCls}>What are you selling?</label>
+        <input type="hidden" name="product_type" value={type} />
+        <div className="inline-flex rounded-md border border-line overflow-hidden">
+          {TYPE_OPTIONS.map((t) => (
+            <button
+              key={t.value}
+              type="button"
+              onClick={() => setType(t.value)}
+              className={[
+                "text-[13px] px-4 py-2 border-r border-line last:border-r-0 cursor-pointer transition-colors",
+                type === t.value ? "bg-brand text-white font-medium" : "bg-transparent text-ink-soft hover:bg-muted",
+              ].join(" ")}
+            >
+              {t.label}
+            </button>
+          ))}
+        </div>
+        <p className={hintCls}>{typeMeta.hint}</p>
+      </div>
+
       <div className="mb-4">
-        <label className={labelCls}>Product name</label>
-        <input name="name" required className="field w-full" placeholder="VectorForge" />
+        <label className={labelCls}>{isDigital ? "Product name" : "Title"}</label>
+        <input name="name" required className="field w-full" placeholder={isDigital ? "VectorForge" : "Ankara two-piece set"} />
       </div>
 
       <div className="mb-4">
         <label className={labelCls}>Slug</label>
-        <input name="slug" className="field w-full" placeholder="vectorforge" />
-        <p className={hintCls}>Used in the URL. Leave blank to generate from the name.</p>
+        <input name="slug" className="field w-full" placeholder="auto-generated from the title" />
+        <p className={hintCls}>Used in the URL. Leave blank to generate from the title.</p>
       </div>
 
-      {/* App icon */}
+      {/* Images */}
       <div className="mb-4">
-        <label className={labelCls}>App icon</label>
+        <label className={labelCls}>{isDigital ? "App icon" : "Cover photo"}</label>
         <input name="icon" type="file" accept="image/*" className={fileCls} />
-        <p className={hintCls}>Square image (PNG/JPG/SVG). Shown on cards and the product page.</p>
+        <p className={hintCls}>Square image. Shown on cards and at the top of the page.</p>
       </div>
 
-      {/* Screenshots */}
       <div className="mb-4">
-        <label className={labelCls}>Screenshots</label>
+        <label className={labelCls}>{isDigital ? "Screenshots" : "Photos"}</label>
         <input name="screenshots" type="file" accept="image/*" multiple className={fileCls} />
-        <p className={hintCls}>Up to 6 images. The first is shown large on the product page.</p>
-      </div>
-
-      <div className="mb-4">
-        <label className={labelCls}>Product type</label>
-        <select name="product_type" className="field w-full" defaultValue="digital">
-          <option value="digital">Digital — buyers download it / get a license</option>
-          <option value="physical">Physical — you ship it to the buyer</option>
-          <option value="service">Service — you fulfil / contact the buyer</option>
-        </select>
-        <p className={hintCls}>Digital delivers instantly; physical & service collect the buyer’s contact.</p>
+        <p className={hintCls}>Up to 6 images. The first is shown large. Good photos sell — add several.</p>
       </div>
 
       <div className="mb-4">
@@ -111,7 +134,7 @@ export function ProductForm({ categories = [] }: { categories?: string[] }) {
         <input
           name="tagline"
           className="field w-full"
-          placeholder="Vector illustration, offline-first"
+          placeholder={isDigital ? "Vector illustration, offline-first" : "Handmade, ships nationwide"}
         />
       </div>
 
@@ -119,9 +142,15 @@ export function ProductForm({ categories = [] }: { categories?: string[] }) {
         <label className={labelCls}>Description</label>
         <textarea
           name="description"
-          rows={3}
+          rows={4}
           className="field w-full resize-y"
-          placeholder="What it does, who it's for…"
+          placeholder={
+            isDigital
+              ? "What it does, who it's for…"
+              : type === "physical"
+                ? "Materials, sizes/colours available, what's in the box, delivery time…"
+                : "What's included, turnaround time, how you deliver…"
+          }
         />
       </div>
 
@@ -140,74 +169,79 @@ export function ProductForm({ categories = [] }: { categories?: string[] }) {
         </div>
       </div>
 
-      <div className="grid grid-cols-2 gap-3 mb-4">
-        <div>
-          <label className={labelCls}>Platform</label>
-          <select name="platform" className="field w-full" defaultValue="desktop">
-            <option value="desktop">Desktop</option>
-            <option value="mobile">Mobile</option>
-            <option value="web">Web app</option>
-          </select>
-        </div>
-        <div>
-          <label className={labelCls}>Category</label>
-          <input
-            name="category"
-            list="category-list"
-            className="field w-full"
-            placeholder="Design tools"
-          />
-          <datalist id="category-list">
-            {categories.map((c) => (
-              <option key={c} value={c} />
-            ))}
-          </datalist>
-        </div>
-      </div>
-
-      <div className="grid grid-cols-2 gap-3 mb-4">
-        <div>
-          <label className={labelCls}>Version</label>
-          <input name="version" className="field w-full" defaultValue="1.0.0" />
-        </div>
-        <div>
-          <label className={labelCls}>Platform badges</label>
-          <input name="os_badges" className="field w-full" placeholder="Windows, macOS" />
-          <p className={hintCls}>Comma-separated.</p>
-        </div>
-      </div>
-
       <div className="mb-4">
-        <label className={labelCls}>System requirements</label>
-        <input
-          name="system_requirements"
-          className="field w-full"
-          placeholder="Windows 10+, 4GB RAM, 500MB disk"
-        />
+        <label className={labelCls}>Category</label>
+        <input name="category" list="category-list" className="field w-full" placeholder="e.g. Design tools, Fashion" />
+        <datalist id="category-list">
+          {categories.map((c) => (
+            <option key={c} value={c} />
+          ))}
+        </datalist>
       </div>
 
-      <div className="mb-2">
-        <label className={labelCls}>Download link</label>
-        <input
-          name="download_url"
-          type="url"
-          className="field w-full"
-          placeholder="https://drive.google.com/uc?export=download&id=…"
-        />
-        <p className={hintCls}>
-          Direct-download link to your installer (Drive, Dropbox, GitHub release…). Buyers
-          only see it after purchase.
+      {/* Digital-only fields */}
+      {isDigital ? (
+        <>
+          <div className="grid grid-cols-2 gap-3 mb-4">
+            <div>
+              <label className={labelCls}>Platform</label>
+              <select name="platform" className="field w-full" defaultValue="desktop">
+                <option value="desktop">Desktop</option>
+                <option value="mobile">Mobile</option>
+                <option value="web">Web app</option>
+              </select>
+            </div>
+            <div>
+              <label className={labelCls}>Version</label>
+              <input name="version" className="field w-full" defaultValue="1.0.0" />
+            </div>
+          </div>
+
+          <div className="mb-4">
+            <label className={labelCls}>Platform badges</label>
+            <input name="os_badges" className="field w-full" placeholder="Windows, macOS" />
+            <p className={hintCls}>Comma-separated.</p>
+          </div>
+
+          <div className="mb-4">
+            <label className={labelCls}>System requirements</label>
+            <input
+              name="system_requirements"
+              className="field w-full"
+              placeholder="Windows 10+, 4GB RAM, 500MB disk"
+            />
+          </div>
+
+          <div className="mb-2">
+            <label className={labelCls}>Download link</label>
+            <input
+              name="download_url"
+              type="url"
+              className="field w-full"
+              placeholder="https://drive.google.com/uc?export=download&id=…"
+            />
+            <p className={hintCls}>
+              Direct-download link to your file (Drive, Dropbox, GitHub release…). Buyers only see it
+              after purchase.
+            </p>
+          </div>
+
+          <div className="mb-6 max-w-[200px]">
+            <label className={labelCls}>File size (MB)</label>
+            <input name="file_size_mb" type="number" min="0" step="1" className="field w-full" placeholder="700" />
+            <p className={hintCls}>Optional — shown to buyers.</p>
+          </div>
+        </>
+      ) : (
+        <p className="text-[12px] text-info bg-info-bg rounded-md px-3 py-2 mb-6">
+          {type === "physical"
+            ? "After payment, you'll get the buyer's delivery address in Orders, and can mark it shipped/delivered. No download or version needed."
+            : "After payment, you'll get the buyer's contact in Orders to fulfil the service. No download or version needed."}
         </p>
-      </div>
-
-      <div className="mb-6 max-w-[200px]">
-        <label className={labelCls}>File size (MB)</label>
-        <input name="file_size_mb" type="number" min="0" step="1" className="field w-full" placeholder="700" />
-        <p className={hintCls}>Optional — shown to buyers.</p>
-      </div>
+      )}
 
       <button type="submit" disabled={busy} className="btn-primary px-4 py-2">
-        {uploading ? "Uploading images…" : isPending ? "Saving…" : "Publish product"}
+        {uploading ? "Uploading images…" : isPending ? "Saving…" : "Publish"}
       </button>
     </form>
   );

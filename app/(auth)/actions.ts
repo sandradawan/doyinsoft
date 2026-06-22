@@ -5,6 +5,7 @@ import { createClient } from "@/lib/supabase/server";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { hasServiceRole, isSupabaseConfigured } from "@/lib/supabase/env";
 import { initialsOf } from "@/lib/format";
+import { clientId, isBot, rateLimit } from "@/lib/ratelimit";
 
 const SITE_URL = process.env.NEXT_PUBLIC_SITE_URL ?? "http://localhost:3000";
 
@@ -46,6 +47,9 @@ export async function signIn(_prev: AuthState, formData: FormData): Promise<Auth
 
 export async function signUp(_prev: AuthState, formData: FormData): Promise<AuthState> {
   if (!isSupabaseConfigured) return { error: DEMO_MSG };
+  if (isBot(formData)) return { error: "Something went wrong. Please try again." };
+  if (!rateLimit(`signup:${await clientId()}`, 5, 60_000))
+    return { error: "Too many attempts — please wait a minute and try again." };
 
   const businessName = String(formData.get("business_name") ?? "").trim();
   const email = String(formData.get("email") ?? "").trim();
@@ -94,6 +98,9 @@ export async function signUp(_prev: AuthState, formData: FormData): Promise<Auth
 /** Buyer sign-up — creates an auth account only (no vendor profile). */
 export async function signUpBuyer(_prev: AuthState, formData: FormData): Promise<AuthState> {
   if (!isSupabaseConfigured) return { error: DEMO_MSG };
+  if (isBot(formData)) return { error: "Something went wrong. Please try again." };
+  if (!rateLimit(`signup:${await clientId()}`, 5, 60_000))
+    return { error: "Too many attempts — please wait a minute and try again." };
 
   const email = String(formData.get("email") ?? "").trim();
   const password = String(formData.get("password") ?? "");

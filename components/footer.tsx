@@ -36,6 +36,9 @@ export function Footer() {
         <Link href="/legal/refunds" className="text-ink-faint no-underline hover:text-ink-soft">
           Refunds
         </Link>
+        <Link href="/legal" className="text-ink-faint no-underline hover:text-ink-soft">
+          All policies
+        </Link>
       </nav>
       <p className="text-[11px] text-ink-faint mt-2 m-0">
         © {2026} DoyinSoft. All rights reserved.
