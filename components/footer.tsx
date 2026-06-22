@@ -26,7 +26,18 @@ export function Footer() {
           </Link>
         </nav>
       </div>
-      <p className="text-[11px] text-ink-faint mt-4 m-0">
+      <nav className="flex flex-wrap gap-4 text-[11px] mt-4">
+        <Link href="/legal/terms" className="text-ink-faint no-underline hover:text-ink-soft">
+          Terms
+        </Link>
+        <Link href="/legal/privacy" className="text-ink-faint no-underline hover:text-ink-soft">
+          Privacy
+        </Link>
+        <Link href="/legal/refunds" className="text-ink-faint no-underline hover:text-ink-soft">
+          Refunds
+        </Link>
+      </nav>
+      <p className="text-[11px] text-ink-faint mt-2 m-0">
         © {2026} DoyinSoft. All rights reserved.
       </p>
     </footer>
