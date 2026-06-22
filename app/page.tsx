@@ -1,6 +1,6 @@
 import Link from "next/link";
 import { TopNav } from "@/components/top-nav";
-import { FilterPills } from "@/components/filter-pills";
+import { CategorySelect } from "@/components/category-select";
 import { ProductCard } from "@/components/product-card";
 import { HeroCarousel } from "@/components/hero-carousel";
 import { Footer } from "@/components/footer";
@@ -53,16 +53,6 @@ export default async function HomePage({
     return qs ? `/?${qs}` : "/";
   };
 
-  // Preserve other filters when switching category.
-  const catHref = (c: string) => {
-    const params = new URLSearchParams();
-    if (active !== "all") params.set("platform", active);
-    if (query) params.set("q", query);
-    if (activeType !== "all") params.set("type", activeType);
-    if (c) params.set("category", c);
-    const qs = params.toString();
-    return qs ? `/?${qs}` : "/";
-  };
   // Prefer admin-featured products; fall back to top-rated if none are featured.
   const featuredFlagged = all.filter((p) => p.featured);
   const featured = (
@@ -92,72 +82,46 @@ export default async function HomePage({
         </section>
       )}
 
-      {/* Browse by type */}
-      <div className="flex gap-2 flex-wrap mb-3">
-        {TYPES.map((t) => (
-          <Link
-            key={t.value}
-            href={typeHref(t.value)}
-            className={[
-              "text-[12px] px-3 py-[5px] rounded-md no-underline border transition-colors",
-              activeType === t.value
-                ? "border-brand text-brand bg-brand-tint font-medium"
-                : "border-line text-ink-soft hover:border-line-strong hover:text-ink",
-            ].join(" ")}
-          >
-            {t.label}
-          </Link>
-        ))}
-      </div>
-
-      <FilterPills active={active === "free" ? "free" : active} />
-
-      {/* Category filter */}
-      {categories.length > 0 && (
-        <div className="flex gap-2 flex-wrap mb-4 -mt-1">
-          <Link
-            href={catHref("")}
-            className={[
-              "text-[12px] px-3 py-[5px] rounded-md no-underline border transition-colors",
-              !activeCategory
-                ? "border-brand text-brand bg-brand-tint font-medium"
-                : "border-line text-ink-soft hover:border-line-strong hover:text-ink",
-            ].join(" ")}
-          >
-            All categories
-          </Link>
-          {categories.map((c) => (
+      {/* Toolbar: type segmented control + category dropdown */}
+      <div className="flex items-center justify-between gap-3 flex-wrap mb-5">
+        <div className="inline-flex rounded-md border border-line overflow-hidden">
+          {TYPES.map((t) => (
             <Link
-              key={c}
-              href={catHref(c)}
+              key={t.value}
+              href={typeHref(t.value)}
               className={[
-                "text-[12px] px-3 py-[5px] rounded-md no-underline border transition-colors",
-                activeCategory === c
-                  ? "border-brand text-brand bg-brand-tint font-medium"
-                  : "border-line text-ink-soft hover:border-line-strong hover:text-ink",
+                "text-[12px] px-3 py-[7px] no-underline border-r border-line last:border-r-0 transition-colors",
+                activeType === t.value
+                  ? "bg-brand text-white font-medium"
+                  : "text-ink-soft hover:text-ink hover:bg-muted",
               ].join(" ")}
             >
-              {c}
+              {t.label}
             </Link>
           ))}
         </div>
-      )}
+        {categories.length > 0 && (
+          <CategorySelect categories={categories} value={activeCategory} type={activeType} q={query} />
+        )}
+      </div>
 
       {(query || activeCategory) && (
-        <p className="text-[12px] text-ink-soft mb-3">
-          {products.length} result{products.length === 1 ? "" : "s"}
-          {query ? ` for “${query}”` : ""}
-          {activeCategory ? ` in ${activeCategory}` : ""} ·{" "}
-          <Link href="/" className="text-brand no-underline hover:underline">
-            Clear
+        <div className="flex items-center justify-between mb-4">
+          <p className="text-[14px] font-medium m-0">
+            {products.length} result{products.length === 1 ? "" : "s"}
+            {query ? ` for “${query}”` : ""}
+            {activeCategory ? ` in ${activeCategory}` : ""}
+          </p>
+          <Link href="/" className="text-[12px] text-brand no-underline hover:underline">
+            Clear filters
           </Link>
-        </p>
+        </div>
       )}
 
       {/* Product grid */}
       <section
         className="grid gap-3"
-        style={{ gridTemplateColumns: "repeat(auto-fit, minmax(140px, 1fr))" }}
+        style={{ gridTemplateColumns: "repeat(auto-fit, minmax(150px, 1fr))" }}
       >
         {products.map((product) => (
           <ProductCard key={product.id} product={product} />
