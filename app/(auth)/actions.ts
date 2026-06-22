@@ -6,6 +6,7 @@ import { createAdminClient } from "@/lib/supabase/admin";
 import { hasServiceRole, isSupabaseConfigured } from "@/lib/supabase/env";
 import { initialsOf } from "@/lib/format";
 import { clientId, isBot, rateLimit } from "@/lib/ratelimit";
+import { emailButton, emailLayout, emailText, sendEmail } from "@/lib/email";
 
 const SITE_URL = process.env.NEXT_PUBLIC_SITE_URL ?? "http://localhost:3000";
 
@@ -88,6 +89,22 @@ export async function signUp(_prev: AuthState, formData: FormData): Promise<Auth
     }
   }
 
+  // Welcome the new vendor.
+  await sendEmail({
+    to: email,
+    subject: "Welcome to DoyinSoft — let's get you selling",
+    html: emailLayout(
+      `Welcome, ${businessName} 👋`,
+      `${emailText("Your seller account is ready. Here's how to get to your first sale:")}
+       <ul style="font-size:13px;color:#525252;line-height:1.8;padding-left:18px;margin:0 0 16px;">
+         <li>Add your WhatsApp number and connect your bank</li>
+         <li>List your first product (software, digital, physical or a service)</li>
+         <li>Share your link and start earning</li>
+       </ul>
+       <div style="margin:18px 0;">${emailButton(`${SITE_URL}/vendor/dashboard`, "Go to your dashboard")}</div>`
+    ),
+  });
+
   // If email confirmation is off, a session exists now → straight to dashboard.
   if (data.session) redirect(next);
 
@@ -115,6 +132,18 @@ export async function signUpBuyer(_prev: AuthState, formData: FormData): Promise
     options: { emailRedirectTo: `${SITE_URL}/auth/callback?next=${encodeURIComponent(next)}` },
   });
   if (error) return { error: error.message };
+
+  // Welcome the new buyer.
+  await sendEmail({
+    to: email,
+    subject: "Welcome to DoyinSoft 👋",
+    html: emailLayout(
+      "Welcome to DoyinSoft 👋",
+      `${emailText("Your account is ready. Discover software, digital products, fashion and services from independent African sellers.")}
+       ${emailText(`Tip: refer friends and <a href="${SITE_URL}/affiliate" style="color:#047857;">earn a commission</a> on what they buy.`)}
+       <div style="margin:18px 0;">${emailButton(SITE_URL, "Start browsing")}</div>`
+    ),
+  });
 
   if (data.session) redirect(next);
   redirect("/sign-in?notice=confirm-email");

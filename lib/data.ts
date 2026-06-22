@@ -10,6 +10,7 @@ import { hasServiceRole, isSupabaseConfigured } from "./supabase/env";
 import { deterministicLicenseKey, generateLicenseKey } from "./license";
 import { emailButton, emailKeyBox, emailLayout, emailText, sendEmail } from "./email";
 import { getSettings } from "./settings";
+import { formatPrice } from "./format";
 
 const SITE_URL = process.env.NEXT_PUBLIC_SITE_URL ?? "http://localhost:3000";
 import {
@@ -962,10 +963,10 @@ export async function issueLicenseForOrder(
   const existing = await getLicenseByOrder(orderId);
   if (existing) return existing;
 
-  // Look up the order to get the product, then mark it paid and mint the key.
+  // Look up the order, then mark it paid and mint the key.
   const { data: order } = await admin
     .from("orders")
-    .select("id, product_id, amount_minor, affiliate_id")
+    .select("id, product_id, vendor_id, amount_minor, currency, affiliate_id, product:products(name, product_type)")
     .eq("id", orderId)
     .maybeSingle();
   if (!order) return null;
@@ -975,11 +976,25 @@ export async function issueLicenseForOrder(
     .update({ status: "paid", ...(reference ? { reference } : {}) })
     .eq("id", orderId);
 
+  const o = order as {
+    product_id: string;
+    vendor_id: string;
+    amount_minor: number;
+    currency: "NGN" | "USD";
+    affiliate_id: string | null;
+    product: { name: string; product_type?: string } | { name: string; product_type?: string }[] | null;
+  };
+  const op = Array.isArray(o.product) ? o.product[0] : o.product;
+  const productName = op?.name ?? "your order";
+  const isDigital = (op?.product_type ?? "digital") === "digital";
+  const amountStr = formatPrice(o.amount_minor, o.currency);
+  const ref = orderId.slice(0, 8).toUpperCase();
+
   // Credit the referring affiliate (idempotent via unique index on order_id).
-  const o = order as { amount_minor: number; affiliate_id: string | null };
+  let commission = 0;
   if (o.affiliate_id) {
     const { affiliate_percent } = await getSettings();
-    const commission = Math.round((o.amount_minor * affiliate_percent) / 100);
+    commission = Math.round((o.amount_minor * affiliate_percent) / 100);
     await admin
       .from("referrals")
       .insert({ affiliate_id: o.affiliate_id, order_id: orderId, amount_minor: commission })
@@ -990,7 +1005,7 @@ export async function issueLicenseForOrder(
     .from("licenses")
     .insert({
       order_id: orderId,
-      product_id: (order as { product_id: string }).product_id,
+      product_id: o.product_id,
       key: generateLicenseKey(),
       email,
       status: "active",
@@ -1001,21 +1016,65 @@ export async function issueLicenseForOrder(
   if (!inserted) return null;
   const license = mapLicense(inserted as unknown as LicenseRow);
 
-  // Email the buyer their key + download link (no-op if email isn't configured).
+  const receiptLine = `<table role="presentation" width="100%" style="margin:0 0 16px;border-collapse:collapse;">
+    <tr><td style="font-size:12px;color:#737373;padding:4px 0;">Item</td><td style="font-size:12px;color:#171717;padding:4px 0;text-align:right;">${productName}</td></tr>
+    <tr><td style="font-size:12px;color:#737373;padding:4px 0;">Amount paid</td><td style="font-size:12px;color:#171717;padding:4px 0;text-align:right;font-weight:600;">${amountStr}</td></tr>
+    <tr><td style="font-size:12px;color:#737373;padding:4px 0;">Order</td><td style="font-size:12px;color:#171717;padding:4px 0;text-align:right;">#${ref}</td></tr>
+  </table>`;
+
+  // 1) Buyer — receipt (+ licence & download for digital).
   if (license.email) {
     const dl = `${SITE_URL}/api/download?order=${encodeURIComponent(orderId)}&key=${encodeURIComponent(license.key)}`;
-    await sendEmail({
-      to: license.email,
-      subject: `Your ${license.product.name} license + download`,
-      html: emailLayout(
-        "Thank you for your purchase 🎉",
-        `${emailText(`Your license for <strong style="color:#171717">${license.product.name}</strong> is ready. Keep this email — it’s your proof of purchase.`)}
-         <p style="font-size:12px;color:#737373;margin:0 0 8px;">Your license key</p>
+    const digitalBlock = `<p style="font-size:12px;color:#737373;margin:0 0 8px;">Your license key</p>
          ${emailKeyBox(license.key)}
          <div style="margin:22px 0;">${emailButton(dl, "⬇  Download now")}</div>
-         ${emailText(`You can also find your purchases any time on your <a href="${SITE_URL}/downloads" style="color:#047857;">downloads page</a>.`)}`
+         ${emailText(`Find your purchases any time on your <a href="${SITE_URL}/downloads" style="color:#047857;">downloads page</a>.`)}`;
+    const physicalBlock = emailText(
+      "Your payment is confirmed. The seller has your details and will fulfil your order — they may contact you with delivery updates."
+    );
+    await sendEmail({
+      to: license.email,
+      subject: `Receipt — ${productName} (#${ref})`,
+      html: emailLayout(
+        "Thank you for your purchase 🎉",
+        `${emailText("Here's your receipt. Keep this email as proof of purchase.")}${receiptLine}${isDigital ? digitalBlock : physicalBlock}`
       ),
     });
+  }
+
+  // 2) Vendor — new-sale alert.
+  const vendorEmail = await getVendorOwnerEmail(o.vendor_id);
+  if (vendorEmail) {
+    await sendEmail({
+      to: vendorEmail,
+      subject: `💰 You made a sale — ${productName}`,
+      html: emailLayout(
+        "You made a sale! 💰",
+        `${emailText(`<strong style="color:#171717">${productName}</strong> just sold for <strong style="color:#171717">${amountStr}</strong> (order #${ref}). Your share settles to your bank automatically.`)}
+         <div style="margin:18px 0;">${emailButton(`${SITE_URL}/vendor/dashboard`, "View dashboard")}</div>`
+      ),
+    });
+  }
+
+  // 3) Affiliate — earnings alert.
+  if (o.affiliate_id && commission > 0) {
+    const { data: aff } = await admin
+      .from("affiliates")
+      .select("email")
+      .eq("id", o.affiliate_id)
+      .maybeSingle();
+    const affEmail = (aff as { email?: string } | null)?.email;
+    if (affEmail) {
+      await sendEmail({
+        to: affEmail,
+        subject: `🎉 You earned ${formatPrice(commission, o.currency)} on DoyinSoft`,
+        html: emailLayout(
+          "You earned a commission! 🎉",
+          `${emailText(`Someone bought <strong style="color:#171717">${productName}</strong> through your referral link. You earned <strong style="color:#171717">${formatPrice(commission, o.currency)}</strong>.`)}
+           <div style="margin:18px 0;">${emailButton(`${SITE_URL}/affiliate`, "View earnings")}</div>`
+        ),
+      });
+    }
   }
 
   return license;
