@@ -2,9 +2,12 @@ import { TrendingUp, TrendingDown } from "lucide-react";
 import { VendorShell } from "@/components/vendor-shell";
 import { StatusBadge } from "@/components/status-badge";
 import { BarChart, LineChart } from "@/components/charts";
+import { VendorOnboarding } from "@/components/vendor-onboarding";
 import {
   getDashboardMetrics,
   getRecentOrders,
+  getVendorProducts,
+  getVendorSubaccount,
   vendorMonthlyStats,
   vendorTopProducts,
 } from "@/lib/data";
@@ -13,11 +16,13 @@ import { formatPrice } from "@/lib/format";
 
 export default async function VendorDashboardPage() {
   const vendor = await requireVendor();
-  const [metrics, orders, monthly, topProducts] = await Promise.all([
+  const [metrics, orders, monthly, topProducts, products, subaccount] = await Promise.all([
     getDashboardMetrics(vendor.id),
     getRecentOrders(vendor.id),
     vendorMonthlyStats(vendor.id),
     vendorTopProducts(vendor.id),
+    getVendorProducts(vendor.id),
+    getVendorSubaccount(vendor.id),
   ]);
 
   const last = monthly[monthly.length - 1]?.revenue_minor ?? 0;
@@ -44,6 +49,13 @@ export default async function VendorDashboardPage() {
           Demo mode — connect Supabase and sign up to manage a real vendor account.
         </p>
       )}
+
+      <VendorOnboarding
+        whatsappDone={Boolean(vendor.whatsapp)}
+        bankDone={subaccount.connected}
+        productDone={products.length > 0}
+        saleDone={orders.some((o) => o.status === "paid")}
+      />
 
       {/* Metric cards */}
       <div className="grid [grid-template-columns:repeat(3,1fr)] gap-3 mb-4">
