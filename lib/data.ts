@@ -8,7 +8,7 @@ import { createClient } from "./supabase/server";
 import { createAdminClient } from "./supabase/admin";
 import { hasServiceRole, isSupabaseConfigured } from "./supabase/env";
 import { deterministicLicenseKey, generateLicenseKey } from "./license";
-import { emailLayout, sendEmail } from "./email";
+import { emailButton, emailKeyBox, emailLayout, emailText, sendEmail } from "./email";
 import { getSettings } from "./settings";
 
 const SITE_URL = process.env.NEXT_PUBLIC_SITE_URL ?? "http://localhost:3000";
@@ -1006,13 +1006,14 @@ export async function issueLicenseForOrder(
     const dl = `${SITE_URL}/api/download?order=${encodeURIComponent(orderId)}&key=${encodeURIComponent(license.key)}`;
     await sendEmail({
       to: license.email,
-      subject: `Your ${license.product.name} license`,
+      subject: `Your ${license.product.name} license + download`,
       html: emailLayout(
-        "Thanks for your purchase 🎉",
-        `<p>Here is your license for <strong>${license.product.name}</strong>:</p>
-         <p style="font-size:15px;font-weight:600;letter-spacing:.5px">${license.key}</p>
-         <p><a href="${dl}" style="background:#047857;color:#fff;text-decoration:none;padding:10px 16px;border-radius:8px;display:inline-block">Download software</a></p>
-         <p style="font-size:12px;color:#737373">Or find it any time on your downloads page.</p>`
+        "Thank you for your purchase 🎉",
+        `${emailText(`Your license for <strong style="color:#171717">${license.product.name}</strong> is ready. Keep this email — it’s your proof of purchase.`)}
+         <p style="font-size:12px;color:#737373;margin:0 0 8px;">Your license key</p>
+         ${emailKeyBox(license.key)}
+         <div style="margin:22px 0;">${emailButton(dl, "⬇  Download now")}</div>
+         ${emailText(`You can also find your purchases any time on your <a href="${SITE_URL}/downloads" style="color:#047857;">downloads page</a>.`)}`
       ),
     });
   }
