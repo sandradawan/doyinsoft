@@ -17,6 +17,9 @@ export interface Vendor {
   suspended?: boolean;
   /** WhatsApp number (digits, intl) for buyer contact. */
   whatsapp?: string | null;
+  /** Store bio + cover image (store page branding). */
+  bio?: string | null;
+  cover_url?: string | null;
 }
 
 export interface Product {

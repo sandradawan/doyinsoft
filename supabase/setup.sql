@@ -296,6 +296,10 @@ on conflict (name) do nothing;
 -- Affiliate program + WhatsApp.
 alter table vendors add column if not exists whatsapp text;
 
+-- Store branding.
+alter table vendors add column if not exists bio       text;
+alter table vendors add column if not exists cover_url text;
+
 create table if not exists affiliates (
   id         uuid primary key default gen_random_uuid(),
   code       text unique not null,

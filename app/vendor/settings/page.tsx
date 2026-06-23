@@ -1,10 +1,12 @@
 import { BadgeCheck } from "lucide-react";
 import { VendorShell } from "@/components/vendor-shell";
 import { requireVendor } from "@/lib/auth";
+import { getVendorBySlug } from "@/lib/data";
 import { SettingsForm } from "./settings-form";
 
 export default async function VendorSettingsPage() {
   const vendor = await requireVendor();
+  const profile = await getVendorBySlug(vendor.slug);
 
   return (
     <VendorShell active="settings">
@@ -30,7 +32,11 @@ export default async function VendorSettingsPage() {
         </p>
       )}
 
-      <SettingsForm vendor={vendor} />
+      <SettingsForm
+        vendor={vendor}
+        bio={profile?.bio ?? null}
+        coverUrl={profile?.cover_url ?? null}
+      />
     </VendorShell>
   );
 }

@@ -28,15 +28,25 @@ export async function updateVendor(
   const initials = (initialsInput || initialsOf(name) || "V").slice(0, 2);
 
   const whatsapp = String(formData.get("whatsapp") ?? "").trim();
+  const bio = String(formData.get("bio") ?? "").trim();
+  const coverUrl = String(formData.get("cover_url") ?? "").trim(); // only set when newly uploaded
 
+  const base = { name, initials, whatsapp: whatsapp || null };
   const supabase = await createClient();
   const { error } = await supabase
     .from("vendors")
-    .update({ name, initials, whatsapp: whatsapp || null })
+    .update({ ...base, bio: bio || null, ...(coverUrl ? { cover_url: coverUrl } : {}) })
     .eq("id", vendor.id);
-  if (error) return { error: error.message };
+
+  // bio/cover_url may not exist yet (migration pending) — retry core fields only.
+  if (error) {
+    const r = await supabase.from("vendors").update(base).eq("id", vendor.id);
+    if (r.error) return { error: r.error.message };
+    return { success: "Profile updated. (Run migration 0016 to enable store bio/cover.)" };
+  }
 
   revalidatePath("/vendor/settings");
   revalidatePath("/vendor/dashboard");
+  revalidatePath(`/store/${vendor.slug}`);
   return { success: "Profile updated." };
 }

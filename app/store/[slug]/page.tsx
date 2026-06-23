@@ -7,6 +7,7 @@ import { Footer } from "@/components/footer";
 import { ProductCard } from "@/components/product-card";
 import { WhatsAppButton } from "@/components/whatsapp-button";
 import { getStoreProducts, getVendorBySlug } from "@/lib/data";
+import { formatPrice } from "@/lib/format";
 import type { Product } from "@/lib/types";
 
 const SITE_URL = process.env.NEXT_PUBLIC_SITE_URL ?? "https://doyinsoft.vercel.app";
@@ -67,6 +68,17 @@ export default async function StorePage({
   });
   list = sortProducts(list, sort);
 
+  // Spotlight the best product on the default (unfiltered) view.
+  const spotlight =
+    all.length > 2 && !query && !type && !category
+      ? [...all].sort(
+          (a, b) =>
+            Number(b.featured) - Number(a.featured) ||
+            b.rating_avg * b.rating_count - a.rating_avg * a.rating_count
+        )[0]
+      : null;
+  const spotImage = spotlight?.icon_url || spotlight?.screenshots[0] || null;
+
   return (
     <main className="max-w-5xl mx-auto px-5 py-6">
       <header className="flex items-center justify-between border-b border-line pb-[14px] mb-6">
@@ -78,7 +90,12 @@ export default async function StorePage({
 
       {/* Store banner */}
       <div className="rounded-lg overflow-hidden border border-line mb-6">
-        <div className="h-24 bg-brand" />
+        {vendor.cover_url ? (
+          // eslint-disable-next-line @next/next/no-img-element
+          <img src={vendor.cover_url} alt="" className="w-full h-32 object-cover bg-muted block" />
+        ) : (
+          <div className="h-24 bg-brand" />
+        )}
         <div className="px-5 pb-5 -mt-8">
           <div className="flex items-end gap-3 flex-wrap">
             <div className="w-16 h-16 rounded-full bg-white border border-line flex items-center justify-center text-[20px] font-medium text-brand shrink-0">
@@ -106,6 +123,10 @@ export default async function StorePage({
             </div>
           </div>
 
+          {vendor.bio && (
+            <p className="text-[13px] text-ink-soft leading-[1.6] m-0 mt-3 max-w-2xl">{vendor.bio}</p>
+          )}
+
           {/* Stat chips */}
           <div className="flex gap-2 flex-wrap mt-4">
             <span className="inline-flex items-center gap-1 text-[12px] text-ink-soft bg-muted rounded-md px-2.5 py-1">
@@ -129,6 +150,31 @@ export default async function StorePage({
           </div>
         </div>
       </div>
+
+      {/* Spotlight */}
+      {spotlight && (
+        <Link
+          href={`/products/${spotlight.slug}`}
+          className="block border border-line rounded-lg overflow-hidden mb-5 no-underline text-ink hover:border-brand transition-colors"
+        >
+          <div className="flex items-center gap-4 p-4">
+            {spotImage ? (
+              // eslint-disable-next-line @next/next/no-img-element
+              <img src={spotImage} alt="" className="w-16 h-16 rounded-md object-cover bg-muted shrink-0" />
+            ) : (
+              <div className="w-16 h-16 rounded-md bg-muted shrink-0" />
+            )}
+            <div className="flex-1 min-w-0">
+              <span className="text-[11px] uppercase tracking-wide text-brand font-medium">Spotlight</span>
+              <p className="text-[15px] font-medium m-0">{spotlight.name}</p>
+              <p className="text-[12px] text-ink-soft m-0 truncate">{spotlight.tagline}</p>
+            </div>
+            <span className="text-[15px] font-medium shrink-0">
+              {formatPrice(spotlight.price_minor, spotlight.currency)}
+            </span>
+          </div>
+        </Link>
+      )}
 
       {/* Filter / search toolbar */}
       <form method="get" className="flex flex-wrap items-center gap-2 mb-5">

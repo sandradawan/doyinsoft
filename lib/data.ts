@@ -52,6 +52,8 @@ interface VendorRow {
   verified: boolean;
   suspended?: boolean;
   whatsapp?: string | null;
+  bio?: string | null;
+  cover_url?: string | null;
 }
 
 interface ProductRow {
@@ -93,6 +95,8 @@ function mapVendor(v: VendorRow): Vendor {
     verified: v.verified,
     suspended: v.suspended ?? false,
     whatsapp: v.whatsapp ?? null,
+    bio: v.bio ?? null,
+    cover_url: v.cover_url ?? null,
   };
 }
 
@@ -240,12 +244,20 @@ export async function getProductBySlug(slug: string): Promise<Product | null> {
 export async function getVendorBySlug(slug: string): Promise<Vendor | null> {
   if (!isSupabaseConfigured) return seedVendors.find((v) => v.slug === slug) ?? null;
   const supabase = await createClient();
-  const { data } = await supabase
+  const { data, error } = await supabase
+    .from("vendors")
+    .select("id, slug, name, initials, verified, suspended, whatsapp, bio, cover_url")
+    .eq("slug", slug)
+    .maybeSingle();
+  if (!error) return data ? mapVendor(data as VendorRow) : null;
+
+  // bio/cover_url may not exist yet (migration pending) — fall back to core.
+  const res = await supabase
     .from("vendors")
     .select("id, slug, name, initials, verified, suspended, whatsapp")
     .eq("slug", slug)
     .maybeSingle();
-  return data ? mapVendor(data as VendorRow) : null;
+  return res.data ? mapVendor(res.data as VendorRow) : null;
 }
 
 export async function getStoreProducts(vendorId: string): Promise<Product[]> {
