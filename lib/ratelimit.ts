@@ -67,6 +67,27 @@ export async function checkRateLimit(
 }
 
 /**
+ * Health probe for the rate-limit backend. Returns:
+ *  - "connected"      — Upstash configured and responding to PING
+ *  - "unreachable"    — Upstash configured but the request failed
+ *  - "not-configured" — no Upstash env (using the in-memory fallback)
+ */
+export async function rateLimitStoreStatus(): Promise<
+  "connected" | "unreachable" | "not-configured"
+> {
+  if (!hasDistributedRateLimit) return "not-configured";
+  try {
+    const res = await fetch(`${UPSTASH_URL}/ping`, {
+      headers: { Authorization: `Bearer ${UPSTASH_TOKEN}` },
+      cache: "no-store",
+    });
+    return res.ok ? "connected" : "unreachable";
+  } catch {
+    return "unreachable";
+  }
+}
+
+/**
  * Best-effort client identifier. On Vercel the platform sets x-forwarded-for to
  * the real client IP; the leftmost entry is the originating address.
  */
