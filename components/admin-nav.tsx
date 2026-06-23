@@ -33,7 +33,7 @@ const NAV = [
 export function AdminNav() {
   const pathname = usePathname();
   return (
-    <nav className="flex flex-col gap-1">
+    <nav className="flex flex-col gap-1.5">
       {NAV.map(({ label, href, icon: Icon, match }) => {
         const active = match(pathname);
         return (
@@ -41,13 +41,13 @@ export function AdminNav() {
             key={label}
             href={href}
             className={[
-              "flex items-center gap-2.5 text-[14px] px-3 py-2.5 rounded-md no-underline",
+              "flex items-center gap-3 text-[15px] px-4 py-3 rounded-lg no-underline whitespace-nowrap border transition-colors",
               active
-                ? "bg-brand-tint font-medium text-brand"
-                : "text-ink-soft hover:text-ink hover:bg-muted",
+                ? "bg-brand-tint font-semibold text-brand border-brand/25"
+                : "text-ink-soft hover:text-ink hover:bg-muted border-transparent",
             ].join(" ")}
           >
-            <Icon size={16} aria-hidden />
+            <Icon size={18} aria-hidden className="shrink-0" />
             {label}
           </Link>
         );

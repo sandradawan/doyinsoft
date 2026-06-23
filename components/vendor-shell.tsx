@@ -38,8 +38,8 @@ export async function VendorShell({
         role="Seller"
       />
 
-      <div className="grid gap-7 [grid-template-columns:170px_minmax(0,1fr)]">
-        <nav className="flex flex-col gap-1">
+      <div className="grid gap-8 [grid-template-columns:208px_minmax(0,1fr)]">
+        <nav className="flex flex-col gap-1.5">
           {NAV.map(({ key, label, href, icon: Icon }) => {
             const isActive = key === active;
             return (
@@ -47,13 +47,13 @@ export async function VendorShell({
                 key={key}
                 href={href}
                 className={[
-                  "flex items-center gap-2.5 text-[14px] px-3 py-2.5 rounded-md no-underline",
+                  "flex items-center gap-3 text-[15px] px-4 py-3 rounded-lg no-underline whitespace-nowrap border transition-colors",
                   isActive
-                    ? "bg-brand-tint font-medium text-brand"
-                    : "text-ink-soft hover:text-ink hover:bg-muted",
+                    ? "bg-brand-tint font-semibold text-brand border-brand/25"
+                    : "text-ink-soft hover:text-ink hover:bg-muted border-transparent",
                 ].join(" ")}
               >
-                <Icon size={16} aria-hidden />
+                <Icon size={18} aria-hidden className="shrink-0" />
                 {label}
               </Link>
             );

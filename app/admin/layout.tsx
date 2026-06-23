@@ -12,7 +12,7 @@ export default async function AdminLayout({ children }: { children: React.ReactN
         initials={(email[0] ?? "A").toUpperCase()}
         role="Admin"
       />
-      <div className="grid gap-7 [grid-template-columns:180px_minmax(0,1fr)]">
+      <div className="grid gap-8 [grid-template-columns:208px_minmax(0,1fr)]">
         <aside>
           <AdminNav />
         </aside>
