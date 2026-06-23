@@ -6,7 +6,7 @@ import { requireUser, getCurrentVendor } from "@/lib/auth";
 import { getLicensesByEmail, getProductsByVendorIds } from "@/lib/data";
 import { getFollowedVendors } from "@/lib/follows";
 
-export const metadata = { title: "Your account — DoyinSoft" };
+export const metadata = { title: "Your account — DoyinMart" };
 
 export default async function AccountPage() {
   const user = await requireUser("/account");

@@ -22,11 +22,11 @@ export async function generateMetadata({
 }): Promise<Metadata> {
   const { slug } = await params;
   const vendor = await getVendorBySlug(slug);
-  if (!vendor) return { title: "Store not found — DoyinSoft" };
-  const title = `${vendor.name} — store on DoyinSoft`;
+  if (!vendor) return { title: "Store not found — DoyinMart" };
+  const title = `${vendor.name} — store on DoyinMart`;
   return {
     title,
-    description: `Shop ${vendor.name}'s products on DoyinSoft.`,
+    description: `Shop ${vendor.name}'s products on DoyinMart.`,
     openGraph: { title, type: "website" },
   };
 }
@@ -127,12 +127,12 @@ export default async function StorePage({
               {vendor.whatsapp && (
                 <WhatsAppButton
                   phone={vendor.whatsapp}
-                  text={`Hi ${vendor.name}, I found your store on DoyinSoft.`}
+                  text={`Hi ${vendor.name}, I found your store on DoyinMart.`}
                   label="Chat"
                 />
               )}
               <WhatsAppButton
-                text={`Check out ${vendor.name}'s store on DoyinSoft — ${SITE_URL}/store/${vendor.slug}`}
+                text={`Check out ${vendor.name}'s store on DoyinMart — ${SITE_URL}/store/${vendor.slug}`}
                 label="Share"
               />
             </div>

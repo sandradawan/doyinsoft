@@ -66,7 +66,7 @@ export default async function HomePage({
       <TopNav defaultQuery={query} />
 
       <h1 className="sr-only">
-        DoyinSoft — software built for African markets
+        DoyinMart — software built for African markets
       </h1>
 
       {showHero ? (

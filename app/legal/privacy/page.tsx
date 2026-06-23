@@ -1,6 +1,6 @@
 import type { Metadata } from "next";
 
-export const metadata: Metadata = { title: "Privacy Policy — DoyinSoft" };
+export const metadata: Metadata = { title: "Privacy Policy — DoyinMart" };
 
 export default function PrivacyPage() {
   return (
@@ -9,7 +9,7 @@ export default function PrivacyPage() {
       <p className="updated">Last updated: 22 June 2026</p>
 
       <p>
-        This policy explains what we collect, why, and your rights. It applies to DoyinSoft and is
+        This policy explains what we collect, why, and your rights. It applies to DoyinMart and is
         aligned with the Nigeria Data Protection Act.
       </p>
 

@@ -14,7 +14,7 @@ const TABS: { label: string; value: LaunchPeriod }[] = [
 ];
 
 export const metadata = {
-  title: "Launches — new software on DoyinSoft",
+  title: "Launches — new software on DoyinMart",
   description: "Discover and upvote the newest software launches from African developers.",
 };
 

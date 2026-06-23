@@ -23,10 +23,10 @@ export async function generateMetadata({
 }): Promise<Metadata> {
   const { slug } = await params;
   const product = await getProductBySlug(slug);
-  if (!product) return { title: "Software not found — DoyinSoft" };
+  if (!product) return { title: "Software not found — DoyinMart" };
 
-  const title = `${product.name} — ${formatPrice(product.price_minor, product.currency)} | DoyinSoft`;
-  const description = product.tagline || product.description || `${product.name} on DoyinSoft.`;
+  const title = `${product.name} — ${formatPrice(product.price_minor, product.currency)} | DoyinMart`;
+  const description = product.tagline || product.description || `${product.name} on DoyinMart.`;
   const image = product.icon_url || product.screenshots[0];
 
   return {
@@ -253,13 +253,13 @@ export default async function ProductDetailPage({
           {/* Share + contact */}
           <div className="flex flex-wrap gap-2 mt-3">
             <WhatsAppButton
-              text={`${product.name} on DoyinSoft — ${SITE_URL}/products/${product.slug}`}
+              text={`${product.name} on DoyinMart — ${SITE_URL}/products/${product.slug}`}
               label="Share"
             />
             {product.vendor.whatsapp && (
               <WhatsAppButton
                 phone={product.vendor.whatsapp}
-                text={`Hi, I'm interested in ${product.name} on DoyinSoft.`}
+                text={`Hi, I'm interested in ${product.name} on DoyinMart.`}
                 label="Chat vendor"
               />
             )}

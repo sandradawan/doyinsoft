@@ -94,7 +94,7 @@ export async function signUp(_prev: AuthState, formData: FormData): Promise<Auth
   // Welcome the new vendor.
   await sendEmail({
     to: email,
-    subject: "Welcome to DoyinSoft — let's get you selling",
+    subject: "Welcome to DoyinMart — let's get you selling",
     html: emailLayout(
       `Welcome, ${businessName} 👋`,
       `${emailText("Your seller account is ready. Here's how to get to your first sale:")}
@@ -138,9 +138,9 @@ export async function signUpBuyer(_prev: AuthState, formData: FormData): Promise
   // Welcome the new buyer.
   await sendEmail({
     to: email,
-    subject: "Welcome to DoyinSoft 👋",
+    subject: "Welcome to DoyinMart 👋",
     html: emailLayout(
-      "Welcome to DoyinSoft 👋",
+      "Welcome to DoyinMart 👋",
       `${emailText("Your account is ready. Discover software, digital products, fashion and services from independent African sellers.")}
        ${emailText(`Tip: refer friends and <a href="${SITE_URL}/affiliate" style="color:#047857;">earn a commission</a> on what they buy.`)}
        <div style="margin:18px 0;">${emailButton(SITE_URL, "Start browsing")}</div>`

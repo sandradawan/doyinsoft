@@ -10,7 +10,7 @@ export default async function SignUpPage({
 
   return (
     <div>
-      <h1 className="text-[22px] font-medium m-0 mb-1">Sell on DoyinSoft</h1>
+      <h1 className="text-[22px] font-medium m-0 mb-1">Sell on DoyinMart</h1>
       <p className="text-[13px] text-ink-soft m-0 mb-5">
         Create a vendor account to upload software and get paid.
       </p>

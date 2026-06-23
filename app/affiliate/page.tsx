@@ -49,7 +49,7 @@ export default async function AffiliatePage() {
         role="Affiliate"
       />
 
-      <h1 className="text-[24px] font-medium m-0 mb-1">Earn with DoyinSoft</h1>
+      <h1 className="text-[24px] font-medium m-0 mb-1">Earn with DoyinMart</h1>
       <p className="text-[14px] text-ink-soft m-0 mb-6">
         Share your link. When someone buys through it, you earn{" "}
         <span className="font-medium text-ink">{settings.affiliate_percent}%</span> of the sale.
@@ -76,7 +76,7 @@ export default async function AffiliatePage() {
       </div>
 
       <p className="text-[12px] font-medium m-0 mb-2">Your referral link</p>
-      <ShareLink url={link} message="Check out this software on DoyinSoft —" />
+      <ShareLink url={link} message="Check out this software on DoyinMart —" />
 
       {/* Withdraw */}
       <div className="mt-8">

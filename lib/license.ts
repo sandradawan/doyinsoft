@@ -24,7 +24,7 @@ export function licenseCertificate(opts: {
   issuedAt: string;
 }): string {
   return [
-    "DoyinSoft — software license certificate",
+    "DoyinMart — software license certificate",
     "==========================================",
     "",
     `Product:     ${opts.productName}`,

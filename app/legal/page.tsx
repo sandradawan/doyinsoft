@@ -1,13 +1,13 @@
 import Link from "next/link";
 import type { Metadata } from "next";
 
-export const metadata: Metadata = { title: "Legal — DoyinSoft" };
+export const metadata: Metadata = { title: "Legal — DoyinMart" };
 
 const DOCS = [
-  { href: "/legal/terms", title: "Terms of Service", desc: "The rules for using DoyinSoft." },
+  { href: "/legal/terms", title: "Terms of Service", desc: "The rules for using DoyinMart." },
   { href: "/legal/privacy", title: "Privacy Policy", desc: "What we collect and your rights." },
   { href: "/legal/refunds", title: "Refund Policy", desc: "Refunds for digital, physical & services." },
-  { href: "/legal/vendor-agreement", title: "Vendor Agreement", desc: "Terms for selling on DoyinSoft." },
+  { href: "/legal/vendor-agreement", title: "Vendor Agreement", desc: "Terms for selling on DoyinMart." },
   { href: "/legal/acceptable-use", title: "Acceptable Use Policy", desc: "What's not allowed on the platform." },
   { href: "/legal/cookies", title: "Cookie Policy", desc: "How we use cookies." },
 ];

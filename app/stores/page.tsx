@@ -7,8 +7,8 @@ import { getProducts } from "@/lib/data";
 import type { Vendor } from "@/lib/types";
 
 export const metadata: Metadata = {
-  title: "Stores — DoyinSoft",
-  description: "Browse independent sellers on DoyinSoft.",
+  title: "Stores — DoyinMart",
+  description: "Browse independent sellers on DoyinMart.",
 };
 
 interface StoreRow {
@@ -41,7 +41,7 @@ export default async function StoresPage() {
         <h1 className="text-[22px] font-medium m-0">Stores</h1>
       </div>
       <p className="text-[14px] text-ink-soft m-0 mb-6">
-        {stores.length} independent seller{stores.length === 1 ? "" : "s"} on DoyinSoft
+        {stores.length} independent seller{stores.length === 1 ? "" : "s"} on DoyinMart
       </p>
 
       {stores.length === 0 ? (

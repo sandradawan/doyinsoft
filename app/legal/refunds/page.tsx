@@ -1,6 +1,6 @@
 import type { Metadata } from "next";
 
-export const metadata: Metadata = { title: "Refund Policy — DoyinSoft" };
+export const metadata: Metadata = { title: "Refund Policy — DoyinMart" };
 
 export default function RefundsPage() {
   return (
@@ -9,7 +9,7 @@ export default function RefundsPage() {
       <p className="updated">Last updated: 22 June 2026</p>
 
       <p>
-        We want buyers and sellers to trade with confidence. Because DoyinSoft lists different kinds
+        We want buyers and sellers to trade with confidence. Because DoyinMart lists different kinds
         of products, refunds depend on what was purchased.
       </p>
 

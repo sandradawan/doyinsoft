@@ -51,7 +51,7 @@ export default async function VendorPayoutsPage() {
       </div>
 
       <p className="text-[11px] text-ink-faint mb-8">
-        DoyinSoft keeps {PLATFORM_COMMISSION_PERCENT}% commission per sale. The rest is settled
+        DoyinMart keeps {PLATFORM_COMMISSION_PERCENT}% commission per sale. The rest is settled
         to your connected bank automatically by Paystack — no manual withdrawals needed.
       </p>
 

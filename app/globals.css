@@ -1,7 +1,7 @@
 @import "tailwindcss";
 
 /* ------------------------------------------------------------------ */
-/* DoyinSoft design tokens — single source of truth.                   */
+/* DoyinMart design tokens — single source of truth.                   */
 /* Flat, hairline, two weights. Accent = emerald. Light + dark.        */
 /* ------------------------------------------------------------------ */
 :root {
@@ -10,8 +10,8 @@
   --bg-info: #e6f1fb;
   --bg-success: #eaf3de;
 
-  --border-tertiary: #e5e5e5;
-  --border-secondary: #d4d4d4;
+  --border-tertiary: #cfcfcf;
+  --border-secondary: #9a9a9a;
 
   --text-primary: #171717;
   --text-secondary: #737373;
@@ -19,9 +19,9 @@
   --text-info: #0c447c;
   --text-success: #27500a;
 
-  /* Brand accent — emerald. The single hue in the system. */
-  --brand: #047857;
-  --brand-hover: #065f46;
+  /* Brand accent — emerald. The single hue in the system. Darkened. */
+  --brand: #04553e;
+  --brand-hover: #033a2a;
   --brand-tint: #ecfdf5;
   --brand-ink: #ffffff; /* text/icon color on a filled brand surface */
 
@@ -119,24 +119,25 @@ body {
   color: var(--text-primary);
   font-family: var(--font-sans);
   font-weight: 400;
-  font-size: 13px;
-  line-height: 1.5;
+  font-size: 15px;
+  line-height: 1.55;
   -webkit-font-smoothing: antialiased;
 }
 
-/* The single filled button style — now emerald (brand). */
+/* The single filled button style — emerald (brand), darkened. */
 .btn-primary {
   background: var(--brand);
   color: var(--brand-ink);
-  border: none;
+  border: 1px solid var(--brand-hover);
   border-radius: var(--radius-md);
-  font-size: 13px;
-  font-weight: 500;
+  font-size: 14px;
+  font-weight: 600;
   cursor: pointer;
-  transition: background-color 0.12s ease;
+  transition: background-color 0.12s ease, border-color 0.12s ease;
 }
 .btn-primary:hover {
   background: var(--brand-hover);
+  border-color: var(--brand-hover);
 }
 .btn-primary:disabled {
   opacity: 0.5;
@@ -145,12 +146,12 @@ body {
 
 /* Quiet text inputs — hairline border, no shadow. */
 .field {
-  border: 1px solid var(--border-tertiary);
+  border: 1px solid var(--border-secondary);
   border-radius: var(--radius-md);
   background: var(--bg-primary);
-  font-size: 13px;
+  font-size: 14px;
   color: var(--text-primary);
-  padding: 7px 10px;
+  padding: 8px 11px;
 }
 .field::placeholder {
   color: var(--text-tertiary);

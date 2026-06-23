@@ -1,6 +1,6 @@
 import type { Metadata } from "next";
 
-export const metadata: Metadata = { title: "Terms of Service — DoyinSoft" };
+export const metadata: Metadata = { title: "Terms of Service — DoyinMart" };
 
 export default function TermsPage() {
   return (
@@ -9,10 +9,10 @@ export default function TermsPage() {
       <p className="updated">Last updated: 22 June 2026</p>
 
       <p>
-        Welcome to DoyinSoft (&ldquo;DoyinSoft&rdquo;, &ldquo;we&rdquo;, &ldquo;us&rdquo;). DoyinSoft is an
+        Welcome to DoyinMart (&ldquo;DoyinMart&rdquo;, &ldquo;we&rdquo;, &ldquo;us&rdquo;). DoyinMart is an
         online marketplace that connects independent sellers (&ldquo;Vendors&rdquo;) with buyers
         (&ldquo;Buyers&rdquo;) of software, digital products, physical goods and services. By accessing or
-        using DoyinSoft you agree to these Terms. If you do not agree, do not use the platform.
+        using DoyinMart you agree to these Terms. If you do not agree, do not use the platform.
       </p>
 
       <h2>1. Accounts</h2>
@@ -22,9 +22,9 @@ export default function TermsPage() {
         <li>You must be at least 18, or have the consent of a parent or guardian.</li>
       </ul>
 
-      <h2>2. The role of DoyinSoft</h2>
+      <h2>2. The role of DoyinMart</h2>
       <p>
-        DoyinSoft is a venue. Vendors — not DoyinSoft — are responsible for their listings, products,
+        DoyinMart is a venue. Vendors — not DoyinMart — are responsible for their listings, products,
         fulfilment, support and compliance with the law. We do not manufacture, own, inspect or
         guarantee any product listed, except where expressly stated.
       </p>
@@ -34,7 +34,7 @@ export default function TermsPage() {
         <li>You may only list products you have the right to sell.</li>
         <li>Listings must be accurate and not misleading. Prohibited, illegal, infringing, or harmful items are not allowed.</li>
         <li>You must deliver what you sell — digital downloads/license keys, or shipment/performance of physical goods and services.</li>
-        <li>DoyinSoft deducts a platform commission from each sale; the remainder is settled to your connected bank by our payment partner.</li>
+        <li>DoyinMart deducts a platform commission from each sale; the remainder is settled to your connected bank by our payment partner.</li>
         <li>We may review, reject, unpublish or remove listings, and suspend vendors who violate these Terms.</li>
       </ul>
 
@@ -71,7 +71,7 @@ export default function TermsPage() {
 
       <h2>9. Disclaimers &amp; liability</h2>
       <p>
-        The platform is provided &ldquo;as is&rdquo;. To the maximum extent permitted by law, DoyinSoft is not
+        The platform is provided &ldquo;as is&rdquo;. To the maximum extent permitted by law, DoyinMart is not
         liable for indirect or consequential losses, or for the acts or omissions of Vendors or
         Buyers. Nothing in these Terms excludes liability that cannot be excluded by law.
       </p>

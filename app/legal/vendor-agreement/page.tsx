@@ -1,6 +1,6 @@
 import type { Metadata } from "next";
 
-export const metadata: Metadata = { title: "Vendor Agreement — DoyinSoft" };
+export const metadata: Metadata = { title: "Vendor Agreement — DoyinMart" };
 
 export default function VendorAgreementPage() {
   return (
@@ -9,7 +9,7 @@ export default function VendorAgreementPage() {
       <p className="updated">Last updated: 22 June 2026</p>
 
       <p>
-        This Agreement governs your use of DoyinSoft as a seller (&ldquo;Vendor&rdquo;). It applies in
+        This Agreement governs your use of DoyinMart as a seller (&ldquo;Vendor&rdquo;). It applies in
         addition to our <a href="/legal/terms">Terms of Service</a>. By listing a product, you accept it.
       </p>
 
@@ -35,7 +35,7 @@ export default function VendorAgreementPage() {
 
       <h2>4. Fees &amp; payouts</h2>
       <ul>
-        <li>DoyinSoft charges a platform commission on each sale, deducted automatically.</li>
+        <li>DoyinMart charges a platform commission on each sale, deducted automatically.</li>
         <li>Your share is settled to your connected bank by our payment partner (Paystack) via split payments.</li>
         <li>You are responsible for your own taxes.</li>
       </ul>
@@ -48,7 +48,7 @@ export default function VendorAgreementPage() {
 
       <h2>6. Intellectual property</h2>
       <p>
-        You retain ownership of your content and grant DoyinSoft a licence to host, display and promote
+        You retain ownership of your content and grant DoyinMart a licence to host, display and promote
         your listings on the platform. You must not infringe others&rsquo; rights.
       </p>
 

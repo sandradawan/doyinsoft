@@ -19,7 +19,7 @@ export function Footer() {
             Stores
           </Link>
           <Link href="/sign-up" className="text-ink-soft no-underline hover:text-ink">
-            Sell on DoyinSoft
+            Sell on DoyinMart
           </Link>
           <Link href="/downloads" className="text-ink-soft no-underline hover:text-ink">
             Downloads
@@ -44,7 +44,7 @@ export function Footer() {
         </Link>
       </nav>
       <p className="text-[11px] text-ink-faint mt-2 m-0">
-        © {2026} DoyinSoft. All rights reserved.
+        © {2026} DoyinMart. All rights reserved.
       </p>
     </footer>
   );

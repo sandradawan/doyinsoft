@@ -1,5 +1,5 @@
 -- ============================================================================
--- DoyinSoft — complete database setup (single file)
+-- DoyinMart — complete database setup (single file)
 -- ----------------------------------------------------------------------------
 -- Paste this whole file into the Supabase SQL editor and click Run.
 -- It creates every table, type, index, function, trigger, RLS policy, the

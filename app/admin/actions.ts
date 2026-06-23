@@ -83,7 +83,7 @@ async function setProductStatus(
           subject: subjectSafe(`New from ${vname}: ${row.name}`),
           html: emailLayout(
             `${esc(vname)} just dropped something new 🎉`,
-            `${emailText(`<strong style="color:#171717">${esc(row.name)}</strong> is now live on DoyinSoft.`)}
+            `${emailText(`<strong style="color:#171717">${esc(row.name)}</strong> is now live on DoyinMart.`)}
              <div style="margin:18px 0;">${emailButton(`${SITE_URL}/products/${row.slug}`, "View product")}</div>`
           ),
         });
@@ -298,7 +298,7 @@ export async function processPaymentByReference(
   if (!v.orderId) {
     return {
       error:
-        "This payment isn't linked to a DoyinSoft order (no order_id). It may not have gone through checkout.",
+        "This payment isn't linked to a DoyinMart order (no order_id). It may not have gone through checkout.",
     };
   }
 
@@ -344,7 +344,7 @@ export async function sendTestEmail(): Promise<TestEmailState> {
   }
   const res = await sendEmail({
     to: adminEmail,
-    subject: "DoyinSoft — production email test ✅",
+    subject: "DoyinMart — production email test ✅",
     html: emailLayout(
       "Email is working ✅",
       emailText(

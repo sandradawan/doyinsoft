@@ -73,7 +73,7 @@ export async function TopNav({ defaultQuery = "" }: { defaultQuery?: string }) {
             href="/sign-up"
             className="hidden sm:inline text-[13px] text-ink-soft no-underline hover:text-ink"
           >
-            Sell on DoyinSoft
+            Sell on DoyinMart
           </Link>
           <Link href="/sign-in" className="btn-primary px-[14px] py-[6px] no-underline">
             Sign in

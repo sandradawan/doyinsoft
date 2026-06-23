@@ -1,6 +1,6 @@
 import type { Metadata } from "next";
 
-export const metadata: Metadata = { title: "Acceptable Use Policy — DoyinSoft" };
+export const metadata: Metadata = { title: "Acceptable Use Policy — DoyinMart" };
 
 export default function AcceptableUsePage() {
   return (
@@ -9,7 +9,7 @@ export default function AcceptableUsePage() {
       <p className="updated">Last updated: 22 June 2026</p>
 
       <p>
-        To keep DoyinSoft safe and trustworthy, the following are not allowed. This applies to all
+        To keep DoyinMart safe and trustworthy, the following are not allowed. This applies to all
         users, listings, reviews and messages.
       </p>
 

@@ -1,4 +1,4 @@
--- DoyinSoft schema. Run in the Supabase SQL editor (or via the CLI).
+-- DoyinMart schema. Run in the Supabase SQL editor (or via the CLI).
 -- Mirrors lib/types.ts and lib/seed-data.ts.
 
 create extension if not exists pgcrypto;

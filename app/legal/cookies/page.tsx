@@ -1,6 +1,6 @@
 import type { Metadata } from "next";
 
-export const metadata: Metadata = { title: "Cookie Policy — DoyinSoft" };
+export const metadata: Metadata = { title: "Cookie Policy — DoyinMart" };
 
 export default function CookiePage() {
   return (
@@ -9,7 +9,7 @@ export default function CookiePage() {
       <p className="updated">Last updated: 22 June 2026</p>
 
       <p>
-        Cookies are small files stored on your device. DoyinSoft uses only the cookies needed to run
+        Cookies are small files stored on your device. DoyinMart uses only the cookies needed to run
         the service — we do not use third-party advertising cookies.
       </p>
 

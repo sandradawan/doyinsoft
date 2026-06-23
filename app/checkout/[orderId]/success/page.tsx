@@ -65,7 +65,7 @@ export default async function CheckoutSuccessPage({
         {vendorWa && (
           <WhatsAppButton
             phone={vendorWa}
-            text={`Hi, I just ordered ${order?.product.name} on DoyinSoft.`}
+            text={`Hi, I just ordered ${order?.product.name} on DoyinMart.`}
             label="Message the seller on WhatsApp"
           />
         )}

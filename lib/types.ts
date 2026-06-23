@@ -1,4 +1,4 @@
-// Domain types for the DoyinSoft marketplace.
+// Domain types for the DoyinMart marketplace.
 // These mirror the Supabase schema in supabase/migrations/0001_init.sql.
 
 export type Platform = "desktop" | "mobile" | "web" | "free";

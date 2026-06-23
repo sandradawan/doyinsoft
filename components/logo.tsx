@@ -1,7 +1,7 @@
 import Link from "next/link";
 
 /**
- * The DoyinSoft mark: an emerald rounded-square tile with a white "D" monogram
+ * The DoyinMart mark: an emerald rounded-square tile with a white "D" monogram
  * (the counter is cut out so the brand color shows through). Uses currentColor
  * for the tile, so it adapts to the brand token in light/dark.
  */
@@ -50,7 +50,7 @@ export function Logo({
       <LogoMark size={size} />
       <span className={`font-medium tracking-tight ${textClassName}`}>
         <span className="text-ink">Doyin</span>
-        <span className="text-brand">Soft</span>
+        <span className="text-brand">Mart</span>
       </span>
     </span>
   );

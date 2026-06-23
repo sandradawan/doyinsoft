@@ -1248,7 +1248,7 @@ export async function issueLicenseForOrder(
     if (affEmail) {
       await sendEmail({
         to: affEmail,
-        subject: `🎉 You earned ${formatPrice(commission, o.currency)} on DoyinSoft`,
+        subject: `🎉 You earned ${formatPrice(commission, o.currency)} on DoyinMart`,
         html: emailLayout(
           "You earned a commission! 🎉",
           `${emailText(`Someone bought <strong style="color:#171717">${safeName}</strong> through your referral link. You earned <strong style="color:#171717">${formatPrice(commission, o.currency)}</strong>.`)}

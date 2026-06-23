@@ -10,7 +10,7 @@ const RESEND_KEY = process.env.RESEND_API_KEY ?? "";
 
 const FROM =
   process.env.EMAIL_FROM ||
-  (GMAIL_USER ? `DoyinSoft <${GMAIL_USER}>` : "DoyinSoft <onboarding@resend.dev>");
+  (GMAIL_USER ? `DoyinMart <${GMAIL_USER}>` : "DoyinMart <onboarding@resend.dev>");
 
 export const isEmailConfigured = Boolean((GMAIL_USER && GMAIL_PASS) || RESEND_KEY);
 
@@ -108,7 +108,7 @@ export function emailLayout(title: string, bodyHtml: string): string {
   <table role="presentation" width="100%" cellpadding="0" cellspacing="0"><tr><td align="center">
     <table role="presentation" width="480" cellpadding="0" cellspacing="0" style="width:480px;max-width:100%;background:#ffffff;border:1px solid #e5e5e5;border-radius:14px;overflow:hidden;">
       <tr><td style="background:#047857;padding:18px 28px;">
-        <span style="color:#ffffff;font-size:18px;font-weight:700;letter-spacing:-0.2px;">DoyinSoft</span>
+        <span style="color:#ffffff;font-size:18px;font-weight:700;letter-spacing:-0.2px;">DoyinMart</span>
       </td></tr>
       <tr><td style="padding:28px;">
         <h1 style="font-size:19px;line-height:1.3;margin:0 0 16px;color:#171717;font-weight:600;">${title}</h1>
@@ -123,7 +123,7 @@ export function emailLayout(title: string, bodyHtml: string): string {
         </p>
       </td></tr>
     </table>
-    <p style="font-size:11px;color:#a3a3a3;margin:14px 0 0;">© 2026 DoyinSoft. All rights reserved.</p>
+    <p style="font-size:11px;color:#a3a3a3;margin:14px 0 0;">© 2026 DoyinMart. All rights reserved.</p>
   </td></tr></table>
 </body></html>`;
 }
