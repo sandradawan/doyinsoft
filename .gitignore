@@ -22,6 +22,10 @@ yarn-error.log*
 # local env files
 .env*.local
 .env
+.env.gmail
+.env.*
+!.env.local.example
+!.env*.example
 
 # typescript
 *.tsbuildinfo

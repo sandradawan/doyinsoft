@@ -10,6 +10,7 @@ import { hasServiceRole, isSupabaseConfigured } from "./supabase/env";
 import { deterministicLicenseKey, generateLicenseKey } from "./license";
 import { emailButton, emailKeyBox, emailLayout, emailText, sendEmail } from "./email";
 import { getSettings } from "./settings";
+import { incrementCouponUse } from "./coupons";
 import { formatPrice } from "./format";
 
 const SITE_URL = process.env.NEXT_PUBLIC_SITE_URL ?? "http://localhost:3000";
@@ -1135,7 +1136,7 @@ export async function issueLicenseForOrder(
   // Look up the order, then mark it paid and mint the key.
   const { data: order } = await admin
     .from("orders")
-    .select("id, product_id, vendor_id, amount_minor, currency, affiliate_id, product:products(name, product_type)")
+    .select("id, product_id, vendor_id, amount_minor, currency, affiliate_id, coupon_code, product:products(name, product_type)")
     .eq("id", orderId)
     .maybeSingle();
   if (!order) return null;
@@ -1144,6 +1145,10 @@ export async function issueLicenseForOrder(
     .from("orders")
     .update({ status: "paid", ...(reference ? { reference } : {}) })
     .eq("id", orderId);
+
+  // Count the coupon use once (this path only runs on first issue — idempotent).
+  const couponCode = (order as { coupon_code?: string | null }).coupon_code;
+  if (couponCode) await incrementCouponUse(couponCode);
 
   const o = order as {
     product_id: string;

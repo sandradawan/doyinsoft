@@ -4,9 +4,15 @@ import { redirect } from "next/navigation";
 import { cookies } from "next/headers";
 import { hasServiceRole } from "@/lib/supabase/env";
 import { createAdminClient } from "@/lib/supabase/admin";
-import { getOrderById, getProductBySlug, getVendorSubaccountCode } from "@/lib/data";
+import {
+  getOrderById,
+  getProductBySlug,
+  getVendorSubaccountCode,
+  issueLicenseForOrder,
+} from "@/lib/data";
 import { getSettings } from "@/lib/settings";
 import { resolveAffiliateId } from "@/lib/affiliate";
+import { validateCoupon, type CouponCheck } from "@/lib/coupons";
 import type { Currency, Gateway } from "@/lib/types";
 
 const PAYSTACK_SECRET = process.env.PAYSTACK_SECRET_KEY ?? "";
@@ -19,9 +25,24 @@ interface CheckoutInput {
   email: string;
   amountMinor: number;
   currency: Currency;
+  coupon?: string;
   shippingName?: string;
   shippingPhone?: string;
   shippingAddress?: string;
+}
+
+/**
+ * Preview a coupon for the checkout UI. The charge passed here is already NGN
+ * (the page converts USD before rendering the form). Re-validated authoritatively
+ * in startCheckout before any money moves.
+ */
+export async function previewCoupon(
+  code: string,
+  productSlug: string | null,
+  chargeMinor: number
+): Promise<CouponCheck> {
+  const product = productSlug ? await getProductBySlug(productSlug) : null;
+  return validateCoupon(code, { chargeMinor, productVendorId: product?.vendor.id ?? null });
 }
 
 /**
@@ -55,6 +76,22 @@ export async function startCheckout(
   // Physical/service products need fulfilment + buyer contact.
   const needsFulfilment = product ? product.product_type !== "digital" : false;
 
+  // Apply a discount code (server-authoritative — never trust the client's number).
+  let discountMinor = 0;
+  let couponCode: string | null = null;
+  let finalCharge = chargeMinor;
+  if (input.coupon && product) {
+    const check = await validateCoupon(input.coupon, {
+      chargeMinor,
+      productVendorId: product.vendor.id,
+    });
+    if (check.ok) {
+      discountMinor = check.discountMinor ?? 0;
+      finalCharge = check.finalMinor ?? chargeMinor;
+      couponCode = check.code ?? null;
+    }
+  }
+
   // Persist a real pending order via the service role (buyers aren't logged in,
   // so this trusted server action creates the order, not the anon client).
   if (hasServiceRole && orderId === "new" && product) {
@@ -66,12 +103,14 @@ export async function startCheckout(
         vendor_id: product.vendor.id,
         buyer_name: input.shippingName || input.email.split("@")[0] || "Guest",
         buyer_initials: (input.email[0] ?? "G").toUpperCase(),
-        amount_minor: chargeMinor,
+        amount_minor: finalCharge,
         currency: chargeCurrency,
         status: "pending",
         gateway: input.gateway,
         affiliate_id: affiliateId,
         buyer_email: input.email,
+        coupon_code: couponCode,
+        discount_minor: discountMinor,
         fulfilment_status: needsFulfilment ? "pending" : null,
         shipping_name: input.shippingName || null,
         shipping_phone: input.shippingPhone || null,
@@ -80,6 +119,15 @@ export async function startCheckout(
       .select("id")
       .single();
     if (data?.id) orderId = data.id;
+  }
+
+  // Fully discounted (e.g. 100%-off code, or a free item): no payment needed —
+  // issue the licence + receipt directly and skip the gateway.
+  if (finalCharge <= 0) {
+    if (hasServiceRole && orderId !== "new") {
+      await issueLicenseForOrder(orderId, input.email);
+    }
+    redirect(`/checkout/${orderId}/success?email=${encodeURIComponent(input.email)}`);
   }
 
   // Paystack hosted checkout — the only path that takes a real payment.
@@ -95,7 +143,7 @@ export async function startCheckout(
         },
         body: JSON.stringify({
           email: input.email,
-          amount: chargeMinor, // NGN kobo
+          amount: finalCharge, // NGN kobo (after any discount code)
           currency: chargeCurrency,
           callback_url: `${SITE_URL}/checkout/${orderId}/success`,
           metadata: { order_id: orderId, product_slug: input.productSlug },

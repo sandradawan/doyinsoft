@@ -3,7 +3,14 @@
 import { useState, useTransition } from "react";
 import { formatPrice } from "@/lib/format";
 import type { Currency, Gateway, ProductType } from "@/lib/types";
-import { startCheckout } from "./actions";
+import { previewCoupon, startCheckout } from "./actions";
+
+interface AppliedCoupon {
+  code: string;
+  label: string;
+  discountMinor: number;
+  finalMinor: number;
+}
 
 const GATEWAYS: { value: Gateway; label: string }[] = [
   { value: "paystack", label: "Paystack" },
@@ -32,6 +39,41 @@ export function CheckoutForm({
   const [error, setError] = useState<string | null>(null);
   const [pending, startTransition] = useTransition();
 
+  // Discount code
+  const [couponInput, setCouponInput] = useState("");
+  const [applied, setApplied] = useState<AppliedCoupon | null>(null);
+  const [couponMsg, setCouponMsg] = useState<string | null>(null);
+  const [couponPending, startCoupon] = useTransition();
+
+  const payMinor = applied ? applied.finalMinor : amountMinor;
+
+  function applyCoupon() {
+    const code = couponInput.trim();
+    if (!code) return;
+    setCouponMsg(null);
+    startCoupon(async () => {
+      const res = await previewCoupon(code, productSlug, amountMinor);
+      if (res.ok) {
+        setApplied({
+          code: res.code!,
+          label: res.label ?? "Discount",
+          discountMinor: res.discountMinor ?? 0,
+          finalMinor: res.finalMinor ?? amountMinor,
+        });
+        setCouponMsg(null);
+      } else {
+        setApplied(null);
+        setCouponMsg(res.error ?? "That code isn’t valid.");
+      }
+    });
+  }
+
+  function removeCoupon() {
+    setApplied(null);
+    setCouponInput("");
+    setCouponMsg(null);
+  }
+
   const isPhysical = productType === "physical";
   const isService = productType === "service";
   const needsDetails = isPhysical || isService;
@@ -50,6 +92,7 @@ export function CheckoutForm({
         email,
         amountMinor,
         currency,
+        coupon: applied?.code,
         shippingName,
         shippingPhone,
         shippingAddress,
@@ -131,12 +174,65 @@ export function CheckoutForm({
         })}
       </div>
 
+      {/* Discount code */}
+      <p className="text-[12px] font-medium m-0 mb-2">Discount code</p>
+      {applied ? (
+        <div className="flex items-center justify-between border border-brand/40 bg-brand-tint rounded-md px-[10px] py-2 mb-2 text-[13px]">
+          <span className="text-brand font-medium">
+            {applied.code} — {applied.label}
+          </span>
+          <button
+            type="button"
+            onClick={removeCoupon}
+            className="text-ink-faint hover:text-info bg-transparent border-0 cursor-pointer text-[12px]"
+          >
+            Remove
+          </button>
+        </div>
+      ) : (
+        <div className="flex gap-2 mb-2">
+          <input
+            value={couponInput}
+            onChange={(e) => setCouponInput(e.target.value.toUpperCase())}
+            placeholder="Have a code?"
+            className="field flex-1 uppercase"
+            onKeyDown={(e) => {
+              if (e.key === "Enter") {
+                e.preventDefault();
+                applyCoupon();
+              }
+            }}
+          />
+          <button
+            type="button"
+            onClick={applyCoupon}
+            disabled={couponPending || couponInput.trim().length === 0}
+            className="border border-line rounded-md px-3 text-[13px] text-ink-soft hover:text-ink shrink-0 cursor-pointer disabled:opacity-50"
+          >
+            {couponPending ? "…" : "Apply"}
+          </button>
+        </div>
+      )}
+      {couponMsg && <p className="text-[11px] text-info mb-2">{couponMsg}</p>}
+
+      {applied && (
+        <div className="flex justify-between text-[12px] text-ink-soft mb-3">
+          <span>Discount</span>
+          <span>−{formatPrice(applied.discountMinor, currency)}</span>
+        </div>
+      )}
+      {!applied && <div className="mb-2" />}
+
       <button
         type="submit"
         disabled={pending || email.length === 0 || !detailsValid}
         className="btn-primary w-full py-[10px]"
       >
-        {pending ? "Redirecting…" : `Pay ${formatPrice(amountMinor, currency)}`}
+        {pending
+          ? "Redirecting…"
+          : payMinor <= 0
+            ? "Get it free"
+            : `Pay ${formatPrice(payMinor, currency)}`}
       </button>
 
       <p className="text-[11px] text-ink-faint text-center mt-[10px] mb-0">

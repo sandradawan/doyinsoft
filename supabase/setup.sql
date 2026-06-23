@@ -17,6 +17,7 @@ do $$ begin create type order_status as enum ('paid','pending','refunded'); exce
 do $$ begin create type gateway as enum ('paystack','flutterwave','stripe'); exception when duplicate_object then null; end $$;
 do $$ begin create type payout_status as enum ('requested','paid','failed'); exception when duplicate_object then null; end $$;
 do $$ begin create type product_status as enum ('pending','approved','rejected'); exception when duplicate_object then null; end $$;
+do $$ begin create type discount_type as enum ('percent','fixed'); exception when duplicate_object then null; end $$;
 do $$ begin create type product_type as enum ('digital','physical','service'); exception when duplicate_object then null; end $$;
 
 -- ----------------------------------------------------------------------------
@@ -299,6 +300,29 @@ alter table vendors add column if not exists whatsapp text;
 -- Store branding.
 alter table vendors add column if not exists bio       text;
 alter table vendors add column if not exists cover_url text;
+
+-- Coupons / discount codes.
+create table if not exists coupons (
+  id             uuid primary key default gen_random_uuid(),
+  code           text unique not null,
+  vendor_id      uuid references vendors (id) on delete cascade,
+  discount_type  discount_type not null default 'percent',
+  discount_value integer not null,
+  active         boolean not null default true,
+  max_uses       integer,
+  used_count     integer not null default 0,
+  expires_at     timestamptz,
+  created_at     timestamptz not null default now()
+);
+alter table coupons enable row level security;
+create index if not exists coupons_code_lower_idx on coupons (lower(code));
+create index if not exists coupons_vendor_idx on coupons (vendor_id);
+alter table orders add column if not exists coupon_code    text;
+alter table orders add column if not exists discount_minor integer not null default 0;
+create or replace function increment_coupon_use(p_code text)
+returns void language sql as $$
+  update coupons set used_count = used_count + 1 where lower(code) = lower(p_code);
+$$;
 
 -- Follow a seller.
 create table if not exists follows (

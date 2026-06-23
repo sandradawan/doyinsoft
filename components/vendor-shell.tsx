@@ -1,12 +1,13 @@
 import Link from "next/link";
-import { BarChart3, Folder, File, Banknote, Settings } from "lucide-react";
+import { BarChart3, Folder, File, Banknote, Settings, Ticket } from "lucide-react";
 
-type NavKey = "overview" | "products" | "orders" | "payouts" | "settings";
+type NavKey = "overview" | "products" | "orders" | "coupons" | "payouts" | "settings";
 
 const NAV: { key: NavKey; label: string; href: string; icon: typeof BarChart3 }[] = [
   { key: "overview", label: "Overview", href: "/vendor/dashboard", icon: BarChart3 },
   { key: "products", label: "Products", href: "/vendor/products", icon: Folder },
   { key: "orders", label: "Orders", href: "/vendor/orders", icon: File },
+  { key: "coupons", label: "Coupons", href: "/vendor/coupons", icon: Ticket },
   { key: "payouts", label: "Payouts", href: "/vendor/payouts", icon: Banknote },
   { key: "settings", label: "Settings", href: "/vendor/settings", icon: Settings },
 ];
