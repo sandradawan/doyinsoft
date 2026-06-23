@@ -2,11 +2,13 @@ import Link from "next/link";
 import { Check, Download, Clock, X, Package } from "lucide-react";
 import {
   getLicenseByOrder,
+  getOrderAmount,
   getOrderById,
   getProductBySlug,
   issueLicenseForOrder,
   markOrderPaid,
 } from "@/lib/data";
+import { hasServiceRole } from "@/lib/supabase/env";
 import { isPaystackConfigured, verifyPaystackTransaction } from "@/lib/paystack";
 import { WhatsAppButton } from "@/components/whatsapp-button";
 import type { License } from "@/lib/types";
@@ -29,17 +31,27 @@ export default async function CheckoutSuccessPage({
   const isFulfilment =
     (order?.fulfilment_status ?? null) !== null || productType === "physical" || productType === "service";
 
+  // Authoritative order amount/status via the service role — NOT the RLS client.
+  // (Buyers can't read their own order under RLS, so `order` from getOrderById is
+  // null for them; relying on it would skip the amount check. Fail closed here.)
+  const amt = isPaystackConfigured && hasServiceRole ? await getOrderAmount(orderId) : null;
+
   // Confirm the payment (shared by both flows).
   let paid = false;
   if (isPaystackConfigured) {
     if (ref) {
       const v = await verifyPaystackTransaction(ref);
-      // Require: verified success, the reference belongs to THIS order, and the
-      // amount paid covers the Paystack portion (order total minus any gift card).
-      const due = order ? order.amount_minor - (order.gift_card_minor ?? 0) : 0;
-      paid = v.ok && (!order || (v.orderId === orderId && (v.amountMinor ?? 0) >= due));
+      if (hasServiceRole) {
+        // Require: verified success, the reference belongs to THIS order, and the
+        // amount paid covers the Paystack portion (order total minus any gift card).
+        // No order loadable → fail closed.
+        const due = amt ? amt.amount_minor - (amt.gift_card_minor ?? 0) : 0;
+        paid = Boolean(amt) && v.ok && v.orderId === orderId && (v.amountMinor ?? 0) >= due;
+      } else {
+        paid = v.ok; // demo (no DB to check against)
+      }
     } else {
-      paid = order?.status === "paid";
+      paid = (hasServiceRole ? amt?.status : order?.status) === "paid";
     }
   } else {
     paid = true; // demo
