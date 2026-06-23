@@ -5,6 +5,7 @@ import { StatusBadge } from "@/components/status-badge";
 import { Pagination } from "@/components/pagination";
 import type { OrderStatus } from "@/lib/types";
 import { refundOrder, resendLicense, revokeLicense } from "../actions";
+import { RecoverPayment } from "./recover";
 
 const FILTERS: { label: string; value: OrderStatus | "all" }[] = [
   { label: "All", value: "all" },
@@ -50,6 +51,8 @@ export default async function AdminOrdersPage({
           Export CSV
         </a>
       </div>
+
+      <RecoverPayment />
 
       {/* Search by email / reference / order ID */}
       <form method="get" className="flex gap-2 mb-3 max-w-md">

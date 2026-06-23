@@ -4,11 +4,11 @@ import { revalidatePath } from "next/cache";
 import { requireAdmin } from "@/lib/admin";
 import { hasServiceRole } from "@/lib/supabase/env";
 import { createAdminClient } from "@/lib/supabase/admin";
-import { getLicenseByOrder, getVendorOwnerEmail } from "@/lib/data";
+import { getLicenseByOrder, getVendorOwnerEmail, issueLicenseForOrder } from "@/lib/data";
 import { emailLayout, sendEmail } from "@/lib/email";
 import { logAudit } from "@/lib/audit";
 import { saveSettings } from "@/lib/settings";
-import { refundPaystackTransaction } from "@/lib/paystack";
+import { refundPaystackTransaction, verifyPaystackTransaction } from "@/lib/paystack";
 import { markAffiliatePayoutPaid } from "@/lib/affiliate";
 import { vendorFollowerEmails } from "@/lib/follows";
 import { emailButton, emailText, isEmailConfigured } from "@/lib/email";
@@ -242,6 +242,49 @@ export async function deleteCategory(formData: FormData) {
   await createAdminClient().from("categories").delete().eq("id", id);
   await logAudit(adminEmail, "delete_category", "category", id);
   revalidatePath("/admin/categories");
+}
+
+// ---- Recover a payment by Paystack reference ---------------------------------
+
+export interface RecoverState {
+  error?: string;
+  success?: string;
+}
+
+/**
+ * Verify a Paystack reference and issue the license + branded receipt for it.
+ * Use this to recover async/bank-transfer payments that came in before the
+ * webhook was set up. Idempotent — re-running won't double-issue or re-email.
+ */
+export async function processPaymentByReference(
+  _prev: RecoverState,
+  formData: FormData
+): Promise<RecoverState> {
+  const adminEmail = await requireAdmin();
+  const reference = String(formData.get("reference") ?? "").trim();
+  if (!reference) return { error: "Enter a Paystack transaction reference." };
+
+  const v = await verifyPaystackTransaction(reference);
+  if (!v.ok) {
+    return {
+      error: "Paystack couldn't confirm this reference as a successful payment. Check the reference.",
+    };
+  }
+  if (!v.orderId) {
+    return {
+      error:
+        "This payment isn't linked to a DoyinSoft order (no order_id). It may not have gone through checkout.",
+    };
+  }
+
+  const license = await issueLicenseForOrder(v.orderId, v.email ?? "", reference);
+  await logAudit(adminEmail, "recover_payment", "order", v.orderId, reference);
+  if (!license) {
+    return { error: "Verified, but the matching order couldn't be found to issue the license." };
+  }
+  return {
+    success: `Done. License issued and the branded receipt was emailed to ${license.email || v.email || "the buyer"}.`,
+  };
 }
 
 // ---- Email test --------------------------------------------------------------
