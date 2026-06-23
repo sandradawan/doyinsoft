@@ -43,3 +43,20 @@ export async function getAuditLog(limit = 100): Promise<AuditEntry[]> {
     .limit(limit);
   return (data as AuditEntry[]) ?? [];
 }
+
+export const AUDIT_PAGE_SIZE = 5;
+
+/** A page of the audit log (latest first), with the total count for pagination. */
+export async function getAuditLogPage(
+  page = 1,
+  pageSize = AUDIT_PAGE_SIZE
+): Promise<{ items: AuditEntry[]; total: number }> {
+  if (!hasServiceRole) return { items: [], total: 0 };
+  const from = (Math.max(1, page) - 1) * pageSize;
+  const { data, count } = await createAdminClient()
+    .from("admin_audit")
+    .select("*", { count: "exact" })
+    .order("created_at", { ascending: false })
+    .range(from, from + pageSize - 1);
+  return { items: (data as AuditEntry[]) ?? [], total: count ?? 0 };
+}

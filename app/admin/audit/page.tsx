@@ -1,4 +1,5 @@
-import { getAuditLog } from "@/lib/audit";
+import { getAuditLogPage, AUDIT_PAGE_SIZE } from "@/lib/audit";
+import { Pagination } from "@/components/pagination";
 
 function when(iso: string): string {
   if (!iso) return "";
@@ -10,14 +11,20 @@ function when(iso: string): string {
   });
 }
 
-export default async function AdminAuditPage() {
-  const entries = await getAuditLog();
+export default async function AdminAuditPage({
+  searchParams,
+}: {
+  searchParams: Promise<{ page?: string }>;
+}) {
+  const { page: pageParam } = await searchParams;
+  const page = Math.max(1, Number(pageParam) || 1);
+  const { items: entries, total } = await getAuditLogPage(page);
 
   return (
     <div>
       <h1 className="text-[22px] font-medium m-0 mb-4">Audit log</h1>
 
-      {entries.length === 0 ? (
+      {total === 0 ? (
         <p className="text-[13px] text-ink-soft">No admin actions recorded yet.</p>
       ) : (
         <div>
@@ -42,6 +49,12 @@ export default async function AdminAuditPage() {
               </span>
             </div>
           ))}
+          <Pagination
+            page={page}
+            total={total}
+            pageSize={AUDIT_PAGE_SIZE}
+            hrefForPage={(p) => `/admin/audit${p > 1 ? `?page=${p}` : ""}`}
+          />
         </div>
       )}
     </div>
