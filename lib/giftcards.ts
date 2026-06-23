@@ -216,6 +216,32 @@ export async function activateGiftCard(id: string): Promise<void> {
   await createAdminClient().from("gift_cards").update({ status: "active" }).eq("id", id).eq("status", "inactive");
 }
 
+/** Recent print runs (grouped by batch_ref) so they can be re-printed. */
+export async function adminListBatches(): Promise<
+  { batch_ref: string; count: number; amount_minor: number; active: number; created_at: string }[]
+> {
+  if (!hasServiceRole) return [];
+  const { data } = await createAdminClient()
+    .from("gift_cards")
+    .select("batch_ref, initial_minor, status, created_at")
+    .not("batch_ref", "is", null)
+    .order("created_at", { ascending: false })
+    .limit(1000);
+  const rows =
+    (data as { batch_ref: string; initial_minor: number; status: string; created_at: string }[]) ?? [];
+  const map = new Map<string, { count: number; amount_minor: number; active: number; created_at: string }>();
+  for (const r of rows) {
+    const e = map.get(r.batch_ref) ?? { count: 0, amount_minor: r.initial_minor, active: 0, created_at: r.created_at };
+    e.count++;
+    if (r.status === "active") e.active++;
+    if (r.created_at < e.created_at) e.created_at = r.created_at;
+    map.set(r.batch_ref, e);
+  }
+  return [...map.entries()]
+    .map(([batch_ref, e]) => ({ batch_ref, ...e }))
+    .sort((a, b) => b.created_at.localeCompare(a.created_at));
+}
+
 export async function listGiftCardsByBatch(batchRef: string): Promise<GiftCard[]> {
   if (!hasServiceRole || !batchRef) return [];
   const { data } = await createAdminClient()

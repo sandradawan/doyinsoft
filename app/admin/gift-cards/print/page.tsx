@@ -51,22 +51,47 @@ export default async function PrintGiftCardsPage({
       {cards.length === 0 ? (
         <p className="print-hide text-[13px] text-ink-soft">No cards in this batch.</p>
       ) : (
+        <>
         <div className="gift-print-grid">
           {cards.map((c, i) => (
             <div key={c.id} className="gift-print-card">
+              {/* Front: design + amount, NO code visible */}
               <div className="w-full max-w-[340px]">
-                <GiftCardVisual design={giftDesign(c.design)} amountLabel={formatPrice(c.initial_minor, c.currency)} code={c.code} />
+                <GiftCardVisual
+                  design={giftDesign(c.design)}
+                  amountLabel={formatPrice(c.initial_minor, c.currency)}
+                />
               </div>
-              <div className="flex items-center gap-3 mt-2 max-w-[340px]">
-                <div className="w-[58px] h-[58px] shrink-0 [&>svg]:w-full [&>svg]:h-full" dangerouslySetInnerHTML={{ __html: qrs[i] }} />
-                <p className="text-[10px] text-ink-soft leading-snug m-0">
-                  Redeem at <strong>doyinmart.com</strong> — enter this code in the “Gift card” field at
-                  checkout. {formatPrice(c.initial_minor, c.currency)} value. Non-refundable.
-                </p>
+
+              {/* Sealed panel: cover this with a scratch-off label. Holds the
+                  code + QR — the only place the secret appears. */}
+              <div className="scratch-zone max-w-[340px]">
+                <p className="scratch-caption">🔒 SCRATCH TO REVEAL CODE</p>
+                <div className="flex items-center gap-3">
+                  <div
+                    className="w-[56px] h-[56px] shrink-0 bg-white p-[3px] rounded [&>svg]:w-full [&>svg]:h-full"
+                    dangerouslySetInnerHTML={{ __html: qrs[i] }}
+                  />
+                  <p className="font-mono text-[14px] font-semibold tracking-wider text-[#1f2937] m-0 break-all">
+                    {c.code}
+                  </p>
+                </div>
               </div>
+
+              <p className="text-[10px] text-ink-soft leading-snug m-0 max-w-[340px] mt-1.5">
+                Redeem at <strong>doyinmart.com</strong> — scratch the panel, then enter the code (or
+                scan the QR) in the “Gift card” field at checkout. {formatPrice(c.initial_minor, c.currency)}{" "}
+                value · non-refundable.
+              </p>
             </div>
           ))}
         </div>
+
+        <p className="print-hide text-[12px] text-ink-soft mt-6">
+          Tip: after printing, cover each <strong>silver panel</strong> with a scratch-off
+          sticker/label so the code stays hidden until the buyer scratches it.
+        </p>
+        </>
       )}
     </div>
   );

@@ -124,6 +124,28 @@ html {
   break-inside: avoid;
   page-break-inside: avoid;
 }
+/* Silver "scratch-off" panel — cover with a physical scratch label after printing. */
+.scratch-zone {
+  margin-top: 8px;
+  padding: 10px 12px;
+  border-radius: 10px;
+  border: 1.5px dashed #9ca3af;
+  background-image: linear-gradient(
+    135deg,
+    #d4d4d8 0%,
+    #a1a1aa 35%,
+    #e5e7eb 50%,
+    #9ca3af 70%,
+    #cbd5e1 100%
+  );
+}
+.scratch-caption {
+  margin: 0 0 6px;
+  font-size: 9px;
+  font-weight: 700;
+  letter-spacing: 0.14em;
+  color: #374151;
+}
 @media print {
   .print-hide { display: none !important; }
   body { background: #ffffff; }

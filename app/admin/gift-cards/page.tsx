@@ -1,8 +1,10 @@
+import Link from "next/link";
 import {
   adminListGiftCards,
   adminGiftCardLiability,
   adminGiftCardRedeemed,
   adminGiftCardVendorOwed,
+  adminListBatches,
 } from "@/lib/giftcards";
 import { PLATFORM_COMMISSION_PERCENT } from "@/lib/paystack";
 import { GIFT_DESIGNS } from "@/lib/gift-designs";
@@ -27,11 +29,12 @@ export default async function AdminGiftCardsPage({
   searchParams: Promise<{ error?: string }>;
 }) {
   const { error } = await searchParams;
-  const [cards, liability, redeemed, owed] = await Promise.all([
+  const [cards, liability, redeemed, owed, batches] = await Promise.all([
     adminListGiftCards(100),
     adminGiftCardLiability(),
     adminGiftCardRedeemed(),
     adminGiftCardVendorOwed(),
+    adminListBatches(),
   ]);
   const issued = cards.reduce((t, c) => t + c.initial_minor, 0);
 
@@ -126,6 +129,29 @@ export default async function AdminGiftCardsPage({
       <p className="text-[11px] text-ink-faint -mt-4 mb-6">
         Leave “Active now” off to print cards that a store activates on sale (safer against theft).
       </p>
+
+      {/* Past print runs — re-print any time */}
+      {batches.length > 0 && (
+        <div className="border border-line rounded-lg p-4 mb-6">
+          <p className="text-[14px] font-medium m-0 mb-2">Print runs</p>
+          {batches.map((b) => (
+            <div key={b.batch_ref} className="flex items-center gap-3 py-2 border-t border-line text-[13px]">
+              <span>
+                {b.count} × {formatPrice(b.amount_minor, "NGN")}
+              </span>
+              <span className="text-ink-faint text-[11px]">
+                {b.active}/{b.count} active · {shortDate(b.created_at)}
+              </span>
+              <Link
+                href={`/admin/gift-cards/print?batch=${b.batch_ref}`}
+                className="ml-auto text-[12px] text-brand no-underline hover:underline"
+              >
+                Print →
+              </Link>
+            </div>
+          ))}
+        </div>
+      )}
 
       {cards.length === 0 ? (
         <p className="text-[13px] text-ink-soft">No gift cards yet.</p>
