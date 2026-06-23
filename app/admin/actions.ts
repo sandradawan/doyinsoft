@@ -4,7 +4,12 @@ import { revalidatePath } from "next/cache";
 import { requireAdmin } from "@/lib/admin";
 import { hasServiceRole } from "@/lib/supabase/env";
 import { createAdminClient } from "@/lib/supabase/admin";
-import { getLicenseByOrder, getVendorOwnerEmail, issueLicenseForOrder } from "@/lib/data";
+import {
+  getLicenseByOrder,
+  getVendorOwnerEmail,
+  issueLicenseForOrder,
+  sendReceiptForOrder,
+} from "@/lib/data";
 import { emailLayout, sendEmail } from "@/lib/email";
 import { logAudit } from "@/lib/audit";
 import { saveSettings } from "@/lib/settings";
@@ -277,13 +282,19 @@ export async function processPaymentByReference(
     };
   }
 
-  const license = await issueLicenseForOrder(v.orderId, v.email ?? "", reference);
-  await logAudit(adminEmail, "recover_payment", "order", v.orderId, reference);
+  // Issue if missing (this emails on first issue), then always (re)send the
+  // receipt so the buyer definitely gets it — even if it was already issued.
+  const existing = await getLicenseByOrder(v.orderId);
+  const license = existing ?? (await issueLicenseForOrder(v.orderId, v.email ?? "", reference));
   if (!license) {
     return { error: "Verified, but the matching order couldn't be found to issue the license." };
   }
+  if (existing) await sendReceiptForOrder(v.orderId);
+
+  await logAudit(adminEmail, "recover_payment", "order", v.orderId, reference);
+  const buyer = license.email || v.email || "the buyer";
   return {
-    success: `Done. License issued and the branded receipt was emailed to ${license.email || v.email || "the buyer"}.`,
+    success: `Done. Branded receipt sent to ${buyer}. ⚠ It goes to the BUYER's inbox (not yours) — check ${buyer}'s inbox and spam.`,
   };
 }
 

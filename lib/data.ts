@@ -1062,6 +1062,56 @@ export async function hasPurchased(productId: string, email: string): Promise<bo
 }
 
 /**
+ * Send the branded receipt (+ license & download for digital) to the buyer for
+ * an order. Always sends — use it to (re)send a receipt independently of the
+ * one-time issuance. Returns false if there's no license/email to send to.
+ */
+export async function sendReceiptForOrder(orderId: string): Promise<boolean> {
+  if (!hasServiceRole) return false;
+  const license = await getLicenseByOrder(orderId);
+  if (!license?.email) return false;
+
+  const admin = createAdminClient();
+  const { data } = await admin
+    .from("orders")
+    .select("amount_minor, currency, product:products(name, product_type)")
+    .eq("id", orderId)
+    .maybeSingle();
+  const o = data as
+    | { amount_minor: number; currency: "NGN" | "USD"; product: { name: string; product_type?: string } | { name: string; product_type?: string }[] | null }
+    | null;
+  const op = o ? (Array.isArray(o.product) ? o.product[0] : o.product) : null;
+  const productName = op?.name ?? license.product.name;
+  const isDigital = (op?.product_type ?? "digital") === "digital";
+  const amountStr = formatPrice(o?.amount_minor ?? 0, o?.currency ?? "NGN");
+  const ref = orderId.slice(0, 8).toUpperCase();
+  const dl = `${SITE_URL}/api/download?order=${encodeURIComponent(orderId)}&key=${encodeURIComponent(license.key)}`;
+
+  const receiptLine = `<table role="presentation" width="100%" style="margin:0 0 16px;border-collapse:collapse;">
+    <tr><td style="font-size:12px;color:#737373;padding:4px 0;">Item</td><td style="font-size:12px;color:#171717;padding:4px 0;text-align:right;">${productName}</td></tr>
+    <tr><td style="font-size:12px;color:#737373;padding:4px 0;">Amount paid</td><td style="font-size:12px;color:#171717;padding:4px 0;text-align:right;font-weight:600;">${amountStr}</td></tr>
+    <tr><td style="font-size:12px;color:#737373;padding:4px 0;">Order</td><td style="font-size:12px;color:#171717;padding:4px 0;text-align:right;">#${ref}</td></tr>
+  </table>`;
+  const digitalBlock = `<p style="font-size:12px;color:#737373;margin:0 0 8px;">Your license key</p>
+       ${emailKeyBox(license.key)}
+       <div style="margin:22px 0;">${emailButton(dl, "⬇  Download now")}</div>
+       ${emailText(`Find your purchases any time on your <a href="${SITE_URL}/downloads" style="color:#047857;">downloads page</a>.`)}`;
+  const physicalBlock = emailText(
+    "Your payment is confirmed. The seller has your details and will fulfil your order — they may contact you with delivery updates."
+  );
+
+  await sendEmail({
+    to: license.email,
+    subject: `Receipt — ${productName} (#${ref})`,
+    html: emailLayout(
+      "Thank you for your purchase 🎉",
+      `${emailText("Here's your receipt. Keep this email as proof of purchase.")}${receiptLine}${isDigital ? digitalBlock : physicalBlock}`
+    ),
+  });
+  return true;
+}
+
+/**
  * Issue (or return the existing) license for an order. Idempotent.
  * Called by the Paystack webhook in production and by the success page in the
  * mock flow so the key shown is real and stored when Supabase is connected.
@@ -1135,31 +1185,8 @@ export async function issueLicenseForOrder(
   if (!inserted) return null;
   const license = mapLicense(inserted as unknown as LicenseRow);
 
-  const receiptLine = `<table role="presentation" width="100%" style="margin:0 0 16px;border-collapse:collapse;">
-    <tr><td style="font-size:12px;color:#737373;padding:4px 0;">Item</td><td style="font-size:12px;color:#171717;padding:4px 0;text-align:right;">${productName}</td></tr>
-    <tr><td style="font-size:12px;color:#737373;padding:4px 0;">Amount paid</td><td style="font-size:12px;color:#171717;padding:4px 0;text-align:right;font-weight:600;">${amountStr}</td></tr>
-    <tr><td style="font-size:12px;color:#737373;padding:4px 0;">Order</td><td style="font-size:12px;color:#171717;padding:4px 0;text-align:right;">#${ref}</td></tr>
-  </table>`;
-
-  // 1) Buyer — receipt (+ licence & download for digital).
-  if (license.email) {
-    const dl = `${SITE_URL}/api/download?order=${encodeURIComponent(orderId)}&key=${encodeURIComponent(license.key)}`;
-    const digitalBlock = `<p style="font-size:12px;color:#737373;margin:0 0 8px;">Your license key</p>
-         ${emailKeyBox(license.key)}
-         <div style="margin:22px 0;">${emailButton(dl, "⬇  Download now")}</div>
-         ${emailText(`Find your purchases any time on your <a href="${SITE_URL}/downloads" style="color:#047857;">downloads page</a>.`)}`;
-    const physicalBlock = emailText(
-      "Your payment is confirmed. The seller has your details and will fulfil your order — they may contact you with delivery updates."
-    );
-    await sendEmail({
-      to: license.email,
-      subject: `Receipt — ${productName} (#${ref})`,
-      html: emailLayout(
-        "Thank you for your purchase 🎉",
-        `${emailText("Here's your receipt. Keep this email as proof of purchase.")}${receiptLine}${isDigital ? digitalBlock : physicalBlock}`
-      ),
-    });
-  }
+  // 1) Buyer — branded receipt (+ licence & download for digital).
+  await sendReceiptForOrder(orderId);
 
   // 2) Vendor — new-sale alert.
   const vendorEmail = await getVendorOwnerEmail(o.vendor_id);
