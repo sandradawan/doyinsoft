@@ -16,6 +16,7 @@ import {
 } from "@/lib/data";
 import { requireVendor } from "@/lib/auth";
 import { vendorCouponStats } from "@/lib/coupons";
+import { vendorGiftCardStats } from "@/lib/giftcards";
 import { formatPrice } from "@/lib/format";
 
 const ORDERS_PER_PAGE = 3;
@@ -30,7 +31,7 @@ export default async function VendorDashboardPage({
   const query = q?.trim() ?? "";
   const oPage = Math.max(1, Number(pageParam) || 1);
 
-  const [metrics, recent, monthly, topProducts, products, subaccount, today, coupons, orderPage] =
+  const [metrics, recent, monthly, topProducts, products, subaccount, today, coupons, giftCards, orderPage] =
     await Promise.all([
       getDashboardMetrics(vendor.id),
       getRecentOrders(vendor.id),
@@ -40,6 +41,7 @@ export default async function VendorDashboardPage({
       getVendorSubaccount(vendor.id),
       vendorTodayStats(vendor.id),
       vendorCouponStats(vendor.id),
+      vendorGiftCardStats(vendor.id),
       getVendorOrders(vendor.id, {
         page: oPage,
         pageSize: ORDERS_PER_PAGE,
@@ -79,6 +81,15 @@ export default async function VendorDashboardPage({
           : undefined,
     },
   ];
+
+  // Only surface gift-card income when there is some, to avoid clutter.
+  if (giftCards.gift_card_minor > 0) {
+    cards.push({
+      label: "Paid by gift card",
+      value: formatPrice(giftCards.gift_card_minor, metrics.currency),
+      sub: `${giftCards.count} order${giftCards.count === 1 ? "" : "s"} · settled by the platform`,
+    });
+  }
 
   return (
     <VendorShell active="overview">

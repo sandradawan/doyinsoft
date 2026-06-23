@@ -169,6 +169,24 @@ export async function setGiftCardDisabled(id: string, disabled: boolean): Promis
     .eq("id", id);
 }
 
+/** A vendor's sales paid (in part) by gift card — settled by the platform, not Paystack. */
+export async function vendorGiftCardStats(
+  vendorId: string
+): Promise<{ count: number; gift_card_minor: number }> {
+  if (!hasServiceRole) return { count: 0, gift_card_minor: 0 };
+  const { data } = await createAdminClient()
+    .from("orders")
+    .select("gift_card_minor")
+    .eq("vendor_id", vendorId)
+    .eq("status", "paid")
+    .gt("gift_card_minor", 0);
+  const rows = (data as { gift_card_minor: number }[]) ?? [];
+  return {
+    count: rows.length,
+    gift_card_minor: rows.reduce((t, r) => t + (r.gift_card_minor || 0), 0),
+  };
+}
+
 /** Outstanding liability = sum of balances on active cards (money the platform owes). */
 export async function adminGiftCardLiability(): Promise<number> {
   if (!hasServiceRole) return 0;
