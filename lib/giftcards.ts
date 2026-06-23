@@ -5,6 +5,7 @@ import { hasServiceRole } from "./supabase/env";
 import { sendEmail, emailLayout, emailText, emailKeyBox, emailButton, esc, subjectSafe } from "./email";
 import { formatPrice } from "./format";
 import { giftDesign, giftGradient } from "./gift-designs";
+import { PLATFORM_COMMISSION_PERCENT } from "./paystack";
 
 const SITE_URL = process.env.NEXT_PUBLIC_SITE_URL ?? "http://localhost:3000";
 
@@ -225,6 +226,35 @@ export async function adminGiftCardRedeemed(): Promise<number> {
     .eq("status", "paid")
     .gt("gift_card_minor", 0);
   return ((data as { gift_card_minor: number }[]) ?? []).reduce((t, r) => t + (r.gift_card_minor || 0), 0);
+}
+
+/**
+ * Per-vendor settlement owed from gift-card spend. Paystack's split only routes the
+ * card-charged portion to vendors, so the platform owes each vendor their
+ * (100 − commission)% share of the gift-card-funded part of their paid sales.
+ */
+export async function adminGiftCardVendorOwed(): Promise<
+  { vendor: string; gross_minor: number; owed_minor: number }[]
+> {
+  if (!hasServiceRole) return [];
+  const { data } = await createAdminClient()
+    .from("orders")
+    .select("gift_card_minor, vendor:vendors(name)")
+    .eq("status", "paid")
+    .gt("gift_card_minor", 0);
+  const rows =
+    (data as { gift_card_minor: number; vendor: { name?: string } | { name?: string }[] | null }[]) ?? [];
+
+  const byVendor = new Map<string, number>();
+  for (const r of rows) {
+    const v = Array.isArray(r.vendor) ? r.vendor[0] : r.vendor;
+    const name = v?.name ?? "Unknown vendor";
+    byVendor.set(name, (byVendor.get(name) ?? 0) + (r.gift_card_minor || 0));
+  }
+  const share = (100 - PLATFORM_COMMISSION_PERCENT) / 100;
+  return [...byVendor.entries()]
+    .map(([vendor, gross]) => ({ vendor, gross_minor: gross, owed_minor: Math.round(gross * share) }))
+    .sort((a, b) => b.owed_minor - a.owed_minor);
 }
 
 /** Cards a person bought or received (for the account page). Masks the full code. */
