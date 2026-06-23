@@ -10,7 +10,8 @@ import { logAudit } from "@/lib/audit";
 import { saveSettings } from "@/lib/settings";
 import { refundPaystackTransaction } from "@/lib/paystack";
 import { markAffiliatePayoutPaid } from "@/lib/affiliate";
-import { emailText, isEmailConfigured } from "@/lib/email";
+import { vendorFollowerEmails } from "@/lib/follows";
+import { emailButton, emailText, isEmailConfigured } from "@/lib/email";
 
 const SITE_URL = process.env.NEXT_PUBLIC_SITE_URL ?? "http://localhost:3000";
 
@@ -28,8 +29,11 @@ async function setProductStatus(
     .from("products")
     .update({ status, rejection_reason: reason ?? null })
     .eq("id", id)
-    .select("name, vendor_id")
+    .select("name, slug, vendor_id, launched_at")
     .single();
+
+  const row = data as { name: string; slug: string; vendor_id: string; launched_at: string | null } | null;
+  const isFirstLaunch = status === "approved" && row && !row.launched_at;
 
   // First approval = launch date (powers the Launches board).
   if (status === "approved") {
@@ -39,8 +43,6 @@ async function setProductStatus(
       .eq("id", id)
       .is("launched_at", null);
   }
-
-  const row = data as { name: string; vendor_id: string } | null;
   if (row?.vendor_id) {
     const email = await getVendorOwnerEmail(row.vendor_id);
     if (email) {
@@ -59,6 +61,30 @@ async function setProductStatus(
       }
     }
   }
+  // Notify followers of the seller about a newly launched product.
+  if (isFirstLaunch && row) {
+    const followers = await vendorFollowerEmails(row.vendor_id);
+    if (followers.length) {
+      const { data: v } = await admin
+        .from("vendors")
+        .select("name")
+        .eq("id", row.vendor_id)
+        .maybeSingle();
+      const vname = (v as { name?: string } | null)?.name ?? "A seller you follow";
+      for (const to of followers) {
+        await sendEmail({
+          to,
+          subject: `New from ${vname}: ${row.name}`,
+          html: emailLayout(
+            `${vname} just dropped something new 🎉`,
+            `${emailText(`<strong style="color:#171717">${row.name}</strong> is now live on DoyinSoft.`)}
+             <div style="margin:18px 0;">${emailButton(`${SITE_URL}/products/${row.slug}`, "View product")}</div>`
+          ),
+        });
+      }
+    }
+  }
+
   await logAudit(adminEmail, status === "approved" ? "approve_product" : "reject_product", "product", id, reason);
   revalidatePath("/admin/products");
   revalidatePath("/admin");

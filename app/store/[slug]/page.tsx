@@ -7,8 +7,11 @@ import { Footer } from "@/components/footer";
 import { ProductCard } from "@/components/product-card";
 import { WhatsAppButton } from "@/components/whatsapp-button";
 import { getStoreProducts, getVendorBySlug } from "@/lib/data";
+import { getCurrentUser } from "@/lib/auth";
+import { followerCount, isFollowing } from "@/lib/follows";
 import { formatPrice } from "@/lib/format";
 import type { Product } from "@/lib/types";
+import { FollowButton } from "./follow";
 
 const SITE_URL = process.env.NEXT_PUBLIC_SITE_URL ?? "https://doyinsoft.vercel.app";
 
@@ -48,6 +51,11 @@ export default async function StorePage({
   if (!vendor || vendor.suspended) notFound();
 
   const all = await getStoreProducts(vendor.id);
+  const user = await getCurrentUser();
+  const [following, followers] = await Promise.all([
+    user ? isFollowing(vendor.id, user.id) : Promise.resolve(false),
+    followerCount(vendor.id),
+  ]);
 
   // Store stats (over the whole catalogue, not the filtered view).
   const totalDownloads = all.reduce((t, p) => t + p.download_count, 0);
@@ -108,7 +116,14 @@ export default async function StorePage({
               </h1>
               <p className="text-[12px] text-ink-soft m-0">@{vendor.slug}</p>
             </div>
-            <div className="flex gap-2 pb-1">
+            <div className="flex gap-2 pb-1 flex-wrap">
+              <FollowButton
+                vendorId={vendor.id}
+                initialFollowing={following}
+                initialCount={followers}
+                signedIn={Boolean(user)}
+                signInHref={`/sign-in?next=/store/${vendor.slug}`}
+              />
               {vendor.whatsapp && (
                 <WhatsAppButton
                   phone={vendor.whatsapp}
