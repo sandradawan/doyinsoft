@@ -106,6 +106,8 @@ export async function requestPayout(): Promise<PayoutState> {
   }
 
   const supabase = await createClient();
+  // The partial unique index (payouts_one_pending) prevents a second concurrent
+  // request from withdrawing the same balance twice.
   const { error } = await supabase.from("payouts").insert({
     vendor_id: vendor.id,
     amount_minor: summary.available_minor,
@@ -113,7 +115,11 @@ export async function requestPayout(): Promise<PayoutState> {
     status: "requested",
     method: "Bank transfer",
   });
-  if (error) return { error: error.message };
+  if (error) {
+    if (error.code === "23505")
+      return { error: "You already have a payout request being processed." };
+    return { error: error.message };
+  }
 
   revalidatePath("/vendor/payouts");
   return { success: "Payout requested — it will be sent to your bank account." };

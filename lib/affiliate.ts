@@ -1,4 +1,5 @@
 import "server-only";
+import { randomInt } from "crypto";
 import { createAdminClient } from "./supabase/admin";
 import { hasServiceRole } from "./supabase/env";
 
@@ -10,8 +11,8 @@ export interface AffiliateStats {
 
 function codeFromEmail(email: string): string {
   const base = (email.split("@")[0] || "ref").replace(/[^a-zA-Z0-9]/g, "").toLowerCase();
-  // short, readable, reasonably unique
-  return `${base.slice(0, 8) || "ref"}${Math.floor(Math.random() * 9000 + 1000)}`;
+  // short, readable, reasonably unique — crypto-random suffix (6 digits).
+  return `${base.slice(0, 8) || "ref"}${randomInt(100000, 1000000)}`;
 }
 
 /** Get the user's affiliate code, creating one on first use. */
@@ -77,6 +78,25 @@ export async function getAffiliateStats(affiliateId: string): Promise<AffiliateS
     earned_minor: rows.reduce((t, r) => t + (r.amount_minor || 0), 0),
     referrals: rows.length,
   };
+}
+
+/**
+ * True if the affiliate's own account email matches the buyer — used to block
+ * self-referral (earning commission on your own purchases).
+ */
+export async function affiliateOwnsEmail(
+  affiliateId: string | null,
+  ...emails: (string | null | undefined)[]
+): Promise<boolean> {
+  if (!hasServiceRole || !affiliateId) return false;
+  const { data } = await createAdminClient()
+    .from("affiliates")
+    .select("email")
+    .eq("id", affiliateId)
+    .maybeSingle();
+  const affEmail = (data as { email?: string } | null)?.email?.toLowerCase();
+  if (!affEmail) return false;
+  return emails.some((e) => e && e.toLowerCase() === affEmail);
 }
 
 /** Resolve a referral code to an affiliate id (for attributing an order). */
@@ -177,9 +197,16 @@ export async function requestAffiliatePayout(affiliateId: string): Promise<strin
   ]);
   if (!bank.bank_code || !bank.account_number) return "Add your bank details first.";
   if (bal.available_minor <= 0) return "No balance available to withdraw.";
-  await createAdminClient()
+  // The partial unique index (affiliate_payouts_one_pending) makes this atomic:
+  // a concurrent/duplicate request hits a unique violation and is rejected, so a
+  // balance can't be withdrawn twice.
+  const { error } = await createAdminClient()
     .from("affiliate_payouts")
     .insert({ affiliate_id: affiliateId, amount_minor: bal.available_minor, status: "requested" });
+  if (error) {
+    if (error.code === "23505") return "You already have a payout request being processed.";
+    return "Could not request payout. Please try again.";
+  }
   return null;
 }
 

@@ -52,7 +52,7 @@ export function CheckoutForm({
     if (!code) return;
     setCouponMsg(null);
     startCoupon(async () => {
-      const res = await previewCoupon(code, productSlug, amountMinor);
+      const res = await previewCoupon(code, productSlug);
       if (res.ok) {
         setApplied({
           code: res.code!,
@@ -90,8 +90,6 @@ export function CheckoutForm({
         productSlug,
         gateway,
         email,
-        amountMinor,
-        currency,
         coupon: applied?.code,
         shippingName,
         shippingPhone,

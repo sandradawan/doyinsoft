@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { createHmac, timingSafeEqual } from "crypto";
-import { issueLicenseForOrder } from "@/lib/data";
+import { getOrderAmount, issueLicenseForOrder } from "@/lib/data";
+import { verifyPaystackTransaction } from "@/lib/paystack";
 
 const PAYSTACK_SECRET = process.env.PAYSTACK_SECRET_KEY ?? "";
 
@@ -35,8 +36,29 @@ export async function POST(request: Request) {
   if (event.event === "charge.success") {
     const orderId = event.data?.metadata?.order_id;
     const email = event.data?.customer?.email ?? "";
-    if (orderId) {
-      await issueLicenseForOrder(orderId, email, event.data?.reference);
+    const reference = event.data?.reference;
+
+    if (orderId && reference) {
+      // A valid signature only proves the body came from Paystack — it does NOT
+      // prove the buyer paid this order's price. Re-verify with Paystack's API and
+      // require the paid amount to cover the order total before issuing a license.
+      const [v, order] = await Promise.all([
+        verifyPaystackTransaction(reference),
+        getOrderAmount(orderId),
+      ]);
+      const paidEnough =
+        v.ok &&
+        order != null &&
+        v.orderId === orderId &&
+        (v.amountMinor ?? 0) >= order.amount_minor;
+
+      if (paidEnough) {
+        await issueLicenseForOrder(orderId, email || v.email || "", reference);
+      } else {
+        console.warn(
+          `[webhook] refused to issue order ${orderId}: paid=${v.amountMinor} expected>=${order?.amount_minor} ok=${v.ok}`
+        );
+      }
     }
   }
 

@@ -6,11 +6,12 @@ import { hasServiceRole } from "@/lib/supabase/env";
 import { createAdminClient } from "@/lib/supabase/admin";
 import {
   getLicenseByOrder,
+  getOrderAmount,
   getVendorOwnerEmail,
   issueLicenseForOrder,
   sendReceiptForOrder,
 } from "@/lib/data";
-import { emailLayout, sendEmail } from "@/lib/email";
+import { emailLayout, esc, sendEmail } from "@/lib/email";
 import { logAudit } from "@/lib/audit";
 import { saveSettings } from "@/lib/settings";
 import { refundPaystackTransaction, verifyPaystackTransaction } from "@/lib/paystack";
@@ -55,13 +56,13 @@ async function setProductStatus(
         await sendEmail({
           to: email,
           subject: `“${row.name}” is approved and live`,
-          html: emailLayout("Your product is live 🎉", `<p>“${row.name}” passed review and is now on the storefront.</p>`),
+          html: emailLayout("Your product is live 🎉", `<p>“${esc(row.name)}” passed review and is now on the storefront.</p>`),
         });
       } else {
         await sendEmail({
           to: email,
           subject: `“${row.name}” was unpublished`,
-          html: emailLayout("Product not live", `<p>“${row.name}” isn’t live.${reason ? ` Reason: ${reason}` : ""}</p><p>Update it and resubmit from your dashboard.</p>`),
+          html: emailLayout("Product not live", `<p>“${esc(row.name)}” isn’t live.${reason ? ` Reason: ${esc(reason)}` : ""}</p><p>Update it and resubmit from your dashboard.</p>`),
         });
       }
     }
@@ -81,8 +82,8 @@ async function setProductStatus(
           to,
           subject: `New from ${vname}: ${row.name}`,
           html: emailLayout(
-            `${vname} just dropped something new 🎉`,
-            `${emailText(`<strong style="color:#171717">${row.name}</strong> is now live on DoyinSoft.`)}
+            `${esc(vname)} just dropped something new 🎉`,
+            `${emailText(`<strong style="color:#171717">${esc(row.name)}</strong> is now live on DoyinSoft.`)}
              <div style="margin:18px 0;">${emailButton(`${SITE_URL}/products/${row.slug}`, "View product")}</div>`
           ),
         });
@@ -178,9 +179,28 @@ export async function refundOrder(formData: FormData) {
   if (!hasServiceRole) return;
   const id = String(formData.get("id") ?? "");
   const admin = createAdminClient();
-  const { data: order } = await admin.from("orders").select("reference").eq("id", id).maybeSingle();
-  const reference = (order as { reference?: string } | null)?.reference;
-  if (reference) await refundPaystackTransaction(reference);
+  const { data: order } = await admin
+    .from("orders")
+    .select("reference, status")
+    .eq("id", id)
+    .maybeSingle();
+  const row = order as { reference?: string; status?: string } | null;
+
+  // Don't double-refund an already-refunded order.
+  if (row?.status === "refunded") return;
+
+  // If there's a real payment, only proceed when Paystack ACTUALLY refunds it —
+  // never mark the order refunded / revoke the license on a failed refund (that
+  // would lock the buyer out while their money was never returned).
+  const reference = row?.reference;
+  if (reference) {
+    const res = await refundPaystackTransaction(reference);
+    if (!res.ok) {
+      await logAudit(adminEmail, "refund_failed", "order", id, res.error ?? "unknown");
+      revalidatePath("/admin/orders");
+      return; // leave order/license untouched
+    }
+  }
   await admin.from("orders").update({ status: "refunded" }).eq("id", id);
   await admin.from("licenses").update({ status: "revoked" }).eq("order_id", id);
   await logAudit(adminEmail, "refund_order", "order", id, reference ?? "no-reference");
@@ -207,8 +227,8 @@ export async function resendLicense(formData: FormData) {
       subject: `Your ${license.product.name} license`,
       html: emailLayout(
         "Here’s your license again",
-        `<p>License for <strong>${license.product.name}</strong>:</p>
-         <p style="font-size:15px;font-weight:600">${license.key}</p>
+        `<p>License for <strong>${esc(license.product.name)}</strong>:</p>
+         <p style="font-size:15px;font-weight:600">${esc(license.key)}</p>
          <p><a href="${dl}" style="background:#047857;color:#fff;text-decoration:none;padding:10px 16px;border-radius:8px;display:inline-block">Download software</a></p>`
       ),
     });
@@ -279,6 +299,15 @@ export async function processPaymentByReference(
     return {
       error:
         "This payment isn't linked to a DoyinSoft order (no order_id). It may not have gone through checkout.",
+    };
+  }
+
+  // Verify the amount actually paid covers the order total — never issue on an
+  // underpaid / mismatched transaction.
+  const ord = await getOrderAmount(v.orderId);
+  if (ord && (v.amountMinor ?? 0) < ord.amount_minor) {
+    return {
+      error: `Paid amount (${(v.amountMinor ?? 0) / 100}) is less than the order total (${ord.amount_minor / 100}). Not issuing.`,
     };
   }
 

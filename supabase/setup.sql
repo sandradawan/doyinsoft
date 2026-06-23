@@ -129,11 +129,20 @@ create table if not exists payouts (
 create table if not exists reviews (
   id          uuid primary key default gen_random_uuid(),
   product_id  uuid not null references products (id) on delete cascade,
+  user_id     uuid,
   author_name text not null default 'Anonymous',
   rating      smallint not null check (rating between 1 and 5),
   body        text not null default '',
   created_at  timestamptz not null default now()
 );
+alter table reviews add column if not exists user_id uuid;
+-- Non-partial so it's a valid ON CONFLICT target for the review upsert.
+create unique index if not exists reviews_product_user_uniq
+  on reviews (product_id, user_id);
+
+-- One outstanding payout request per recipient (atomic double-spend guard).
+create unique index if not exists payouts_one_pending
+  on payouts (vendor_id) where status = 'requested';
 
 -- ----------------------------------------------------------------------------
 -- Indexes
@@ -250,8 +259,12 @@ create policy "vendor requests own payouts" on payouts for insert
 drop policy if exists "reviews are public" on reviews;
 create policy "reviews are public" on reviews for select using (true);
 
+-- Reviews: only a signed-in user may insert a review attributed to themselves
+-- (the old "anyone can review" policy let the public anon key spoof reviews).
 drop policy if exists "anyone can review" on reviews;
-create policy "anyone can review" on reviews for insert with check (rating between 1 and 5);
+drop policy if exists "buyers insert own review" on reviews;
+create policy "buyers insert own review" on reviews for insert
+  to authenticated with check (user_id = auth.uid() and rating between 1 and 5);
 
 -- Note: `licenses` has RLS enabled with no policy on purpose — all license
 -- reads/writes go through the server's service-role client after the app has
@@ -319,9 +332,12 @@ create index if not exists coupons_code_lower_idx on coupons (lower(code));
 create index if not exists coupons_vendor_idx on coupons (vendor_id);
 alter table orders add column if not exists coupon_code    text;
 alter table orders add column if not exists discount_minor integer not null default 0;
+-- Atomic + cap-aware: never lets used_count exceed max_uses under concurrency.
 create or replace function increment_coupon_use(p_code text)
 returns void language sql as $$
-  update coupons set used_count = used_count + 1 where lower(code) = lower(p_code);
+  update coupons set used_count = used_count + 1
+  where lower(code) = lower(p_code)
+    and (max_uses is null or used_count < max_uses);
 $$;
 
 -- Follow a seller.
@@ -373,6 +389,9 @@ create table if not exists affiliate_payouts (
 );
 alter table affiliate_payouts enable row level security;
 create index if not exists affiliate_payouts_aff_idx on affiliate_payouts (affiliate_id);
+-- One outstanding payout request per affiliate (atomic double-spend guard).
+create unique index if not exists affiliate_payouts_one_pending
+  on affiliate_payouts (affiliate_id) where status = 'requested';
 
 -- ----------------------------------------------------------------------------
 -- Storage: private bucket for software binaries

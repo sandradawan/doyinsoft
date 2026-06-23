@@ -10,9 +10,10 @@ import {
   getVendorSubaccountCode,
   issueLicenseForOrder,
 } from "@/lib/data";
-import { getSettings } from "@/lib/settings";
+import { toNgnCharge } from "@/lib/money";
 import { resolveAffiliateId } from "@/lib/affiliate";
 import { validateCoupon, type CouponCheck } from "@/lib/coupons";
+import { clientId, rateLimit } from "@/lib/ratelimit";
 import type { Currency, Gateway } from "@/lib/types";
 
 const PAYSTACK_SECRET = process.env.PAYSTACK_SECRET_KEY ?? "";
@@ -23,8 +24,6 @@ interface CheckoutInput {
   productSlug: string | null;
   gateway: Gateway;
   email: string;
-  amountMinor: number;
-  currency: Currency;
   coupon?: string;
   shippingName?: string;
   shippingPhone?: string;
@@ -32,17 +31,22 @@ interface CheckoutInput {
 }
 
 /**
- * Preview a coupon for the checkout UI. The charge passed here is already NGN
- * (the page converts USD before rendering the form). Re-validated authoritatively
- * in startCheckout before any money moves.
+ * Preview a coupon for the checkout UI. The charge is derived SERVER-SIDE from the
+ * product price (never trusted from the client), and re-validated authoritatively
+ * in startCheckout before any money moves. Lightly rate-limited to deter coupon
+ * enumeration.
  */
 export async function previewCoupon(
   code: string,
-  productSlug: string | null,
-  chargeMinor: number
+  productSlug: string | null
 ): Promise<CouponCheck> {
+  if (!rateLimit(`coupon:${await clientId()}`, 12, 60_000)) {
+    return { ok: false, error: "Too many attempts — please wait a moment and try again." };
+  }
   const product = productSlug ? await getProductBySlug(productSlug) : null;
-  return validateCoupon(code, { chargeMinor, productVendorId: product?.vendor.id ?? null });
+  if (!product) return { ok: false, error: "Unknown product." };
+  const chargeMinor = toNgnCharge(product.price_minor, product.currency);
+  return validateCoupon(code, { chargeMinor, productVendorId: product.vendor.id });
 }
 
 /**
@@ -55,14 +59,23 @@ export async function startCheckout(
   input: CheckoutInput
 ): Promise<{ error: string } | void> {
   let orderId = input.orderId;
-
-  // Always charge NGN (Paystack NG accounts can't take USD). Convert if needed.
-  const { usd_to_ngn } = await getSettings();
-  const chargeMinor =
-    input.currency === "USD" ? Math.round(input.amountMinor * usd_to_ngn) : input.amountMinor;
   const chargeCurrency: Currency = "NGN";
 
   const product = input.productSlug ? await getProductBySlug(input.productSlug) : null;
+
+  // AUTHORITATIVE price — always derived server-side from the product (or, for an
+  // already-created order, from the stored amount). The client never supplies the
+  // amount, so a tampered request can't undercharge. Paystack NG charges NGN.
+  let chargeMinor: number;
+  if (product) {
+    chargeMinor = toNgnCharge(product.price_minor, product.currency);
+  } else if (orderId !== "new") {
+    const existing = await getOrderById(orderId);
+    if (!existing) return { error: "Order not found." };
+    chargeMinor = toNgnCharge(existing.amount_minor, existing.currency);
+  } else {
+    return { error: "Unknown product." };
+  }
 
   // The vendor's Paystack subaccount → enables automatic commission split.
   const subaccountCode = product

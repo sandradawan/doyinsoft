@@ -11,24 +11,30 @@ import { createAdminClient } from "@/lib/supabase/admin";
  * or streams a license certificate (mock mode / products with no file).
  *
  *   GET /api/download?order=<id>&key=<licenseKey>
+ *
+ * The license KEY is the bearer secret and is REQUIRED — an order id alone (which
+ * leaks in URLs/receipts) must never be sufficient to download. The key is the
+ * 64-bit unguessable token issued only to the buyer.
  */
 export async function GET(request: Request) {
   const { searchParams } = new URL(request.url);
   const orderId = searchParams.get("order");
   const key = searchParams.get("key");
 
-  let license = orderId ? await getLicenseByOrder(orderId) : null;
-  if (!license && key) license = await getLicenseByKey(key);
+  // A valid key is mandatory for every download.
+  if (!key) {
+    return NextResponse.json({ error: "A valid license key is required." }, { status: 401 });
+  }
 
-  if (!license) {
-    return NextResponse.json({ error: "No license found for this download." }, { status: 404 });
+  // Resolve by key (authoritative). If an order is also given, it must match.
+  const license =
+    (await getLicenseByKey(key)) ?? (orderId ? await getLicenseByOrder(orderId) : null);
+
+  if (!license || license.key !== key) {
+    return NextResponse.json({ error: "License key does not match." }, { status: 403 });
   }
   if (license.status !== "active") {
     return NextResponse.json({ error: "This license is not active." }, { status: 403 });
-  }
-  // If a key is supplied it must match the resolved license.
-  if (key && license.key !== key) {
-    return NextResponse.json({ error: "License key does not match." }, { status: 403 });
   }
 
   const product = await getProductBySlug(license.product.slug);

@@ -1,7 +1,7 @@
 import "server-only";
 import { redirect } from "next/navigation";
 import { createClient } from "./supabase/server";
-import { isSupabaseConfigured } from "./supabase/env";
+import { isSupabaseConfigured, isDemoMode } from "./supabase/env";
 
 /** Comma-separated list of admin emails, e.g. ADMIN_EMAILS="you@gmail.com,co@x.com" */
 const ADMIN_EMAILS = (process.env.ADMIN_EMAILS ?? "")
@@ -13,7 +13,8 @@ const ADMIN_EMAILS = (process.env.ADMIN_EMAILS ?? "")
 export async function getCurrentAdmin(): Promise<string | null> {
   if (!isSupabaseConfigured) {
     // Demo mode: open the admin panel so it's explorable without a backend.
-    return "demo-admin@doyinsoft.dev";
+    // Fail closed in production (never infer admin from a missing backend).
+    return isDemoMode ? "demo-admin@doyinsoft.dev" : null;
   }
   if (ADMIN_EMAILS.length === 0) return null;
   const supabase = await createClient();

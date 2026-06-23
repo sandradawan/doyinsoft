@@ -44,13 +44,13 @@ export async function addReview(
   const authorName =
     String(formData.get("author_name") ?? "").trim() || user.email.split("@")[0] || "Verified buyer";
 
+  // Upsert so a buyer can update their review but not flood new ones
+  // (unique product_id+user_id). user_id binds the review to its author.
   const db = hasServiceRole ? createAdminClient() : await createClient();
-  const { error } = await db.from("reviews").insert({
-    product_id: productId,
-    author_name: authorName,
-    rating,
-    body,
-  });
+  const { error } = await db.from("reviews").upsert(
+    { product_id: productId, user_id: user.id, author_name: authorName, rating, body },
+    { onConflict: "product_id,user_id" }
+  );
   if (error) return { error: `Could not post review: ${error.message}` };
 
   if (slug) revalidatePath(`/products/${slug}`);

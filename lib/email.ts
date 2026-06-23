@@ -82,6 +82,20 @@ export async function sendEmail(opts: {
 
 const SITE = process.env.NEXT_PUBLIC_SITE_URL ?? "https://doyinsoft.vercel.app";
 
+/**
+ * HTML-escape untrusted text (product names, buyer/vendor names, admin reasons)
+ * before interpolating it into email HTML. Prevents stored HTML/markup injection
+ * into transactional emails (e.g. a product named `<a href=evil>…`).
+ */
+export function esc(value: string | null | undefined): string {
+  return String(value ?? "")
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;")
+    .replace(/"/g, "&quot;")
+    .replace(/'/g, "&#39;");
+}
+
 /** A branded, email-client-safe (table + inline styles) wrapper. */
 export function emailLayout(title: string, bodyHtml: string): string {
   return `<!doctype html>

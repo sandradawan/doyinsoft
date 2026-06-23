@@ -1,7 +1,7 @@
 import "server-only";
 import { redirect } from "next/navigation";
 import { createClient } from "./supabase/server";
-import { isSupabaseConfigured } from "./supabase/env";
+import { isSupabaseConfigured, isDemoMode } from "./supabase/env";
 import { DEMO_VENDOR_ID } from "./data";
 import { vendors as seedVendors } from "./seed-data";
 import type { Vendor } from "./types";
@@ -18,6 +18,7 @@ export interface SessionVendor extends Vendor {
  */
 export async function getCurrentVendor(): Promise<SessionVendor | null> {
   if (!isSupabaseConfigured) {
+    if (!isDemoMode) return null; // fail closed in production
     const demo = seedVendors.find((v) => v.id === DEMO_VENDOR_ID) ?? seedVendors[0];
     return demo ? { ...demo, email: "demo@doyinsoft.dev", isDemo: true } : null;
   }
@@ -53,7 +54,7 @@ export interface SessionUser {
 /** Any signed-in user (vendor or not) — used for affiliate accounts. */
 export async function getCurrentUser(): Promise<SessionUser | null> {
   if (!isSupabaseConfigured) {
-    return { id: "demo-user", email: "demo@doyinsoft.dev" };
+    return isDemoMode ? { id: "demo-user", email: "demo@doyinsoft.dev" } : null;
   }
   const supabase = await createClient();
   const {

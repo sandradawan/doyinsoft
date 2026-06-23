@@ -15,3 +15,13 @@ export const isSupabaseConfigured =
 
 export const hasServiceRole =
   isSupabaseConfigured && SUPABASE_SERVICE_ROLE_KEY.length > 0;
+
+// Demo mode grants open vendor/admin identities when there's no backend. That is
+// safe for local exploration but MUST NOT happen in production (a blank Supabase
+// env would otherwise open the admin panel to anyone). Fail closed in prod unless
+// DEMO_MODE=1 is explicitly set.
+const IS_PRODUCTION =
+  process.env.VERCEL_ENV === "production" || process.env.NODE_ENV === "production";
+
+export const isDemoMode =
+  !isSupabaseConfigured && (!IS_PRODUCTION || process.env.DEMO_MODE === "1");

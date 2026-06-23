@@ -8,9 +8,10 @@ import { createClient } from "./supabase/server";
 import { createAdminClient } from "./supabase/admin";
 import { hasServiceRole, isSupabaseConfigured } from "./supabase/env";
 import { deterministicLicenseKey, generateLicenseKey } from "./license";
-import { emailButton, emailKeyBox, emailLayout, emailText, sendEmail } from "./email";
+import { emailButton, emailKeyBox, emailLayout, emailText, esc, sendEmail } from "./email";
 import { getSettings } from "./settings";
 import { incrementCouponUse } from "./coupons";
+import { affiliateOwnsEmail } from "./affiliate";
 import { formatPrice } from "./format";
 
 const SITE_URL = process.env.NEXT_PUBLIC_SITE_URL ?? "http://localhost:3000";
@@ -149,10 +150,20 @@ const ORDER_SELECT =
 
 const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
+/**
+ * Strip PostgREST filter-grammar and ilike-wildcard characters from user search
+ * input before it's interpolated into a `.or(...)` / `.ilike(...)` string.
+ * Prevents filter injection (e.g. `x),status.eq.draft`) that could broaden a query.
+ */
+export function sanitizeLike(q: string): string {
+  return q.replace(/[%,()*:\\]/g, " ").replace(/\s+/g, " ").trim();
+}
+
 // Add a search filter to an orders query: email + payment reference (+ order id
 // when the query looks like a UUID).
 function applyOrderSearch<T extends { or: (f: string) => T }>(query: T, q: string): T {
-  const like = `%${q}%`;
+  const safe = sanitizeLike(q);
+  const like = `%${safe}%`;
   const parts = [`reference.ilike.${like}`, `buyer_email.ilike.${like}`];
   if (UUID_RE.test(q)) parts.unshift(`id.eq.${q}`);
   return query.or(parts.join(","));
@@ -205,7 +216,7 @@ export async function getProducts(
   if (cat) query = query.eq("category", cat);
   if (productType) query = query.eq("product_type", productType);
   if (q) {
-    const like = `%${q}%`;
+    const like = `%${sanitizeLike(q)}%`;
     query = query.or(`name.ilike.${like},tagline.ilike.${like},category.ilike.${like}`);
   }
   const { data, error } = await query;
@@ -222,7 +233,7 @@ export async function getProducts(
   if (platform) fb = fb.eq("platform", platform);
   if (cat) fb = fb.eq("category", cat);
   if (q) {
-    const like = `%${q}%`;
+    const like = `%${sanitizeLike(q)}%`;
     fb = fb.or(`name.ilike.${like},tagline.ilike.${like},category.ilike.${like}`);
   }
   const res = await fb;
@@ -375,6 +386,22 @@ export async function getOrderById(orderId: string): Promise<Order | null> {
   return data as unknown as Order;
 }
 
+/**
+ * Authoritative order amount via the service role (RLS-independent) — used by the
+ * payment webhook and recovery tool to verify the charged amount matches.
+ */
+export async function getOrderAmount(
+  orderId: string
+): Promise<{ amount_minor: number; currency: "NGN" | "USD"; status: string } | null> {
+  if (!hasServiceRole) return null;
+  const { data } = await createAdminClient()
+    .from("orders")
+    .select("amount_minor, currency, status")
+    .eq("id", orderId)
+    .maybeSingle();
+  return (data as { amount_minor: number; currency: "NGN" | "USD"; status: string }) ?? null;
+}
+
 // ---- Analytics ---------------------------------------------------------------
 
 export interface MonthPoint {
@@ -524,7 +551,7 @@ export async function adminProducts(
     .order("created_at", { ascending: false })
     .range(from, from + ADMIN_PAGE_SIZE - 1);
   if (status) query = query.eq("status", status);
-  if (q) query = query.or(`name.ilike.%${q}%,slug.ilike.%${q}%`);
+  if (q) query = query.or(`name.ilike.%${sanitizeLike(q)}%,slug.ilike.%${sanitizeLike(q)}%`);
   const { data, error, count } = await query;
   if (error || !data) return { items: [], total: 0 };
   return { items: (data as unknown as ProductRow[]).map(mapProduct), total: count ?? 0 };
@@ -542,7 +569,7 @@ export async function adminVendors(search?: string): Promise<Vendor[]> {
     .from("vendors")
     .select("id, slug, name, initials, verified, suspended")
     .order("created_at", { ascending: false });
-  if (q) query = query.or(`name.ilike.%${q}%,slug.ilike.%${q}%`);
+  if (q) query = query.or(`name.ilike.%${sanitizeLike(q)}%,slug.ilike.%${sanitizeLike(q)}%`);
   const { data } = await query;
   return (data as Vendor[]) ?? [];
 }
@@ -582,7 +609,7 @@ export async function adminReviews(
     })
     .order("created_at", { ascending: false })
     .range(from, from + ADMIN_PAGE_SIZE - 1);
-  if (q) query = query.or(`author_name.ilike.%${q}%,body.ilike.%${q}%`);
+  if (q) query = query.or(`author_name.ilike.%${sanitizeLike(q)}%,body.ilike.%${sanitizeLike(q)}%`);
   const { data, count } = await query;
   const items = (
     (data as (Review & { product: { name: string } | { name: string }[] | null })[]) ?? []
@@ -1029,15 +1056,15 @@ export async function markOrderPaid(orderId: string, reference?: string): Promis
   const admin = createAdminClient();
   const { data: order } = await admin
     .from("orders")
-    .select("amount_minor, affiliate_id")
+    .select("amount_minor, affiliate_id, buyer_email")
     .eq("id", orderId)
     .maybeSingle();
   await admin
     .from("orders")
     .update({ status: "paid", ...(reference ? { reference } : {}) })
     .eq("id", orderId);
-  const o = order as { amount_minor: number; affiliate_id: string | null } | null;
-  if (o?.affiliate_id) {
+  const o = order as { amount_minor: number; affiliate_id: string | null; buyer_email: string | null } | null;
+  if (o?.affiliate_id && !(await affiliateOwnsEmail(o.affiliate_id, o.buyer_email))) {
     const { affiliate_percent } = await getSettings();
     const commission = Math.round((o.amount_minor * affiliate_percent) / 100);
     await admin
@@ -1089,7 +1116,7 @@ export async function sendReceiptForOrder(orderId: string): Promise<boolean> {
   const dl = `${SITE_URL}/api/download?order=${encodeURIComponent(orderId)}&key=${encodeURIComponent(license.key)}`;
 
   const receiptLine = `<table role="presentation" width="100%" style="margin:0 0 16px;border-collapse:collapse;">
-    <tr><td style="font-size:12px;color:#737373;padding:4px 0;">Item</td><td style="font-size:12px;color:#171717;padding:4px 0;text-align:right;">${productName}</td></tr>
+    <tr><td style="font-size:12px;color:#737373;padding:4px 0;">Item</td><td style="font-size:12px;color:#171717;padding:4px 0;text-align:right;">${esc(productName)}</td></tr>
     <tr><td style="font-size:12px;color:#737373;padding:4px 0;">Amount paid</td><td style="font-size:12px;color:#171717;padding:4px 0;text-align:right;font-weight:600;">${amountStr}</td></tr>
     <tr><td style="font-size:12px;color:#737373;padding:4px 0;">Order</td><td style="font-size:12px;color:#171717;padding:4px 0;text-align:right;">#${ref}</td></tr>
   </table>`;
@@ -1136,7 +1163,7 @@ export async function issueLicenseForOrder(
   // Look up the order, then mark it paid and mint the key.
   const { data: order } = await admin
     .from("orders")
-    .select("id, product_id, vendor_id, amount_minor, currency, affiliate_id, coupon_code, product:products(name, product_type)")
+    .select("id, product_id, vendor_id, amount_minor, currency, affiliate_id, coupon_code, buyer_email, product:products(name, product_type)")
     .eq("id", orderId)
     .maybeSingle();
   if (!order) return null;
@@ -1156,17 +1183,20 @@ export async function issueLicenseForOrder(
     amount_minor: number;
     currency: "NGN" | "USD";
     affiliate_id: string | null;
+    buyer_email: string | null;
     product: { name: string; product_type?: string } | { name: string; product_type?: string }[] | null;
   };
   const op = Array.isArray(o.product) ? o.product[0] : o.product;
   const productName = op?.name ?? "your order";
+  const safeName = esc(productName);
   const isDigital = (op?.product_type ?? "digital") === "digital";
   const amountStr = formatPrice(o.amount_minor, o.currency);
   const ref = orderId.slice(0, 8).toUpperCase();
 
   // Credit the referring affiliate (idempotent via unique index on order_id).
+  // Skip self-referral — you can't earn commission on your own purchase.
   let commission = 0;
-  if (o.affiliate_id) {
+  if (o.affiliate_id && !(await affiliateOwnsEmail(o.affiliate_id, o.buyer_email, email))) {
     const { affiliate_percent } = await getSettings();
     commission = Math.round((o.amount_minor * affiliate_percent) / 100);
     await admin
@@ -1201,7 +1231,7 @@ export async function issueLicenseForOrder(
       subject: `💰 You made a sale — ${productName}`,
       html: emailLayout(
         "You made a sale! 💰",
-        `${emailText(`<strong style="color:#171717">${productName}</strong> just sold for <strong style="color:#171717">${amountStr}</strong> (order #${ref}). Your share settles to your bank automatically.`)}
+        `${emailText(`<strong style="color:#171717">${safeName}</strong> just sold for <strong style="color:#171717">${amountStr}</strong> (order #${ref}). Your share settles to your bank automatically.`)}
          <div style="margin:18px 0;">${emailButton(`${SITE_URL}/vendor/dashboard`, "View dashboard")}</div>`
       ),
     });
@@ -1221,7 +1251,7 @@ export async function issueLicenseForOrder(
         subject: `🎉 You earned ${formatPrice(commission, o.currency)} on DoyinSoft`,
         html: emailLayout(
           "You earned a commission! 🎉",
-          `${emailText(`Someone bought <strong style="color:#171717">${productName}</strong> through your referral link. You earned <strong style="color:#171717">${formatPrice(commission, o.currency)}</strong>.`)}
+          `${emailText(`Someone bought <strong style="color:#171717">${safeName}</strong> through your referral link. You earned <strong style="color:#171717">${formatPrice(commission, o.currency)}</strong>.`)}
            <div style="margin:18px 0;">${emailButton(`${SITE_URL}/affiliate`, "View earnings")}</div>`
         ),
       });

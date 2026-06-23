@@ -8,13 +8,19 @@ import { createClient } from "@/lib/supabase/server";
 export async function GET(request: Request) {
   const { searchParams, origin } = new URL(request.url);
   const code = searchParams.get("code");
-  const next = searchParams.get("next") ?? "/vendor/dashboard";
+  const nextParam = searchParams.get("next") ?? "/vendor/dashboard";
+  // Only allow same-origin relative paths — reject `//evil.com`, `/\evil.com`
+  // and absolute URLs to prevent an open redirect.
+  const next =
+    nextParam.startsWith("/") && !nextParam.startsWith("//") && !nextParam.startsWith("/\\")
+      ? nextParam
+      : "/vendor/dashboard";
 
   if (code) {
     const supabase = await createClient();
     const { error } = await supabase.auth.exchangeCodeForSession(code);
     if (!error) {
-      return NextResponse.redirect(`${origin}${next.startsWith("/") ? next : "/vendor/dashboard"}`);
+      return NextResponse.redirect(`${origin}${next}`);
     }
   }
 

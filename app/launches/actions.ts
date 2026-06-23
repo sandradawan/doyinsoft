@@ -1,22 +1,23 @@
 "use server";
 
-import { cookies } from "next/headers";
-import { randomUUID } from "crypto";
+import { redirect } from "next/navigation";
 import { revalidatePath } from "next/cache";
 import { hasServiceRole } from "@/lib/supabase/env";
 import { createAdminClient } from "@/lib/supabase/admin";
+import { getCurrentUser } from "@/lib/auth";
 
-/** Toggle the current visitor's upvote for a product (one vote per browser). */
+/**
+ * Toggle the current user's upvote for a product. One vote per authenticated user
+ * (enforced by the unique index on upvotes(product_id, voter)); cookie-based
+ * "identity" was trivially Sybil-able, so a sign-in is required.
+ */
 export async function toggleUpvote(formData: FormData) {
   const productId = String(formData.get("id") ?? "");
   if (!productId || !hasServiceRole) return;
 
-  const jar = await cookies();
-  let voter = jar.get("voter")?.value;
-  if (!voter) {
-    voter = randomUUID();
-    jar.set("voter", voter, { maxAge: 60 * 60 * 24 * 365, path: "/", sameSite: "lax" });
-  }
+  const user = await getCurrentUser();
+  if (!user) redirect("/sign-in?next=/launches");
+  const voter = user.id; // stable per-account identity, not a forgeable cookie
 
   const admin = createAdminClient();
   const { data: existing } = await admin
@@ -29,7 +30,11 @@ export async function toggleUpvote(formData: FormData) {
   if (existing) {
     await admin.from("upvotes").delete().eq("id", (existing as { id: string }).id);
   } else {
-    await admin.from("upvotes").insert({ product_id: productId, voter });
+    // Ignore a duplicate-vote race (unique violation) — already counted.
+    await admin
+      .from("upvotes")
+      .insert({ product_id: productId, voter })
+      .then(() => undefined, () => undefined);
   }
 
   // Recompute the denormalized count.
