@@ -342,8 +342,9 @@ $$;
 
 -- Gift cards: buy a stored-value code, redeem it at checkout.
 do $$ begin
-  create type gift_card_status as enum ('active','depleted','disabled','expired');
+  create type gift_card_status as enum ('active','depleted','disabled','expired','inactive');
 exception when duplicate_object then null; end $$;
+alter type gift_card_status add value if not exists 'inactive';
 create table if not exists gift_cards (
   id                 uuid primary key default gen_random_uuid(),
   code               text unique not null,
@@ -357,11 +358,14 @@ create table if not exists gift_cards (
   message            text,
   purchase_reference text,
   design             text not null default 'classic',
+  batch_ref          text,
   expires_at         timestamptz,
   created_at         timestamptz not null default now()
 );
-alter table gift_cards add column if not exists design text not null default 'classic';
+alter table gift_cards add column if not exists design    text not null default 'classic';
+alter table gift_cards add column if not exists batch_ref text;
 alter table gift_cards enable row level security;
+create index if not exists gift_cards_batch_idx on gift_cards (batch_ref);
 create index if not exists gift_cards_code_idx on gift_cards (code);
 create unique index if not exists gift_cards_purchase_ref_idx
   on gift_cards (purchase_reference) where purchase_reference is not null;

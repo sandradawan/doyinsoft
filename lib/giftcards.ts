@@ -14,6 +14,8 @@ export const GIFT_MIN_MINOR = 50_000; // ₦500
 export const GIFT_MAX_MINOR = 50_000_000; // ₦500,000
 export const GIFT_TIERS_MINOR = [100_000, 200_000, 500_000, 1_000_000, 2_000_000];
 
+export type GiftCardStatus = "active" | "depleted" | "disabled" | "expired" | "inactive";
+
 export interface GiftCard {
   id: string;
   code: string;
@@ -21,14 +23,16 @@ export interface GiftCard {
   initial_minor: number;
   balance_minor: number;
   currency: "NGN" | "USD";
-  status: "active" | "depleted" | "disabled" | "expired";
+  status: GiftCardStatus;
   recipient_email: string | null;
+  design: string;
+  batch_ref: string | null;
   expires_at: string | null;
   created_at: string;
 }
 
 const SELECT =
-  "id, code, vendor_id, initial_minor, balance_minor, currency, status, recipient_email, expires_at, created_at";
+  "id, code, vendor_id, initial_minor, balance_minor, currency, status, recipient_email, design, batch_ref, expires_at, created_at";
 
 /** A fresh, unguessable code: GIFT-XXXX-XXXX-XXXX-XXXX (hex, uppercase). */
 export function generateGiftCardCode(): string {
@@ -51,10 +55,10 @@ export async function validateGiftCard(rawCode: string): Promise<GiftCardCheck> 
 
   const { data } = await createAdminClient().from("gift_cards").select(SELECT).eq("code", code).maybeSingle();
   const c = data as GiftCard | null;
-  // Deliberately generic errors (don't distinguish invalid vs empty) to deter enumeration.
-  if (!c || c.status === "disabled") return { ok: false, error: "This gift card code isn’t valid." };
-  if (c.status === "depleted" || c.balance_minor <= 0)
-    return { ok: false, error: "This gift card has no balance left." };
+  // Only 'active' cards are redeemable. 'inactive' (printed, not yet sold/activated),
+  // 'disabled' and 'expired' are not. Generic error to deter enumeration.
+  if (!c || c.status !== "active") return { ok: false, error: "This gift card code isn’t valid." };
+  if (c.balance_minor <= 0) return { ok: false, error: "This gift card has no balance left." };
   if (c.expires_at && new Date(c.expires_at).getTime() < Date.now())
     return { ok: false, error: "This gift card has expired." };
   return { ok: true, code: c.code, balance_minor: c.balance_minor };
@@ -163,6 +167,63 @@ export async function issueGiftCardFromPayment(opts: {
     });
   }
   return code;
+}
+
+// ---- Physical / batch ----
+
+export const GIFT_BATCH_MAX = 200;
+
+/**
+ * Create a batch of printable gift cards in one go (for physical distribution).
+ * Cards can be created "inactive" (printed, activate on sale) or "active".
+ * Returns the batch ref and the created cards.
+ */
+export async function batchCreateGiftCards(opts: {
+  count: number;
+  amountMinor: number;
+  design?: string;
+  active: boolean;
+  expiresAt?: string | null;
+}): Promise<{ batchRef: string; cards: GiftCard[] } | { error: string }> {
+  if (!hasServiceRole) return { error: "Gift cards need a configured database." };
+  const count = Math.floor(opts.count);
+  if (!Number.isFinite(count) || count < 1 || count > GIFT_BATCH_MAX)
+    return { error: `Quantity must be between 1 and ${GIFT_BATCH_MAX}.` };
+  if (!Number.isFinite(opts.amountMinor) || opts.amountMinor < GIFT_MIN_MINOR || opts.amountMinor > GIFT_MAX_MINOR)
+    return { error: "Amount is out of range." };
+
+  const batchRef = `batch_${randomBytes(5).toString("hex")}`;
+  const design = giftDesign(opts.design).key;
+  const rows = Array.from({ length: count }, () => ({
+    code: generateGiftCardCode(),
+    initial_minor: opts.amountMinor,
+    balance_minor: opts.amountMinor,
+    currency: "NGN" as const,
+    status: opts.active ? "active" : "inactive",
+    design,
+    batch_ref: batchRef,
+    expires_at: opts.expiresAt ?? null,
+  }));
+
+  const { data, error } = await createAdminClient().from("gift_cards").insert(rows).select(SELECT);
+  if (error) return { error: error.message };
+  return { batchRef, cards: (data as GiftCard[]) ?? [] };
+}
+
+/** Activate a printed (inactive) card — e.g. when a store sells it. */
+export async function activateGiftCard(id: string): Promise<void> {
+  if (!hasServiceRole || !id) return;
+  await createAdminClient().from("gift_cards").update({ status: "active" }).eq("id", id).eq("status", "inactive");
+}
+
+export async function listGiftCardsByBatch(batchRef: string): Promise<GiftCard[]> {
+  if (!hasServiceRole || !batchRef) return [];
+  const { data } = await createAdminClient()
+    .from("gift_cards")
+    .select(SELECT)
+    .eq("batch_ref", batchRef)
+    .order("created_at", { ascending: true });
+  return (data as GiftCard[]) ?? [];
 }
 
 // ---- Admin ----

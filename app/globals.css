@@ -114,6 +114,26 @@ html {
   -webkit-text-size-adjust: 100%;
 }
 
+/* Gift-card print sheet: 2-up grid that lays out cleanly on paper. */
+.gift-print-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 22px;
+}
+.gift-print-card {
+  break-inside: avoid;
+  page-break-inside: avoid;
+}
+@media print {
+  .print-hide { display: none !important; }
+  body { background: #ffffff; }
+  main { max-width: none !important; padding: 0 !important; }
+  .admin-shell-grid { display: block !important; }
+  /* keep gradients/colours when printing */
+  * { -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+  @page { margin: 12mm; }
+}
+
 body {
   background: var(--bg-primary);
   color: var(--text-primary);

@@ -5,8 +5,9 @@ import {
   adminGiftCardVendorOwed,
 } from "@/lib/giftcards";
 import { PLATFORM_COMMISSION_PERCENT } from "@/lib/paystack";
+import { GIFT_DESIGNS } from "@/lib/gift-designs";
 import { formatPrice } from "@/lib/format";
-import { toggleGiftCard } from "./actions";
+import { toggleGiftCard, activateGiftCardAction, createGiftCardBatch } from "./actions";
 
 function shortDate(iso: string): string {
   return iso ? new Date(iso).toLocaleDateString("en-NG", { day: "2-digit", month: "short", year: "numeric" }) : "—";
@@ -14,12 +15,18 @@ function shortDate(iso: string): string {
 
 const BADGE: Record<string, string> = {
   active: "bg-success-bg text-success",
+  inactive: "bg-info-bg text-info",
   depleted: "bg-muted text-ink-soft",
   disabled: "bg-info-bg text-info",
   expired: "bg-muted text-ink-faint",
 };
 
-export default async function AdminGiftCardsPage() {
+export default async function AdminGiftCardsPage({
+  searchParams,
+}: {
+  searchParams: Promise<{ error?: string }>;
+}) {
+  const { error } = await searchParams;
   const [cards, liability, redeemed, owed] = await Promise.all([
     adminListGiftCards(100),
     adminGiftCardLiability(),
@@ -34,6 +41,10 @@ export default async function AdminGiftCardsPage() {
       <p className="text-[13px] text-ink-soft m-0 mb-5">
         Outstanding balances are money the platform owes against future redemptions.
       </p>
+
+      {error && (
+        <p className="text-[13px] text-info bg-info-bg rounded-md px-3 py-2 mb-5">{error}</p>
+      )}
 
       <div className="grid [grid-template-columns:repeat(auto-fit,minmax(160px,1fr))] gap-4 mb-6">
         <div className="bg-brand-tint rounded-lg p-5">
@@ -78,6 +89,44 @@ export default async function AdminGiftCardsPage() {
         </div>
       )}
 
+      {/* Print physical cards for stores */}
+      <form
+        action={createGiftCardBatch}
+        className="border border-line rounded-lg p-4 mb-6 flex flex-wrap items-end gap-3"
+      >
+        <div>
+          <p className="text-[14px] font-medium m-0 mb-1">Print physical cards</p>
+          <p className="text-[12px] text-ink-soft m-0">
+            Generate a batch with codes + QR to print and distribute to stores.
+          </p>
+        </div>
+        <div className="ml-auto flex flex-wrap items-end gap-2">
+          <label className="block">
+            <span className="block text-[11px] text-ink-faint mb-1">Quantity</span>
+            <input name="count" type="number" min={1} max={200} defaultValue={20} className="field w-24" />
+          </label>
+          <label className="block">
+            <span className="block text-[11px] text-ink-faint mb-1">Amount (₦)</span>
+            <input name="amount" type="number" min={500} defaultValue={5000} className="field w-28" />
+          </label>
+          <label className="block">
+            <span className="block text-[11px] text-ink-faint mb-1">Design</span>
+            <select name="design" defaultValue="classic" className="field w-36">
+              {GIFT_DESIGNS.map((d) => (
+                <option key={d.key} value={d.key}>{d.label}</option>
+              ))}
+            </select>
+          </label>
+          <label className="inline-flex items-center gap-2 text-[12px] text-ink-soft mb-2">
+            <input type="checkbox" name="active" value="1" /> Active now
+          </label>
+          <button className="btn-primary px-4 py-2">Generate &amp; print</button>
+        </div>
+      </form>
+      <p className="text-[11px] text-ink-faint -mt-4 mb-6">
+        Leave “Active now” off to print cards that a store activates on sale (safer against theft).
+      </p>
+
       {cards.length === 0 ? (
         <p className="text-[13px] text-ink-soft">No gift cards yet.</p>
       ) : (
@@ -96,6 +145,14 @@ export default async function AdminGiftCardsPage() {
               <span className={`text-[11px] px-2 py-[2px] rounded-md w-16 text-center shrink-0 ${BADGE[c.status] ?? "bg-muted"}`}>
                 {c.status}
               </span>
+              {c.status === "inactive" && (
+                <form action={activateGiftCardAction}>
+                  <input type="hidden" name="id" value={c.id} />
+                  <button className="text-[11px] text-brand hover:underline border border-brand/30 rounded-md px-2 py-[3px] cursor-pointer">
+                    Activate
+                  </button>
+                </form>
+              )}
               {(c.status === "active" || c.status === "disabled") && (
                 <form action={toggleGiftCard}>
                   <input type="hidden" name="id" value={c.id} />
