@@ -9,12 +9,17 @@ export async function GET(request: Request) {
   const { searchParams, origin } = new URL(request.url);
   const code = searchParams.get("code");
   const nextParam = searchParams.get("next") ?? "/vendor/dashboard";
-  // Only allow same-origin relative paths — reject `//evil.com`, `/\evil.com`
-  // and absolute URLs to prevent an open redirect.
-  const next =
-    nextParam.startsWith("/") && !nextParam.startsWith("//") && !nextParam.startsWith("/\\")
-      ? nextParam
-      : "/vendor/dashboard";
+  // Resolve `next` against our own origin and only accept it if it stays
+  // same-origin. This is robust against `//evil.com`, `/\evil.com`, backslash
+  // tricks and absolute URLs (which all resolve to a different origin) — far
+  // safer than prefix-denylisting.
+  let next = "/vendor/dashboard";
+  try {
+    const resolved = new URL(nextParam, origin);
+    if (resolved.origin === origin) next = resolved.pathname + resolved.search + resolved.hash;
+  } catch {
+    // malformed → keep the safe default
+  }
 
   if (code) {
     const supabase = await createClient();

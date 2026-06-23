@@ -11,7 +11,7 @@ import {
   issueLicenseForOrder,
   sendReceiptForOrder,
 } from "@/lib/data";
-import { emailLayout, esc, sendEmail } from "@/lib/email";
+import { emailLayout, esc, sendEmail, subjectSafe } from "@/lib/email";
 import { logAudit } from "@/lib/audit";
 import { saveSettings } from "@/lib/settings";
 import { refundPaystackTransaction, verifyPaystackTransaction } from "@/lib/paystack";
@@ -55,13 +55,13 @@ async function setProductStatus(
       if (status === "approved") {
         await sendEmail({
           to: email,
-          subject: `“${row.name}” is approved and live`,
+          subject: subjectSafe(`“${row.name}” is approved and live`),
           html: emailLayout("Your product is live 🎉", `<p>“${esc(row.name)}” passed review and is now on the storefront.</p>`),
         });
       } else {
         await sendEmail({
           to: email,
-          subject: `“${row.name}” was unpublished`,
+          subject: subjectSafe(`“${row.name}” was unpublished`),
           html: emailLayout("Product not live", `<p>“${esc(row.name)}” isn’t live.${reason ? ` Reason: ${esc(reason)}` : ""}</p><p>Update it and resubmit from your dashboard.</p>`),
         });
       }
@@ -80,7 +80,7 @@ async function setProductStatus(
       for (const to of followers) {
         await sendEmail({
           to,
-          subject: `New from ${vname}: ${row.name}`,
+          subject: subjectSafe(`New from ${vname}: ${row.name}`),
           html: emailLayout(
             `${esc(vname)} just dropped something new 🎉`,
             `${emailText(`<strong style="color:#171717">${esc(row.name)}</strong> is now live on DoyinSoft.`)}
@@ -224,7 +224,7 @@ export async function resendLicense(formData: FormData) {
     const dl = `${SITE_URL}/api/download?order=${encodeURIComponent(orderId)}&key=${encodeURIComponent(license.key)}`;
     await sendEmail({
       to: license.email,
-      subject: `Your ${license.product.name} license`,
+      subject: subjectSafe(`Your ${license.product.name} license`),
       html: emailLayout(
         "Here’s your license again",
         `<p>License for <strong>${esc(license.product.name)}</strong>:</p>

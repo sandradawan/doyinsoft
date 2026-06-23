@@ -205,7 +205,7 @@ $$;
 
 drop trigger if exists reviews_aggregate on reviews;
 create trigger reviews_aggregate
-  after insert or delete on reviews
+  after insert or update or delete on reviews
   for each row execute function reviews_after_change();
 
 -- ----------------------------------------------------------------------------

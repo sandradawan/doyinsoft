@@ -99,6 +99,21 @@ export async function affiliateOwnsEmail(
   return emails.some((e) => e && e.toLowerCase() === affEmail);
 }
 
+/** True if the affiliate account is owned by this signed-in user (blocks a
+ *  logged-in affiliate self-referring even with a different buyer email). */
+export async function affiliateOwnedByUser(
+  affiliateId: string | null,
+  userId: string | null
+): Promise<boolean> {
+  if (!hasServiceRole || !affiliateId || !userId) return false;
+  const { data } = await createAdminClient()
+    .from("affiliates")
+    .select("owner")
+    .eq("id", affiliateId)
+    .maybeSingle();
+  return (data as { owner?: string } | null)?.owner === userId;
+}
+
 /** Resolve a referral code to an affiliate id (for attributing an order). */
 export async function resolveAffiliateId(code: string): Promise<string | null> {
   if (!hasServiceRole || !code) return null;

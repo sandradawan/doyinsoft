@@ -13,6 +13,12 @@ drop policy if exists "anyone can review" on reviews;
 drop policy if exists "buyers insert own review" on reviews;
 create policy "buyers insert own review" on reviews for insert
   to authenticated with check (user_id = auth.uid() and rating between 1 and 5);
+-- Reviews are now upserted (a buyer can edit their review), so the rating
+-- aggregate must also recompute on UPDATE, not just insert/delete.
+drop trigger if exists reviews_aggregate on reviews;
+create trigger reviews_aggregate
+  after insert or update or delete on reviews
+  for each row execute function reviews_after_change();
 
 -- H5: one upvote per authenticated user per product (voter now holds user id).
 create unique index if not exists upvotes_product_voter_uniq

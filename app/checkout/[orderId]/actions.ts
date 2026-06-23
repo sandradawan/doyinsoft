@@ -11,7 +11,8 @@ import {
   issueLicenseForOrder,
 } from "@/lib/data";
 import { toNgnCharge } from "@/lib/money";
-import { resolveAffiliateId } from "@/lib/affiliate";
+import { getCurrentUser } from "@/lib/auth";
+import { affiliateOwnedByUser, resolveAffiliateId } from "@/lib/affiliate";
 import { validateCoupon, type CouponCheck } from "@/lib/coupons";
 import { checkRateLimit, clientId } from "@/lib/ratelimit";
 import type { Currency, Gateway } from "@/lib/types";
@@ -82,9 +83,15 @@ export async function startCheckout(
     ? await getVendorSubaccountCode(product.vendor.id)
     : null;
 
-  // Affiliate attribution from the ?ref cookie.
+  // Affiliate attribution from the ?ref cookie. Drop it when the buyer IS the
+  // affiliate (logged-in self-referral) — even if they pay with another email.
   const refCode = (await cookies()).get("ref")?.value;
-  const affiliateId = refCode ? await resolveAffiliateId(refCode) : null;
+  const refAffiliateId = refCode ? await resolveAffiliateId(refCode) : null;
+  const buyerUser = await getCurrentUser();
+  const affiliateId =
+    refAffiliateId && (await affiliateOwnedByUser(refAffiliateId, buyerUser?.id ?? null))
+      ? null
+      : refAffiliateId;
 
   // Physical/service products need fulfilment + buyer contact.
   const needsFulfilment = product ? product.product_type !== "digital" : false;

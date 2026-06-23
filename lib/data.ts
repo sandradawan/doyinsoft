@@ -8,7 +8,7 @@ import { createClient } from "./supabase/server";
 import { createAdminClient } from "./supabase/admin";
 import { hasServiceRole, isSupabaseConfigured } from "./supabase/env";
 import { deterministicLicenseKey, generateLicenseKey } from "./license";
-import { emailButton, emailKeyBox, emailLayout, emailText, esc, sendEmail } from "./email";
+import { emailButton, emailKeyBox, emailLayout, emailText, esc, sendEmail, subjectSafe } from "./email";
 import { getSettings } from "./settings";
 import { incrementCouponUse } from "./coupons";
 import { affiliateOwnsEmail } from "./affiliate";
@@ -1130,7 +1130,7 @@ export async function sendReceiptForOrder(orderId: string): Promise<boolean> {
 
   await sendEmail({
     to: license.email,
-    subject: `Receipt — ${productName} (#${ref})`,
+    subject: subjectSafe(`Receipt — ${productName} (#${ref})`),
     html: emailLayout(
       "Thank you for your purchase 🎉",
       `${emailText("Here's your receipt. Keep this email as proof of purchase.")}${receiptLine}${isDigital ? digitalBlock : physicalBlock}`
@@ -1228,7 +1228,7 @@ export async function issueLicenseForOrder(
   if (vendorEmail) {
     await sendEmail({
       to: vendorEmail,
-      subject: `💰 You made a sale — ${productName}`,
+      subject: subjectSafe(`💰 You made a sale — ${productName}`),
       html: emailLayout(
         "You made a sale! 💰",
         `${emailText(`<strong style="color:#171717">${safeName}</strong> just sold for <strong style="color:#171717">${amountStr}</strong> (order #${ref}). Your share settles to your bank automatically.`)}

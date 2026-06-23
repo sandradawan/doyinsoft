@@ -28,8 +28,10 @@ function slugify(input: string): string {
 
 function safeNext(value: FormDataEntryValue | null): string {
   const next = String(value ?? "");
-  // Only allow internal paths.
-  return next.startsWith("/") && !next.startsWith("//") ? next : "/vendor/dashboard";
+  // Only allow internal paths: must start with a single "/", and contain no
+  // backslash or protocol-relative "//" that could redirect off-site.
+  const ok = next.startsWith("/") && !next.startsWith("//") && !next.includes("\\");
+  return ok ? next : "/vendor/dashboard";
 }
 
 export async function signIn(_prev: AuthState, formData: FormData): Promise<AuthState> {

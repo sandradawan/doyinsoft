@@ -87,6 +87,11 @@ const SITE = process.env.NEXT_PUBLIC_SITE_URL ?? "https://doyinsoft.vercel.app";
  * before interpolating it into email HTML. Prevents stored HTML/markup injection
  * into transactional emails (e.g. a product named `<a href=evil>…`).
  */
+/** Collapse newlines/controls for safe use in an email Subject header. */
+export function subjectSafe(value: string | null | undefined): string {
+  return String(value ?? "").replace(/[\r\n\t]+/g, " ").trim();
+}
+
 export function esc(value: string | null | undefined): string {
   return String(value ?? "")
     .replace(/&/g, "&amp;")
