@@ -5,15 +5,25 @@ import { ProductCard } from "@/components/product-card";
 import { requireUser, getCurrentVendor } from "@/lib/auth";
 import { getLicensesByEmail, getProductsByVendorIds } from "@/lib/data";
 import { getFollowedVendors } from "@/lib/follows";
+import { getGiftCardsForEmail } from "@/lib/giftcards";
+import { formatPrice } from "@/lib/format";
 
 export const metadata = { title: "Your account — DoyinMart" };
 
+const GIFT_BADGE: Record<string, string> = {
+  active: "bg-success-bg text-success",
+  depleted: "bg-muted text-ink-soft",
+  disabled: "bg-info-bg text-info",
+  expired: "bg-muted text-ink-faint",
+};
+
 export default async function AccountPage() {
   const user = await requireUser("/account");
-  const [licenses, vendor, followed] = await Promise.all([
+  const [licenses, vendor, followed, giftCards] = await Promise.all([
     getLicensesByEmail(user.email),
     getCurrentVendor(),
     getFollowedVendors(user.id),
+    getGiftCardsForEmail(user.email),
   ]);
   const followingFeed = await getProductsByVendorIds(followed.map((v) => v.id), 8);
 
@@ -80,6 +90,36 @@ export default async function AccountPage() {
               </section>
             </>
           )}
+        </div>
+      )}
+
+      {/* Gift cards */}
+      {giftCards.length > 0 && (
+        <div className="mb-8">
+          <div className="flex items-center justify-between mb-2">
+            <p className="text-[13px] font-medium m-0">Your gift cards</p>
+            <Link href="/gift-cards" className="text-[12px] text-brand no-underline hover:underline">
+              Buy another →
+            </Link>
+          </div>
+          {giftCards.map((c) => (
+            <div
+              key={c.id}
+              className="flex items-center gap-3 py-3 border-t border-line text-[13px]"
+            >
+              <span className="font-mono text-[12px] flex-1 min-w-0 truncate">{c.code}</span>
+              <span className="font-medium">{formatPrice(c.balance_minor, c.currency)}</span>
+              <span className="text-ink-faint text-[11px] hidden sm:inline">
+                of {formatPrice(c.initial_minor, c.currency)}
+              </span>
+              <span className={`text-[11px] px-2 py-[2px] rounded-md ${GIFT_BADGE[c.status] ?? "bg-muted"}`}>
+                {c.status}
+              </span>
+            </div>
+          ))}
+          <p className="text-[11px] text-ink-faint mt-2 mb-0">
+            Enter a code in the “Gift card” field at checkout to spend the balance.
+          </p>
         </div>
       )}
 

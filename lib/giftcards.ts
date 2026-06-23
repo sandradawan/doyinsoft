@@ -168,3 +168,25 @@ export async function setGiftCardDisabled(id: string, disabled: boolean): Promis
     .update({ status: disabled ? "disabled" : "active" })
     .eq("id", id);
 }
+
+/** Outstanding liability = sum of balances on active cards (money the platform owes). */
+export async function adminGiftCardLiability(): Promise<number> {
+  if (!hasServiceRole) return 0;
+  const { data } = await createAdminClient()
+    .from("gift_cards")
+    .select("balance_minor")
+    .eq("status", "active");
+  return ((data as { balance_minor: number }[]) ?? []).reduce((t, r) => t + (r.balance_minor || 0), 0);
+}
+
+/** Cards a person bought or received (for the account page). Masks the full code. */
+export async function getGiftCardsForEmail(email: string): Promise<GiftCard[]> {
+  // Reject anything with PostgREST filter-grammar chars (defense-in-depth).
+  if (!hasServiceRole || !email || /[,()]/.test(email)) return [];
+  const { data } = await createAdminClient()
+    .from("gift_cards")
+    .select(SELECT)
+    .or(`purchaser_email.eq.${email},recipient_email.eq.${email}`)
+    .order("created_at", { ascending: false });
+  return (data as GiftCard[]) ?? [];
+}
