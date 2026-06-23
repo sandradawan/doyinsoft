@@ -27,17 +27,24 @@ export interface GiftCard {
   recipient_email: string | null;
   design: string;
   batch_ref: string | null;
+  activation_token?: string | null;
   expires_at: string | null;
   created_at: string;
 }
 
 const SELECT =
   "id, code, vendor_id, initial_minor, balance_minor, currency, status, recipient_email, design, batch_ref, expires_at, created_at";
+const BATCH_SELECT = `${SELECT}, activation_token`;
 
 /** A fresh, unguessable code: GIFT-XXXX-XXXX-XXXX-XXXX (hex, uppercase). */
 export function generateGiftCardCode(): string {
   const seg = () => randomBytes(2).toString("hex").toUpperCase();
   return `GIFT-${seg()}-${seg()}-${seg()}-${seg()}`;
+}
+
+/** URL-safe per-card activation token (separate secret from the redeem code). */
+export function generateActivationToken(): string {
+  return randomBytes(12).toString("base64url"); // 96-bit, ~16 chars
 }
 
 export interface GiftCardCheck {
@@ -196,6 +203,7 @@ export async function batchCreateGiftCards(opts: {
   const design = giftDesign(opts.design).key;
   const rows = Array.from({ length: count }, () => ({
     code: generateGiftCardCode(),
+    activation_token: generateActivationToken(),
     initial_minor: opts.amountMinor,
     balance_minor: opts.amountMinor,
     currency: "NGN" as const,
@@ -205,7 +213,7 @@ export async function batchCreateGiftCards(opts: {
     expires_at: opts.expiresAt ?? null,
   }));
 
-  const { data, error } = await createAdminClient().from("gift_cards").insert(rows).select(SELECT);
+  const { data, error } = await createAdminClient().from("gift_cards").insert(rows).select(BATCH_SELECT);
   if (error) return { error: error.message };
   return { batchRef, cards: (data as GiftCard[]) ?? [] };
 }
@@ -214,6 +222,40 @@ export async function batchCreateGiftCards(opts: {
 export async function activateGiftCard(id: string): Promise<void> {
   if (!hasServiceRole || !id) return;
   await createAdminClient().from("gift_cards").update({ status: "active" }).eq("id", id).eq("status", "inactive");
+}
+
+/** Look up a card by its activation token (for the store activation page). */
+export async function getCardByActivationToken(
+  token: string
+): Promise<{ initial_minor: number; status: GiftCardStatus } | null> {
+  if (!hasServiceRole || !token) return null;
+  const { data } = await createAdminClient()
+    .from("gift_cards")
+    .select("initial_minor, status")
+    .eq("activation_token", token)
+    .maybeSingle();
+  return (data as { initial_minor: number; status: GiftCardStatus }) ?? null;
+}
+
+/**
+ * Activate a card by its token (store scans the QR). Idempotent. Activation alone
+ * is harmless — the card is only redeemable once someone also has the sealed code.
+ */
+export async function activateByToken(
+  token: string
+): Promise<{ ok: boolean; alreadyActive?: boolean; amount_minor?: number; error?: string }> {
+  if (!hasServiceRole || !token) return { ok: false, error: "Invalid activation link." };
+  const card = await getCardByActivationToken(token);
+  if (!card) return { ok: false, error: "This activation code isn’t recognised." };
+  if (card.status === "active") return { ok: true, alreadyActive: true, amount_minor: card.initial_minor };
+  if (card.status !== "inactive")
+    return { ok: false, error: `This card can’t be activated (status: ${card.status}).` };
+  await createAdminClient()
+    .from("gift_cards")
+    .update({ status: "active" })
+    .eq("activation_token", token)
+    .eq("status", "inactive");
+  return { ok: true, amount_minor: card.initial_minor };
 }
 
 /** Recent print runs (grouped by batch_ref) so they can be re-printed. */
@@ -246,7 +288,7 @@ export async function listGiftCardsByBatch(batchRef: string): Promise<GiftCard[]
   if (!hasServiceRole || !batchRef) return [];
   const { data } = await createAdminClient()
     .from("gift_cards")
-    .select(SELECT)
+    .select(BATCH_SELECT)
     .eq("batch_ref", batchRef)
     .order("created_at", { ascending: true });
   return (data as GiftCard[]) ?? [];

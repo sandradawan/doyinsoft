@@ -8,9 +8,11 @@ import { PrintButton } from "./print-button";
 
 export const metadata = { title: "Print gift cards — DoyinMart" };
 
-async function qrFor(code: string): Promise<string> {
+const SITE_URL = process.env.NEXT_PUBLIC_SITE_URL ?? "http://localhost:3000";
+
+async function qrFor(value: string): Promise<string> {
   try {
-    return await QRCode.toString(code, {
+    return await QRCode.toString(value, {
       type: "svg",
       margin: 0,
       color: { dark: "#111111", light: "#ffffff" },
@@ -28,6 +30,9 @@ export default async function PrintGiftCardsPage({
   const { batch } = await searchParams;
   const cards = batch ? await listGiftCardsByBatch(batch) : [];
   const qrs = await Promise.all(cards.map((c) => qrFor(c.code)));
+  const actQrs = await Promise.all(
+    cards.map((c) => (c.activation_token ? qrFor(`${SITE_URL}/activate/${c.activation_token}`) : Promise.resolve("")))
+  );
 
   return (
     <div className="print-area">
@@ -62,6 +67,20 @@ export default async function PrintGiftCardsPage({
                   amountLabel={formatPrice(c.initial_minor, c.currency)}
                 />
               </div>
+
+              {/* Visible activation QR (NOT secret) — a store scans it to
+                  activate the card on sale, no admin panel needed. */}
+              {c.status === "inactive" && actQrs[i] && (
+                <div className="flex items-center gap-2 mt-2 max-w-[340px] border border-line rounded-md px-2 py-1.5">
+                  <div
+                    className="w-[42px] h-[42px] shrink-0 [&>svg]:w-full [&>svg]:h-full"
+                    dangerouslySetInnerHTML={{ __html: actQrs[i] }}
+                  />
+                  <p className="text-[9px] uppercase tracking-wider text-ink-soft m-0 leading-snug">
+                    Store: scan to activate on sale
+                  </p>
+                </div>
+              )}
 
               {/* Sealed panel: cover this with a scratch-off label. Holds the
                   code + QR — the only place the secret appears. */}
