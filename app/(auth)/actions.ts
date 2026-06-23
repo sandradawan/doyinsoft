@@ -5,7 +5,7 @@ import { createClient } from "@/lib/supabase/server";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { hasServiceRole, isSupabaseConfigured } from "@/lib/supabase/env";
 import { initialsOf } from "@/lib/format";
-import { clientId, isBot, rateLimit } from "@/lib/ratelimit";
+import { checkRateLimit, clientId, isBot } from "@/lib/ratelimit";
 import { emailButton, emailLayout, emailText, sendEmail } from "@/lib/email";
 
 const SITE_URL = process.env.NEXT_PUBLIC_SITE_URL ?? "http://localhost:3000";
@@ -49,7 +49,7 @@ export async function signIn(_prev: AuthState, formData: FormData): Promise<Auth
 export async function signUp(_prev: AuthState, formData: FormData): Promise<AuthState> {
   if (!isSupabaseConfigured) return { error: DEMO_MSG };
   if (isBot(formData)) return { error: "Something went wrong. Please try again." };
-  if (!rateLimit(`signup:${await clientId()}`, 5, 60_000))
+  if (!(await checkRateLimit(`signup:${await clientId()}`, 5, 60_000)))
     return { error: "Too many attempts — please wait a minute and try again." };
 
   const businessName = String(formData.get("business_name") ?? "").trim();
@@ -116,7 +116,7 @@ export async function signUp(_prev: AuthState, formData: FormData): Promise<Auth
 export async function signUpBuyer(_prev: AuthState, formData: FormData): Promise<AuthState> {
   if (!isSupabaseConfigured) return { error: DEMO_MSG };
   if (isBot(formData)) return { error: "Something went wrong. Please try again." };
-  if (!rateLimit(`signup:${await clientId()}`, 5, 60_000))
+  if (!(await checkRateLimit(`signup:${await clientId()}`, 5, 60_000)))
     return { error: "Too many attempts — please wait a minute and try again." };
 
   const email = String(formData.get("email") ?? "").trim();

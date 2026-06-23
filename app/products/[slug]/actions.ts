@@ -6,7 +6,7 @@ import { createAdminClient } from "@/lib/supabase/admin";
 import { hasServiceRole, isSupabaseConfigured } from "@/lib/supabase/env";
 import { getCurrentUser } from "@/lib/auth";
 import { hasPurchased } from "@/lib/data";
-import { clientId, isBot, rateLimit } from "@/lib/ratelimit";
+import { checkRateLimit, clientId, isBot } from "@/lib/ratelimit";
 
 export interface ReviewState {
   error?: string;
@@ -31,7 +31,7 @@ export async function addReview(
 
   // Abuse guards: silently drop bots (honeypot) and rate-limit per IP.
   if (isBot(formData)) return { success: "Thanks — your review has been posted." };
-  if (!rateLimit(`review:${await clientId()}`, 5, 60_000)) {
+  if (!(await checkRateLimit(`review:${await clientId()}`, 5, 60_000))) {
     return { error: "You're posting too fast — please try again shortly." };
   }
 

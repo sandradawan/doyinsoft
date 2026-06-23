@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 import { getLicenseByKey } from "@/lib/data";
 import { hasServiceRole } from "@/lib/supabase/env";
-import { clientId, rateLimit } from "@/lib/ratelimit";
+import { checkRateLimit, clientId } from "@/lib/ratelimit";
 
 const KEY_RE = /^DOYIN-[0-9A-F]{4}-[0-9A-F]{4}-[0-9A-F]{4}-[0-9A-F]{4}$/;
 
@@ -13,7 +13,7 @@ const KEY_RE = /^DOYIN-[0-9A-F]{4}-[0-9A-F]{4}-[0-9A-F]{4}-[0-9A-F]{4}$/;
  */
 export async function POST(request: Request) {
   // Throttle to deter brute-force / enumeration of the licence oracle.
-  if (!rateLimit(`license-verify:${await clientId()}`, 20, 60_000)) {
+  if (!(await checkRateLimit(`license-verify:${await clientId()}`, 20, 60_000))) {
     return NextResponse.json({ valid: false, error: "Too many requests." }, { status: 429 });
   }
 

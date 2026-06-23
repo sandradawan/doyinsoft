@@ -13,7 +13,7 @@ import {
 import { toNgnCharge } from "@/lib/money";
 import { resolveAffiliateId } from "@/lib/affiliate";
 import { validateCoupon, type CouponCheck } from "@/lib/coupons";
-import { clientId, rateLimit } from "@/lib/ratelimit";
+import { checkRateLimit, clientId } from "@/lib/ratelimit";
 import type { Currency, Gateway } from "@/lib/types";
 
 const PAYSTACK_SECRET = process.env.PAYSTACK_SECRET_KEY ?? "";
@@ -40,7 +40,7 @@ export async function previewCoupon(
   code: string,
   productSlug: string | null
 ): Promise<CouponCheck> {
-  if (!rateLimit(`coupon:${await clientId()}`, 12, 60_000)) {
+  if (!(await checkRateLimit(`coupon:${await clientId()}`, 12, 60_000))) {
     return { ok: false, error: "Too many attempts — please wait a moment and try again." };
   }
   const product = productSlug ? await getProductBySlug(productSlug) : null;
