@@ -8,6 +8,41 @@ export const isPaystackConfigured = SECRET.length > 0;
 export const PLATFORM_COMMISSION_PERCENT =
   Number(process.env.PLATFORM_COMMISSION_PERCENT ?? "") || 15;
 
+export interface PaystackPayment {
+  ok: boolean;
+  amountMinor?: number;
+  email?: string;
+  metadata?: Record<string, unknown>;
+}
+
+/**
+ * Verify a transaction and return its amount, email AND raw metadata. Used by the
+ * gift-card flow, which needs metadata.kind / recipient / message. Authoritative
+ * (server-side, secret key) — only returns ok for a genuinely successful charge.
+ */
+export async function verifyPaystackPayment(reference: string): Promise<PaystackPayment> {
+  if (!SECRET || !reference) return { ok: false };
+  try {
+    const res = await fetch(
+      `https://api.paystack.co/transaction/verify/${encodeURIComponent(reference)}`,
+      { headers: { Authorization: `Bearer ${SECRET}` }, cache: "no-store" }
+    );
+    const json = await res.json();
+    const d = json?.data;
+    if (d?.status === "success") {
+      return {
+        ok: true,
+        amountMinor: d.amount,
+        email: d.customer?.email,
+        metadata: (d.metadata ?? {}) as Record<string, unknown>,
+      };
+    }
+  } catch {
+    // fall through
+  }
+  return { ok: false };
+}
+
 /** Refund a transaction by its reference. Best-effort. */
 export async function refundPaystackTransaction(
   reference: string

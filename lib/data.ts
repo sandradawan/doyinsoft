@@ -11,6 +11,7 @@ import { deterministicLicenseKey, generateLicenseKey } from "./license";
 import { emailButton, emailKeyBox, emailLayout, emailText, esc, sendEmail, subjectSafe } from "./email";
 import { getSettings } from "./settings";
 import { incrementCouponUse } from "./coupons";
+import { redeemGiftCard } from "./giftcards";
 import { affiliateOwnsEmail } from "./affiliate";
 import { formatPrice } from "./format";
 
@@ -378,7 +379,7 @@ export async function getOrderById(orderId: string): Promise<Order | null> {
   const { data, error } = await supabase
     .from("orders")
     .select(
-      "id, buyer_name, buyer_initials, amount_minor, currency, status, gateway, created_at, fulfilment_status, shipping_name, shipping_phone, shipping_address, buyer_email, product:products(id, name, slug, price_minor, currency, product_type)"
+      "id, buyer_name, buyer_initials, amount_minor, currency, status, gateway, created_at, fulfilment_status, shipping_name, shipping_phone, shipping_address, buyer_email, gift_card_minor, product:products(id, name, slug, price_minor, currency, product_type)"
     )
     .eq("id", orderId)
     .maybeSingle();
@@ -392,14 +393,16 @@ export async function getOrderById(orderId: string): Promise<Order | null> {
  */
 export async function getOrderAmount(
   orderId: string
-): Promise<{ amount_minor: number; currency: "NGN" | "USD"; status: string } | null> {
+): Promise<{ amount_minor: number; currency: "NGN" | "USD"; status: string; gift_card_minor: number } | null> {
   if (!hasServiceRole) return null;
   const { data } = await createAdminClient()
     .from("orders")
-    .select("amount_minor, currency, status")
+    .select("amount_minor, currency, status, gift_card_minor")
     .eq("id", orderId)
     .maybeSingle();
-  return (data as { amount_minor: number; currency: "NGN" | "USD"; status: string }) ?? null;
+  return (
+    (data as { amount_minor: number; currency: "NGN" | "USD"; status: string; gift_card_minor: number }) ?? null
+  );
 }
 
 // ---- Analytics ---------------------------------------------------------------
@@ -1056,14 +1059,23 @@ export async function markOrderPaid(orderId: string, reference?: string): Promis
   const admin = createAdminClient();
   const { data: order } = await admin
     .from("orders")
-    .select("amount_minor, affiliate_id, buyer_email")
+    .select("amount_minor, affiliate_id, buyer_email, gift_card_code, gift_card_minor")
     .eq("id", orderId)
     .maybeSingle();
   await admin
     .from("orders")
     .update({ status: "paid", ...(reference ? { reference } : {}) })
     .eq("id", orderId);
-  const o = order as { amount_minor: number; affiliate_id: string | null; buyer_email: string | null } | null;
+  const o = order as {
+    amount_minor: number;
+    affiliate_id: string | null;
+    buyer_email: string | null;
+    gift_card_code: string | null;
+    gift_card_minor: number | null;
+  } | null;
+  if (o?.gift_card_code && (o.gift_card_minor ?? 0) > 0) {
+    await redeemGiftCard(o.gift_card_code, o.gift_card_minor ?? 0, orderId);
+  }
   if (o?.affiliate_id && !(await affiliateOwnsEmail(o.affiliate_id, o.buyer_email))) {
     const { affiliate_percent } = await getSettings();
     const commission = Math.round((o.amount_minor * affiliate_percent) / 100);
@@ -1163,7 +1175,7 @@ export async function issueLicenseForOrder(
   // Look up the order, then mark it paid and mint the key.
   const { data: order } = await admin
     .from("orders")
-    .select("id, product_id, vendor_id, amount_minor, currency, affiliate_id, coupon_code, buyer_email, product:products(name, product_type)")
+    .select("id, product_id, vendor_id, amount_minor, currency, affiliate_id, coupon_code, gift_card_code, gift_card_minor, buyer_email, product:products(name, product_type)")
     .eq("id", orderId)
     .maybeSingle();
   if (!order) return null;
@@ -1176,6 +1188,11 @@ export async function issueLicenseForOrder(
   // Count the coupon use once (this path only runs on first issue — idempotent).
   const couponCode = (order as { coupon_code?: string | null }).coupon_code;
   if (couponCode) await incrementCouponUse(couponCode);
+
+  // Debit the gift card for its share (atomic + idempotent per order).
+  const gcCode = (order as { gift_card_code?: string | null }).gift_card_code;
+  const gcMinor = (order as { gift_card_minor?: number }).gift_card_minor ?? 0;
+  if (gcCode && gcMinor > 0) await redeemGiftCard(gcCode, gcMinor, orderId);
 
   const o = order as {
     product_id: string;

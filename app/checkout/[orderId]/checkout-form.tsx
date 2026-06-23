@@ -3,13 +3,18 @@
 import { useState, useTransition } from "react";
 import { formatPrice } from "@/lib/format";
 import type { Currency, Gateway, ProductType } from "@/lib/types";
-import { previewCoupon, startCheckout } from "./actions";
+import { previewCoupon, previewGiftCard, startCheckout } from "./actions";
 
 interface AppliedCoupon {
   code: string;
   label: string;
   discountMinor: number;
   finalMinor: number;
+}
+
+interface AppliedGift {
+  code: string;
+  balanceMinor: number;
 }
 
 const GATEWAYS: { value: Gateway; label: string }[] = [
@@ -45,7 +50,15 @@ export function CheckoutForm({
   const [couponMsg, setCouponMsg] = useState<string | null>(null);
   const [couponPending, startCoupon] = useTransition();
 
-  const payMinor = applied ? applied.finalMinor : amountMinor;
+  // Gift card (a payment method, applied after any discount)
+  const [giftInput, setGiftInput] = useState("");
+  const [gift, setGift] = useState<AppliedGift | null>(null);
+  const [giftMsg, setGiftMsg] = useState<string | null>(null);
+  const [giftPending, startGift] = useTransition();
+
+  const orderValue = applied ? applied.finalMinor : amountMinor; // after discount
+  const giftMinor = gift ? Math.min(gift.balanceMinor, orderValue) : 0;
+  const payMinor = orderValue - giftMinor;
 
   function applyCoupon() {
     const code = couponInput.trim();
@@ -74,6 +87,28 @@ export function CheckoutForm({
     setCouponMsg(null);
   }
 
+  function applyGift() {
+    const code = giftInput.trim();
+    if (!code) return;
+    setGiftMsg(null);
+    startGift(async () => {
+      const res = await previewGiftCard(code);
+      if (res.ok) {
+        setGift({ code: res.code!, balanceMinor: res.balance_minor ?? 0 });
+        setGiftMsg(null);
+      } else {
+        setGift(null);
+        setGiftMsg(res.error ?? "That gift card isn’t valid.");
+      }
+    });
+  }
+
+  function removeGift() {
+    setGift(null);
+    setGiftInput("");
+    setGiftMsg(null);
+  }
+
   const isPhysical = productType === "physical";
   const isService = productType === "service";
   const needsDetails = isPhysical || isService;
@@ -91,6 +126,7 @@ export function CheckoutForm({
         gateway,
         email,
         coupon: applied?.code,
+        giftCard: gift?.code,
         shippingName,
         shippingPhone,
         shippingAddress,
@@ -221,6 +257,55 @@ export function CheckoutForm({
       )}
       {!applied && <div className="mb-2" />}
 
+      {/* Gift card */}
+      <p className="text-[12px] font-medium m-0 mb-2">Gift card</p>
+      {gift ? (
+        <div className="flex items-center justify-between border border-brand/40 bg-brand-tint rounded-md px-[10px] py-2 mb-2 text-[13px]">
+          <span className="text-brand font-medium">
+            {gift.code} — {formatPrice(gift.balanceMinor, currency)} balance
+          </span>
+          <button
+            type="button"
+            onClick={removeGift}
+            className="text-ink-faint hover:text-info bg-transparent border-0 cursor-pointer text-[12px]"
+          >
+            Remove
+          </button>
+        </div>
+      ) : (
+        <div className="flex gap-2 mb-2">
+          <input
+            value={giftInput}
+            onChange={(e) => setGiftInput(e.target.value.toUpperCase())}
+            placeholder="GIFT-XXXX-XXXX-XXXX-XXXX"
+            className="field flex-1 uppercase font-mono text-[12px]"
+            onKeyDown={(e) => {
+              if (e.key === "Enter") {
+                e.preventDefault();
+                applyGift();
+              }
+            }}
+          />
+          <button
+            type="button"
+            onClick={applyGift}
+            disabled={giftPending || giftInput.trim().length === 0}
+            className="border border-line rounded-md px-3 text-[13px] text-ink-soft hover:text-ink shrink-0 cursor-pointer disabled:opacity-50"
+          >
+            {giftPending ? "…" : "Apply"}
+          </button>
+        </div>
+      )}
+      {giftMsg && <p className="text-[11px] text-info mb-2">{giftMsg}</p>}
+
+      {gift && giftMinor > 0 && (
+        <div className="flex justify-between text-[12px] text-ink-soft mb-3">
+          <span>Gift card</span>
+          <span>−{formatPrice(giftMinor, currency)}</span>
+        </div>
+      )}
+      {!gift && <div className="mb-2" />}
+
       <button
         type="submit"
         disabled={pending || email.length === 0 || !detailsValid}
@@ -229,7 +314,9 @@ export function CheckoutForm({
         {pending
           ? "Redirecting…"
           : payMinor <= 0
-            ? "Get it free"
+            ? gift
+              ? "Place order (gift card)"
+              : "Get it free"
             : `Pay ${formatPrice(payMinor, currency)}`}
       </button>
 

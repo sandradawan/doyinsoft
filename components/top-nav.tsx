@@ -41,6 +41,12 @@ export async function TopNav({ defaultQuery = "" }: { defaultQuery?: string }) {
       >
         Downloads
       </Link>
+      <Link
+        href="/gift-cards"
+        className="hidden sm:inline text-[13px] text-ink-soft no-underline hover:text-ink"
+      >
+        Gift cards
+      </Link>
       {admin && (
         <Link
           href="/admin"

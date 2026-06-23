@@ -35,10 +35,9 @@ export default async function CheckoutSuccessPage({
     if (ref) {
       const v = await verifyPaystackTransaction(ref);
       // Require: verified success, the reference belongs to THIS order, and the
-      // amount paid covers the order total (defense-in-depth, mirrors the webhook).
-      paid =
-        v.ok &&
-        (!order || (v.orderId === orderId && (v.amountMinor ?? 0) >= order.amount_minor));
+      // amount paid covers the Paystack portion (order total minus any gift card).
+      const due = order ? order.amount_minor - (order.gift_card_minor ?? 0) : 0;
+      paid = v.ok && (!order || (v.orderId === orderId && (v.amountMinor ?? 0) >= due));
     } else {
       paid = order?.status === "paid";
     }

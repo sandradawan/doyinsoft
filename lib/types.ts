@@ -115,6 +115,8 @@ export interface Order {
   buyer_email?: string | null;
   /** Payment processor reference (Paystack). */
   reference?: string | null;
+  /** Portion of the order paid by a gift card (rest goes to the gateway). */
+  gift_card_minor?: number | null;
 }
 
 export interface DashboardMetrics {

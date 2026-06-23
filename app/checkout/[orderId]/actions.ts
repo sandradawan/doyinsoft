@@ -14,6 +14,7 @@ import { toNgnCharge } from "@/lib/money";
 import { getCurrentUser } from "@/lib/auth";
 import { affiliateOwnedByUser, resolveAffiliateId } from "@/lib/affiliate";
 import { validateCoupon, type CouponCheck } from "@/lib/coupons";
+import { validateGiftCard, redeemGiftCard, type GiftCardCheck } from "@/lib/giftcards";
 import { checkRateLimit, clientId } from "@/lib/ratelimit";
 import type { Currency, Gateway } from "@/lib/types";
 
@@ -26,6 +27,7 @@ interface CheckoutInput {
   gateway: Gateway;
   email: string;
   coupon?: string;
+  giftCard?: string;
   shippingName?: string;
   shippingPhone?: string;
   shippingAddress?: string;
@@ -48,6 +50,14 @@ export async function previewCoupon(
   if (!product) return { ok: false, error: "Unknown product." };
   const chargeMinor = toNgnCharge(product.price_minor, product.currency);
   return validateCoupon(code, { chargeMinor, productVendorId: product.vendor.id });
+}
+
+/** Preview a gift card's balance for the checkout UI (rate-limited). */
+export async function previewGiftCard(code: string): Promise<GiftCardCheck> {
+  if (!(await checkRateLimit(`gift:${await clientId()}`, 12, 60_000))) {
+    return { ok: false, error: "Too many attempts — please wait a moment and try again." };
+  }
+  return validateGiftCard(code);
 }
 
 /**
@@ -99,7 +109,7 @@ export async function startCheckout(
   // Apply a discount code (server-authoritative — never trust the client's number).
   let discountMinor = 0;
   let couponCode: string | null = null;
-  let finalCharge = chargeMinor;
+  let orderValue = chargeMinor; // the order's value after any discount (= amount_minor)
   if (input.coupon && product) {
     const check = await validateCoupon(input.coupon, {
       chargeMinor,
@@ -107,10 +117,24 @@ export async function startCheckout(
     });
     if (check.ok) {
       discountMinor = check.discountMinor ?? 0;
-      finalCharge = check.finalMinor ?? chargeMinor;
+      orderValue = check.finalMinor ?? chargeMinor;
       couponCode = check.code ?? null;
     }
   }
+
+  // Apply a gift card as a payment method (prepaid credit, not a discount). It
+  // pays toward the order value; the rest goes to Paystack. The card is debited
+  // atomically only once the order is paid (in issueLicenseForOrder/markOrderPaid).
+  let giftCardCode: string | null = null;
+  let giftCardMinor = 0;
+  if (input.giftCard) {
+    const gc = await validateGiftCard(input.giftCard);
+    if (gc.ok) {
+      giftCardCode = gc.code ?? null;
+      giftCardMinor = Math.min(gc.balance_minor ?? 0, orderValue);
+    }
+  }
+  const payNow = orderValue - giftCardMinor; // what Paystack must charge
 
   // Persist a real pending order via the service role (buyers aren't logged in,
   // so this trusted server action creates the order, not the anon client).
@@ -123,7 +147,7 @@ export async function startCheckout(
         vendor_id: product.vendor.id,
         buyer_name: input.shippingName || input.email.split("@")[0] || "Guest",
         buyer_initials: (input.email[0] ?? "G").toUpperCase(),
-        amount_minor: finalCharge,
+        amount_minor: orderValue,
         currency: chargeCurrency,
         status: "pending",
         gateway: input.gateway,
@@ -131,6 +155,8 @@ export async function startCheckout(
         buyer_email: input.email,
         coupon_code: couponCode,
         discount_minor: discountMinor,
+        gift_card_code: giftCardCode,
+        gift_card_minor: giftCardMinor,
         fulfilment_status: needsFulfilment ? "pending" : null,
         shipping_name: input.shippingName || null,
         shipping_phone: input.shippingPhone || null,
@@ -141,10 +167,18 @@ export async function startCheckout(
     if (data?.id) orderId = data.id;
   }
 
-  // Fully discounted (e.g. 100%-off code, or a free item): no payment needed —
-  // issue the licence + receipt directly and skip the gateway.
-  if (finalCharge <= 0) {
+  // Nothing left to charge (free item, 100%-off code, or fully gift-card-paid):
+  // issue directly and skip the gateway. For a gift-card-covered order we debit
+  // FIRST (atomic) so two concurrent checkouts can't both get it free — if the
+  // card no longer covers it, fail safe instead of releasing the goods.
+  if (payNow <= 0) {
     if (hasServiceRole && orderId !== "new") {
+      if (giftCardCode && giftCardMinor > 0) {
+        const debited = await redeemGiftCard(giftCardCode, giftCardMinor, orderId);
+        if (debited < giftCardMinor) {
+          return { error: "That gift card no longer has enough balance. Please try again." };
+        }
+      }
       await issueLicenseForOrder(orderId, input.email);
     }
     redirect(`/checkout/${orderId}/success?email=${encodeURIComponent(input.email)}`);
@@ -163,7 +197,7 @@ export async function startCheckout(
         },
         body: JSON.stringify({
           email: input.email,
-          amount: finalCharge, // NGN kobo (after any discount code)
+          amount: payNow, // NGN kobo (after discount code + gift card)
           currency: chargeCurrency,
           callback_url: `${SITE_URL}/checkout/${orderId}/success`,
           metadata: { order_id: orderId, product_slug: input.productSlug },

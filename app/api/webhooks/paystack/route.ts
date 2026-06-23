@@ -1,7 +1,8 @@
 import { NextResponse } from "next/server";
 import { createHmac, timingSafeEqual } from "crypto";
 import { getOrderAmount, issueLicenseForOrder } from "@/lib/data";
-import { verifyPaystackTransaction } from "@/lib/paystack";
+import { verifyPaystackTransaction, verifyPaystackPayment } from "@/lib/paystack";
+import { issueGiftCardFromPayment } from "@/lib/giftcards";
 
 const PAYSTACK_SECRET = process.env.PAYSTACK_SECRET_KEY ?? "";
 
@@ -34,29 +35,41 @@ export async function POST(request: Request) {
   }
 
   if (event.event === "charge.success") {
-    const orderId = event.data?.metadata?.order_id;
+    const meta = event.data?.metadata;
+    const orderId = meta?.order_id;
     const email = event.data?.customer?.email ?? "";
     const reference = event.data?.reference;
 
-    if (orderId && reference) {
+    // Gift-card purchase: issue a card for the amount actually paid (idempotent
+    // on the reference). No order is involved.
+    if (meta?.kind === "giftcard" && reference) {
+      const v = await verifyPaystackPayment(reference);
+      if (v.ok && (v.amountMinor ?? 0) > 0) {
+        await issueGiftCardFromPayment({
+          reference,
+          amountMinor: v.amountMinor ?? 0,
+          purchaserEmail: (v.metadata?.purchaser_email as string) || v.email,
+          recipientEmail: (v.metadata?.recipient_email as string) || undefined,
+          message: (v.metadata?.message as string) || undefined,
+        });
+      }
+    } else if (orderId && reference) {
       // A valid signature only proves the body came from Paystack — it does NOT
-      // prove the buyer paid this order's price. Re-verify with Paystack's API and
-      // require the paid amount to cover the order total before issuing a license.
+      // prove the buyer paid. Re-verify with Paystack's API and require the paid
+      // amount to cover the Paystack portion (order total minus any gift card).
       const [v, order] = await Promise.all([
         verifyPaystackTransaction(reference),
         getOrderAmount(orderId),
       ]);
+      const due = order ? order.amount_minor - (order.gift_card_minor ?? 0) : 0;
       const paidEnough =
-        v.ok &&
-        order != null &&
-        v.orderId === orderId &&
-        (v.amountMinor ?? 0) >= order.amount_minor;
+        v.ok && order != null && v.orderId === orderId && (v.amountMinor ?? 0) >= due;
 
       if (paidEnough) {
         await issueLicenseForOrder(orderId, email || v.email || "", reference);
       } else {
         console.warn(
-          `[webhook] refused to issue order ${orderId}: paid=${v.amountMinor} expected>=${order?.amount_minor} ok=${v.ok}`
+          `[webhook] refused to issue order ${orderId}: paid=${v.amountMinor} expected>=${due} ok=${v.ok}`
         );
       }
     }
@@ -78,6 +91,13 @@ interface PaystackEvent {
   data?: {
     reference?: string;
     customer?: { email?: string };
-    metadata?: { order_id?: string; product_slug?: string | null };
+    metadata?: {
+      order_id?: string;
+      product_slug?: string | null;
+      kind?: string;
+      recipient_email?: string | null;
+      message?: string | null;
+      purchaser_email?: string | null;
+    };
   };
 }
