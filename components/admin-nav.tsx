@@ -41,11 +41,13 @@ export function AdminNav() {
             key={label}
             href={href}
             className={[
-              "flex items-center gap-2 text-[13px] px-[10px] py-2 rounded-md no-underline",
-              active ? "bg-brand-tint font-medium text-brand" : "text-ink-soft hover:text-ink",
+              "flex items-center gap-2.5 text-[14px] px-3 py-2.5 rounded-md no-underline",
+              active
+                ? "bg-brand-tint font-medium text-brand"
+                : "text-ink-soft hover:text-ink hover:bg-muted",
             ].join(" ")}
           >
-            <Icon size={14} aria-hidden />
+            <Icon size={16} aria-hidden />
             {label}
           </Link>
         );

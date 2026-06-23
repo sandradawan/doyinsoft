@@ -31,9 +31,10 @@
   color-scheme: light;
 }
 
-/* Dark theme — same tokens, flipped. Triggered by system preference. */
+/* Dark theme — same tokens, flipped. Applied either by system preference
+   (when the user hasn't picked) or an explicit data-theme="dark" choice. */
 @media (prefers-color-scheme: dark) {
-  :root {
+  :root:not([data-theme="light"]) {
     --bg-primary: #0b0b0c;
     --bg-secondary: #18181b;
     --bg-info: #11243a;
@@ -48,13 +49,35 @@
     --text-info: #7cb3ec;
     --text-success: #8fce72;
 
-    --brand: #10b981; /* brighter emerald for contrast on dark */
+    --brand: #10b981;
     --brand-hover: #34d399;
     --brand-tint: #0c2a20;
     --brand-ink: #052e22;
 
     color-scheme: dark;
   }
+}
+:root[data-theme="dark"] {
+  --bg-primary: #0b0b0c;
+  --bg-secondary: #18181b;
+  --bg-info: #11243a;
+  --bg-success: #14271a;
+
+  --border-tertiary: #262629;
+  --border-secondary: #3f3f46;
+
+  --text-primary: #fafafa;
+  --text-secondary: #a1a1aa;
+  --text-tertiary: #71717a;
+  --text-info: #7cb3ec;
+  --text-success: #8fce72;
+
+  --brand: #10b981; /* brighter emerald for contrast on dark */
+  --brand-hover: #34d399;
+  --brand-tint: #0c2a20;
+  --brand-ink: #052e22;
+
+  color-scheme: dark;
 }
 
 /* Expose tokens to Tailwind as clean utility names.                   */

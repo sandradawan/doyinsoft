@@ -1,5 +1,8 @@
 import Link from "next/link";
 import { BarChart3, Folder, File, Banknote, Settings, Ticket } from "lucide-react";
+import { DashboardHeader } from "@/components/dashboard-header";
+import { getCurrentVendor } from "@/lib/auth";
+import { initialsOf } from "@/lib/format";
 
 type NavKey = "overview" | "products" | "orders" | "coupons" | "payouts" | "settings";
 
@@ -13,19 +16,29 @@ const NAV: { key: NavKey; label: string; href: string; icon: typeof BarChart3 }[
 ];
 
 /**
- * Shared vendor layout: 140px sidebar + flexible main area, per the spec.
- * `active` highlights the current nav item (bg-muted, medium weight).
+ * Shared vendor layout: header (profile + theme + logout) over a sidebar + main
+ * area. `active` highlights the current nav item.
  */
-export function VendorShell({
+export async function VendorShell({
   active,
   children,
 }: {
   active: NavKey;
   children: React.ReactNode;
 }) {
+  const vendor = await getCurrentVendor();
+  const name = vendor?.name ?? "Vendor";
+
   return (
-    <main className="max-w-5xl mx-auto px-5 py-6">
-      <div className="grid gap-5 [grid-template-columns:140px_minmax(0,1fr)]">
+    <main className="max-w-6xl mx-auto px-5 sm:px-6 py-7 text-[14px]">
+      <DashboardHeader
+        name={name}
+        email={vendor?.email ?? ""}
+        initials={vendor?.initials || initialsOf(name)}
+        role="Seller"
+      />
+
+      <div className="grid gap-7 [grid-template-columns:170px_minmax(0,1fr)]">
         <nav className="flex flex-col gap-1">
           {NAV.map(({ key, label, href, icon: Icon }) => {
             const isActive = key === active;
@@ -34,13 +47,13 @@ export function VendorShell({
                 key={key}
                 href={href}
                 className={[
-                  "flex items-center gap-2 text-[13px] px-[10px] py-2 rounded-md no-underline",
+                  "flex items-center gap-2.5 text-[14px] px-3 py-2.5 rounded-md no-underline",
                   isActive
                     ? "bg-brand-tint font-medium text-brand"
-                    : "text-ink-soft hover:text-ink",
+                    : "text-ink-soft hover:text-ink hover:bg-muted",
                 ].join(" ")}
               >
-                <Icon size={14} aria-hidden />
+                <Icon size={16} aria-hidden />
                 {label}
               </Link>
             );

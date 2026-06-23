@@ -82,15 +82,11 @@ export default async function VendorDashboardPage({
 
   return (
     <VendorShell active="overview">
-      <div className="flex items-center justify-between mb-4">
-        <div>
-          <h1 className="text-[16px] font-medium m-0">{vendor.name}</h1>
-          <p className="text-[12px] text-ink-faint m-0">{vendor.email}</p>
-        </div>
-      </div>
+      <h1 className="text-[24px] font-medium m-0 mb-1">Overview</h1>
+      <p className="text-[14px] text-ink-soft m-0 mb-5">Welcome back, {vendor.name}.</p>
 
       {vendor.isDemo && (
-        <p className="text-[12px] text-info bg-info-bg rounded-md px-3 py-2 mb-4">
+        <p className="text-[13px] text-info bg-info-bg rounded-md px-3 py-2 mb-5">
           Demo mode — connect Supabase and sign up to manage a real vendor account.
         </p>
       )}
@@ -103,21 +99,21 @@ export default async function VendorDashboardPage({
       />
 
       {/* Metric cards */}
-      <div className="grid [grid-template-columns:repeat(auto-fit,minmax(140px,1fr))] gap-3 mb-4">
+      <div className="grid [grid-template-columns:repeat(auto-fit,minmax(160px,1fr))] gap-4 mb-6">
         {cards.map((c) => (
           <div
             key={c.label}
-            className={`rounded-md p-4 ${c.highlight ? "bg-brand-tint" : "bg-muted"}`}
+            className={`rounded-lg p-5 ${c.highlight ? "bg-brand-tint" : "bg-muted"}`}
           >
-            <p className={`text-[13px] m-0 mb-[6px] ${c.highlight ? "text-brand" : "text-ink-soft"}`}>
+            <p className={`text-[14px] m-0 mb-2 ${c.highlight ? "text-brand" : "text-ink-soft"}`}>
               {c.label}
             </p>
             <p
-              className={`text-[22px] font-medium m-0 ${c.highlight ? "text-brand" : "text-ink"}`}
+              className={`text-[28px] font-medium m-0 leading-none ${c.highlight ? "text-brand" : "text-ink"}`}
             >
               {c.value}
             </p>
-            {c.sub && <p className="text-[11px] text-ink-faint m-0 mt-1">{c.sub}</p>}
+            {c.sub && <p className="text-[12px] text-ink-faint m-0 mt-1.5">{c.sub}</p>}
           </div>
         ))}
       </div>

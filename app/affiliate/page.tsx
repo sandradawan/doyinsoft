@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { Logo } from "@/components/logo";
+import { DashboardHeader } from "@/components/dashboard-header";
 import { ShareLink } from "@/components/share-link";
 import { requireUser } from "@/lib/auth";
 import {
@@ -41,33 +41,33 @@ export default async function AffiliatePage() {
   const available = balance?.available_minor ?? 0;
 
   return (
-    <main className="max-w-2xl mx-auto px-5 py-8">
-      <div className="flex items-center justify-between mb-6">
-        <Logo />
-        <Link href="/" className="text-[13px] text-ink-soft no-underline hover:text-ink">
-          ← Store
-        </Link>
-      </div>
+    <main className="max-w-2xl mx-auto px-5 py-7 text-[14px]">
+      <DashboardHeader
+        name={user.email.split("@")[0] || "Affiliate"}
+        email={user.email}
+        initials={(user.email[0] ?? "A").toUpperCase()}
+        role="Affiliate"
+      />
 
-      <h1 className="text-[22px] font-medium m-0 mb-1">Earn with DoyinSoft</h1>
-      <p className="text-[13px] text-ink-soft m-0 mb-6">
+      <h1 className="text-[24px] font-medium m-0 mb-1">Earn with DoyinSoft</h1>
+      <p className="text-[14px] text-ink-soft m-0 mb-6">
         Share your link. When someone buys through it, you earn{" "}
         <span className="font-medium text-ink">{settings.affiliate_percent}%</span> of the sale.
       </p>
 
-      <div className="grid [grid-template-columns:repeat(auto-fit,minmax(130px,1fr))] gap-3 mb-6">
-        <div className="bg-brand-tint rounded-md p-4">
-          <p className="text-[12px] text-brand m-0 mb-[6px]">Earned today</p>
-          <p className="text-[20px] font-medium text-brand m-0">{formatPrice(today.earned_minor, "NGN")}</p>
-          <p className="text-[11px] text-ink-faint m-0 mt-1">{today.count} sale{today.count === 1 ? "" : "s"}</p>
+      <div className="grid [grid-template-columns:repeat(auto-fit,minmax(150px,1fr))] gap-4 mb-6">
+        <div className="bg-brand-tint rounded-lg p-5">
+          <p className="text-[14px] text-brand m-0 mb-2">Earned today</p>
+          <p className="text-[24px] font-medium text-brand m-0 leading-none">{formatPrice(today.earned_minor, "NGN")}</p>
+          <p className="text-[12px] text-ink-faint m-0 mt-1.5">{today.count} sale{today.count === 1 ? "" : "s"}</p>
         </div>
-        <div className="bg-muted rounded-md p-4">
-          <p className="text-[12px] text-ink-soft m-0 mb-[6px]">Available</p>
-          <p className="text-[20px] font-medium m-0">{formatPrice(available, "NGN")}</p>
+        <div className="bg-muted rounded-lg p-5">
+          <p className="text-[14px] text-ink-soft m-0 mb-2">Available</p>
+          <p className="text-[24px] font-medium m-0 leading-none">{formatPrice(available, "NGN")}</p>
         </div>
-        <div className="bg-muted rounded-md p-4">
-          <p className="text-[12px] text-ink-soft m-0 mb-[6px]">Total earned</p>
-          <p className="text-[20px] font-medium m-0">{formatPrice(balance?.earned_minor ?? 0, "NGN")}</p>
+        <div className="bg-muted rounded-lg p-5">
+          <p className="text-[14px] text-ink-soft m-0 mb-2">Total earned</p>
+          <p className="text-[24px] font-medium m-0 leading-none">{formatPrice(balance?.earned_minor ?? 0, "NGN")}</p>
         </div>
         <div className="bg-muted rounded-md p-4">
           <p className="text-[12px] text-ink-soft m-0 mb-[6px]">Referred sales</p>
