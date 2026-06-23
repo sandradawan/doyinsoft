@@ -15,6 +15,7 @@ import {
   vendorTopProducts,
 } from "@/lib/data";
 import { requireVendor } from "@/lib/auth";
+import { vendorCouponStats } from "@/lib/coupons";
 import { formatPrice } from "@/lib/format";
 
 const ORDERS_PER_PAGE = 3;
@@ -29,7 +30,7 @@ export default async function VendorDashboardPage({
   const query = q?.trim() ?? "";
   const oPage = Math.max(1, Number(pageParam) || 1);
 
-  const [metrics, recent, monthly, topProducts, products, subaccount, today, orderPage] =
+  const [metrics, recent, monthly, topProducts, products, subaccount, today, coupons, orderPage] =
     await Promise.all([
       getDashboardMetrics(vendor.id),
       getRecentOrders(vendor.id),
@@ -38,6 +39,7 @@ export default async function VendorDashboardPage({
       getVendorProducts(vendor.id),
       getVendorSubaccount(vendor.id),
       vendorTodayStats(vendor.id),
+      vendorCouponStats(vendor.id),
       getVendorOrders(vendor.id, {
         page: oPage,
         pageSize: ORDERS_PER_PAGE,
@@ -58,7 +60,7 @@ export default async function VendorDashboardPage({
   const prev = monthly[monthly.length - 2]?.revenue_minor ?? 0;
   const growth = prev === 0 ? (last > 0 ? 100 : 0) : Math.round(((last - prev) / prev) * 100);
 
-  const cards = [
+  const cards: { label: string; value: string; sub?: string; highlight?: boolean }[] = [
     {
       label: "Sales today",
       value: formatPrice(today.revenue_minor, metrics.currency),
@@ -68,6 +70,14 @@ export default async function VendorDashboardPage({
     { label: "Revenue (30d)", value: formatPrice(metrics.revenue_minor, metrics.currency) },
     { label: "Units sold", value: String(metrics.units_sold) },
     { label: "Pending payout", value: formatPrice(metrics.pending_payout_minor, metrics.currency) },
+    {
+      label: "Coupons redeemed",
+      value: String(coupons.redeemed),
+      sub:
+        coupons.discount_minor > 0
+          ? `${formatPrice(coupons.discount_minor, metrics.currency)} discounted`
+          : undefined,
+    },
   ];
 
   return (

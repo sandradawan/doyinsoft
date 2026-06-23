@@ -151,6 +151,25 @@ export async function deleteCoupon(id: string, vendorId: string | null): Promise
   await (vendorId === null ? q.is("vendor_id", null) : q.eq("vendor_id", vendorId));
 }
 
+/** Redemption totals for a vendor: how many paid orders used a code, and ₦ discounted. */
+export async function vendorCouponStats(
+  vendorId: string
+): Promise<{ redeemed: number; discount_minor: number }> {
+  if (!hasServiceRole) return { redeemed: 0, discount_minor: 0 };
+  const admin = createAdminClient();
+  const { data } = await admin
+    .from("orders")
+    .select("discount_minor")
+    .eq("vendor_id", vendorId)
+    .eq("status", "paid")
+    .gt("discount_minor", 0);
+  const rows = (data as { discount_minor: number }[]) ?? [];
+  return {
+    redeemed: rows.length,
+    discount_minor: rows.reduce((s, r) => s + (r.discount_minor || 0), 0),
+  };
+}
+
 /** Bump used_count once a discounted order is paid (called from issueLicenseForOrder). */
 export async function incrementCouponUse(code: string): Promise<void> {
   if (!hasServiceRole || !code) return;
