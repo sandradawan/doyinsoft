@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { Star } from "lucide-react";
 import { ADMIN_PAGE_SIZE, adminProducts } from "@/lib/data";
+import { Pagination } from "@/components/pagination";
 import { formatPrice } from "@/lib/format";
 import type { ProductStatus } from "@/lib/types";
 import { approveProduct, rejectProduct, toggleFeatured } from "../actions";
@@ -21,18 +22,30 @@ const STATUS_BADGE: Record<ProductStatus, string> = {
 export default async function AdminProductsPage({
   searchParams,
 }: {
-  searchParams: Promise<{ status?: string; page?: string }>;
+  searchParams: Promise<{ status?: string; page?: string; q?: string }>;
 }) {
-  const { status, page: pageParam } = await searchParams;
+  const { status, page: pageParam, q } = await searchParams;
   const active = (status as ProductStatus | "all") ?? "pending";
   const filter = active === "all" ? undefined : (active as ProductStatus);
+  const query = q?.trim() ?? "";
   const page = Math.max(1, Number(pageParam) || 1);
-  const { items: products, total } = await adminProducts(filter, page);
+  const { items: products, total } = await adminProducts(filter, page, query || undefined);
   const totalPages = Math.max(1, Math.ceil(total / ADMIN_PAGE_SIZE));
 
   return (
     <div>
       <h1 className="text-[22px] font-medium m-0 mb-4">Products</h1>
+
+      <form method="get" className="flex gap-2 mb-3 max-w-md">
+        {active !== "all" ? <input type="hidden" name="status" value={active} /> : null}
+        <input
+          name="q"
+          defaultValue={query}
+          placeholder="Search product name or slug…"
+          className="field flex-1"
+        />
+        <button className="btn-primary px-4 py-2">Search</button>
+      </form>
 
       <div className="flex gap-2 flex-wrap mb-5">
         {FILTERS.map((f) => {
@@ -40,7 +53,7 @@ export default async function AdminProductsPage({
           return (
             <Link
               key={f.value}
-              href={`/admin/products?status=${f.value}`}
+              href={`/admin/products?status=${f.value}${query ? `&q=${encodeURIComponent(query)}` : ""}`}
               className={[
                 "text-[12px] px-3 py-[5px] rounded-md no-underline border transition-colors",
                 isActive
@@ -139,31 +152,19 @@ export default async function AdminProductsPage({
         </div>
       )}
 
-      {totalPages > 1 && (
-        <div className="flex items-center justify-between mt-5 text-[12px]">
-          <span className="text-ink-faint">
-            Page {page} of {totalPages} · {total} total
-          </span>
-          <div className="flex gap-2">
-            {page > 1 && (
-              <Link
-                href={`/admin/products?status=${active}&page=${page - 1}`}
-                className="border border-line rounded-md px-3 py-[5px] no-underline text-ink-soft hover:border-line-strong"
-              >
-                ← Prev
-              </Link>
-            )}
-            {page < totalPages && (
-              <Link
-                href={`/admin/products?status=${active}&page=${page + 1}`}
-                className="border border-line rounded-md px-3 py-[5px] no-underline text-ink-soft hover:border-line-strong"
-              >
-                Next →
-              </Link>
-            )}
-          </div>
-        </div>
-      )}
+      <Pagination
+        page={page}
+        total={total}
+        pageSize={ADMIN_PAGE_SIZE}
+        hrefForPage={(p) => {
+          const params = new URLSearchParams();
+          if (active !== "all") params.set("status", active);
+          if (query) params.set("q", query);
+          if (p > 1) params.set("page", String(p));
+          const s = params.toString();
+          return `/admin/products${s ? `?${s}` : ""}`;
+        }}
+      />
     </div>
   );
 }

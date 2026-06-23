@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { VendorShell } from "@/components/vendor-shell";
 import { StatusBadge } from "@/components/status-badge";
+import { Pagination } from "@/components/pagination";
 import { getVendorOrders } from "@/lib/data";
 import { requireVendor } from "@/lib/auth";
 import { formatPrice } from "@/lib/format";
@@ -22,26 +23,59 @@ function shortDate(iso: string): string {
   return d.toLocaleDateString("en-NG", { day: "2-digit", month: "short" });
 }
 
+const PAGE_SIZE = 10;
+
 export default async function VendorOrdersPage({
   searchParams,
 }: {
-  searchParams: Promise<{ status?: string }>;
+  searchParams: Promise<{ status?: string; q?: string; page?: string }>;
 }) {
   const vendor = await requireVendor();
-  const { status } = await searchParams;
+  const { status, q, page: pageParam } = await searchParams;
   const active = (status as OrderStatus | "all") ?? "all";
   const filter = STATUSES.includes(active as OrderStatus) ? (active as OrderStatus) : undefined;
-  const orders = await getVendorOrders(vendor.id, filter);
+  const query = q?.trim() ?? "";
+  const page = Math.max(1, Number(pageParam) || 1);
+  const { items: orders, total } = await getVendorOrders(vendor.id, {
+    status: filter,
+    page,
+    pageSize: PAGE_SIZE,
+    search: query || undefined,
+  });
+
+  const hrefForPage = (p: number) => {
+    const params = new URLSearchParams();
+    if (active !== "all") params.set("status", active);
+    if (query) params.set("q", query);
+    if (p > 1) params.set("page", String(p));
+    const s = params.toString();
+    return `/vendor/orders${s ? `?${s}` : ""}`;
+  };
 
   return (
     <VendorShell active="orders">
       <p className="text-[13px] font-medium m-0 mb-3">Orders</p>
 
+      {/* Search */}
+      <form method="get" className="flex gap-2 mb-3 max-w-md">
+        {active !== "all" ? <input type="hidden" name="status" value={active} /> : null}
+        <input
+          name="q"
+          defaultValue={query}
+          placeholder="Search email, reference or order ID…"
+          className="field flex-1"
+        />
+        <button className="btn-primary px-4 py-2">Search</button>
+      </form>
+
       {/* Status filter pills */}
       <div className="flex gap-2 flex-wrap mb-4">
         {FILTERS.map((f) => {
           const isActive = f.value === active;
-          const href = f.value === "all" ? "/vendor/orders" : `/vendor/orders?status=${f.value}`;
+          const sp = new URLSearchParams();
+          if (f.value !== "all") sp.set("status", f.value);
+          if (query) sp.set("q", query);
+          const href = `/vendor/orders${sp.toString() ? `?${sp}` : ""}`;
           return (
             <Link
               key={f.value}
@@ -127,6 +161,8 @@ export default async function VendorOrdersPage({
           ))}
         </div>
       )}
+
+      <Pagination page={page} total={total} pageSize={PAGE_SIZE} hrefForPage={hrefForPage} />
     </VendorShell>
   );
 }

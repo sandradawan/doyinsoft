@@ -1,7 +1,8 @@
 import Link from "next/link";
-import { adminOrders } from "@/lib/data";
+import { ADMIN_ORDERS_PAGE_SIZE, adminOrders } from "@/lib/data";
 import { formatPrice } from "@/lib/format";
 import { StatusBadge } from "@/components/status-badge";
+import { Pagination } from "@/components/pagination";
 import type { OrderStatus } from "@/lib/types";
 import { refundOrder, resendLicense, revokeLicense } from "../actions";
 
@@ -20,30 +21,53 @@ function shortDate(iso: string): string {
 export default async function AdminOrdersPage({
   searchParams,
 }: {
-  searchParams: Promise<{ status?: string }>;
+  searchParams: Promise<{ status?: string; q?: string; page?: string }>;
 }) {
-  const { status } = await searchParams;
+  const { status, q, page: pageParam } = await searchParams;
   const active = (status as OrderStatus | "all") ?? "all";
   const filter = active === "all" ? undefined : (active as OrderStatus);
-  const orders = await adminOrders(filter);
+  const query = q?.trim() ?? "";
+  const page = Math.max(1, Number(pageParam) || 1);
+  const { items: orders, total } = await adminOrders(filter, page, query || undefined);
+
+  const hrefForPage = (p: number) => {
+    const params = new URLSearchParams();
+    if (active !== "all") params.set("status", active);
+    if (query) params.set("q", query);
+    if (p > 1) params.set("page", String(p));
+    const s = params.toString();
+    return `/admin/orders${s ? `?${s}` : ""}`;
+  };
 
   return (
     <div>
       <div className="flex items-center justify-between mb-4">
         <h1 className="text-[22px] font-medium m-0">Orders</h1>
         <a
-          href={`/admin/orders/export?status=${active}`}
+          href={`/admin/orders/export?status=${active}${query ? `&q=${encodeURIComponent(query)}` : ""}`}
           className="text-[12px] border border-line rounded-md px-3 py-[6px] no-underline text-ink-soft hover:border-brand hover:text-brand"
         >
           Export CSV
         </a>
       </div>
 
+      {/* Search by email / reference / order ID */}
+      <form method="get" className="flex gap-2 mb-3 max-w-md">
+        {active !== "all" ? <input type="hidden" name="status" value={active} /> : null}
+        <input
+          name="q"
+          defaultValue={query}
+          placeholder="Search email, reference or order ID…"
+          className="field flex-1"
+        />
+        <button className="btn-primary px-4 py-2">Search</button>
+      </form>
+
       <div className="flex gap-2 flex-wrap mb-5">
         {FILTERS.map((f) => (
           <Link
             key={f.value}
-            href={`/admin/orders?status=${f.value}`}
+            href={`/admin/orders?status=${f.value}${query ? `&q=${encodeURIComponent(query)}` : ""}`}
             className={[
               "text-[12px] px-3 py-[5px] rounded-md no-underline border transition-colors",
               f.value === active
@@ -64,11 +88,14 @@ export default async function AdminOrdersPage({
             <div key={o.id} className="border border-line rounded-lg p-3 text-[13px]">
               <div className="flex items-center gap-3 flex-wrap">
                 <span className="flex-1 min-w-0 truncate font-medium">{o.product.name}</span>
-                <span className="text-ink-soft">{o.buyer_name}</span>
+                <span className="text-ink-soft">{o.buyer_email || o.buyer_name}</span>
                 <span className="text-ink-faint text-[11px]">{shortDate(o.created_at)}</span>
                 <span>{formatPrice(o.amount_minor, o.currency)}</span>
                 <StatusBadge status={o.status} />
               </div>
+              <p className="text-[11px] text-ink-faint m-0 mt-1">
+                Ref: {o.reference || "—"} · ID: {o.id.slice(0, 8)}
+              </p>
               <div className="flex items-center gap-2 mt-2 pt-2 border-t border-line">
                 <form action={resendLicense}>
                   <input type="hidden" name="id" value={o.id} />
@@ -95,6 +122,8 @@ export default async function AdminOrdersPage({
           ))}
         </div>
       )}
+
+      <Pagination page={page} total={total} pageSize={ADMIN_ORDERS_PAGE_SIZE} hrefForPage={hrefForPage} />
     </div>
   );
 }

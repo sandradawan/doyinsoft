@@ -14,8 +14,13 @@ export async function GET(request: Request) {
 
   const { searchParams } = new URL(request.url);
   const status = searchParams.get("status");
-  const orders = await adminOrders(
-    status && status !== "all" ? (status as OrderStatus) : undefined
+  const search = searchParams.get("q") ?? undefined;
+  // Export the full filtered set (large page size), not just one page.
+  const { items: orders } = await adminOrders(
+    status && status !== "all" ? (status as OrderStatus) : undefined,
+    1,
+    search,
+    100000
   );
 
   const header = ["id", "date", "product", "buyer", "amount", "currency", "status", "gateway"];

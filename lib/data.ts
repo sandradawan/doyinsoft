@@ -143,6 +143,30 @@ const PRODUCT_SELECT =
 const CORE_SELECT =
   "id, slug, name, price_minor, currency, platform, category, tagline, description, system_requirements, os_badges, vendor:vendors(id, slug, name, initials, verified)";
 
+const ORDER_SELECT =
+  "id, buyer_name, buyer_initials, amount_minor, currency, status, gateway, created_at, reference, fulfilment_status, shipping_name, shipping_phone, shipping_address, buyer_email, product:products(id, name, slug, price_minor, currency, product_type)";
+
+const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+
+// Add a search filter to an orders query: email + payment reference (+ order id
+// when the query looks like a UUID).
+function applyOrderSearch<T extends { or: (f: string) => T }>(query: T, q: string): T {
+  const like = `%${q}%`;
+  const parts = [`reference.ilike.${like}`, `buyer_email.ilike.${like}`];
+  if (UUID_RE.test(q)) parts.unshift(`id.eq.${q}`);
+  return query.or(parts.join(","));
+}
+
+function seedOrderMatch(o: Order, q: string): boolean {
+  const s = q.toLowerCase();
+  return (
+    o.id.toLowerCase().includes(s) ||
+    (o.reference ?? "").toLowerCase().includes(s) ||
+    (o.buyer_email ?? "").toLowerCase().includes(s) ||
+    o.buyer_name.toLowerCase().includes(s)
+  );
+}
+
 // ---- Public queries ----------------------------------------------------------
 
 export async function getProducts(
@@ -456,26 +480,30 @@ export async function adminCategories(): Promise<{ id: string; name: string }[]>
 
 // ---- Admin queries (service role) --------------------------------------------
 
-export const ADMIN_PAGE_SIZE = 15;
+export const ADMIN_PAGE_SIZE = 4;
 
 export async function adminProducts(
   status?: ProductStatus,
-  page = 1
+  page = 1,
+  search?: string
 ): Promise<{ items: Product[]; total: number }> {
+  const q = search?.trim().toLowerCase();
   if (!hasServiceRole) {
-    const all = status ? seedProducts.filter((p) => p.status === status) : seedProducts;
+    let all = status ? seedProducts.filter((p) => p.status === status) : seedProducts;
+    if (q) all = all.filter((p) => `${p.name} ${p.slug}`.toLowerCase().includes(q));
     const start = (page - 1) * ADMIN_PAGE_SIZE;
     return { items: all.slice(start, start + ADMIN_PAGE_SIZE), total: all.length };
   }
   const admin = createAdminClient();
   const from = (page - 1) * ADMIN_PAGE_SIZE;
-  let q = admin
+  let query = admin
     .from("products")
     .select(PRODUCT_SELECT, { count: "exact" })
     .order("created_at", { ascending: false })
     .range(from, from + ADMIN_PAGE_SIZE - 1);
-  if (status) q = q.eq("status", status);
-  const { data, error, count } = await q;
+  if (status) query = query.eq("status", status);
+  if (q) query = query.or(`name.ilike.%${q}%,slug.ilike.%${q}%`);
+  const { data, error, count } = await query;
   if (error || !data) return { items: [], total: 0 };
   return { items: (data as unknown as ProductRow[]).map(mapProduct), total: count ?? 0 };
 }
@@ -538,19 +566,32 @@ export async function adminReviews(limit = 100): Promise<AdminReview[]> {
   });
 }
 
-export async function adminOrders(status?: OrderStatus): Promise<Order[]> {
-  if (!hasServiceRole) return status ? seedOrders.filter((o) => o.status === status) : seedOrders;
+export const ADMIN_ORDERS_PAGE_SIZE = 4;
+
+export async function adminOrders(
+  status?: OrderStatus,
+  page = 1,
+  search?: string,
+  pageSize = ADMIN_ORDERS_PAGE_SIZE
+): Promise<OrdersPage> {
+  const s = search?.trim();
+  if (!hasServiceRole) {
+    let list = status ? seedOrders.filter((o) => o.status === status) : seedOrders;
+    if (s) list = list.filter((o) => seedOrderMatch(o, s));
+    const start = (page - 1) * pageSize;
+    return { items: list.slice(start, start + pageSize), total: list.length };
+  }
   const admin = createAdminClient();
+  const from = (page - 1) * pageSize;
   let q = admin
     .from("orders")
-    .select(
-      "id, buyer_name, buyer_initials, amount_minor, currency, status, gateway, created_at, fulfilment_status, shipping_name, shipping_phone, shipping_address, buyer_email, product:products(id, name, slug, price_minor, currency, product_type)"
-    )
+    .select(ORDER_SELECT, { count: "exact" })
     .order("created_at", { ascending: false })
-    .limit(100);
+    .range(from, from + pageSize - 1);
   if (status) q = q.eq("status", status);
-  const { data } = await q;
-  return (data as unknown as Order[]) ?? [];
+  if (s) q = applyOrderSearch(q, s);
+  const { data, count } = await q;
+  return { items: (data as unknown as Order[]) ?? [], total: count ?? 0 };
 }
 
 export async function adminStats(): Promise<{
@@ -660,25 +701,39 @@ export async function getVendorProductById(
 
 // ---- Vendor orders -----------------------------------------------------------
 
+export interface OrdersPage {
+  items: Order[];
+  total: number;
+}
+
 export async function getVendorOrders(
   vendorId = DEMO_VENDOR_ID,
-  status?: OrderStatus
-): Promise<Order[]> {
+  opts: { status?: OrderStatus; page?: number; pageSize?: number; search?: string } = {}
+): Promise<OrdersPage> {
+  const pageSize = opts.pageSize ?? 10;
+  const page = Math.max(1, opts.page ?? 1);
+  const search = opts.search?.trim();
+
   if (!isSupabaseConfigured) {
-    return status ? seedOrders.filter((o) => o.status === status) : seedOrders;
+    let list = opts.status ? seedOrders.filter((o) => o.status === opts.status) : seedOrders;
+    if (search) list = list.filter((o) => seedOrderMatch(o, search));
+    const start = (page - 1) * pageSize;
+    return { items: list.slice(start, start + pageSize), total: list.length };
   }
+
   const supabase = await createClient();
+  const from = (page - 1) * pageSize;
   let query = supabase
     .from("orders")
-    .select(
-      "id, buyer_name, buyer_initials, amount_minor, currency, status, gateway, created_at, fulfilment_status, shipping_name, shipping_phone, shipping_address, buyer_email, product:products(id, name, slug, price_minor, currency, product_type)"
-    )
+    .select(ORDER_SELECT, { count: "exact" })
     .eq("vendor_id", vendorId)
-    .order("created_at", { ascending: false });
-  if (status) query = query.eq("status", status);
-  const { data, error } = await query;
-  if (error || !data) return [];
-  return data as unknown as Order[];
+    .order("created_at", { ascending: false })
+    .range(from, from + pageSize - 1);
+  if (opts.status) query = query.eq("status", opts.status);
+  if (search) query = applyOrderSearch(query, search);
+  const { data, error, count } = await query;
+  if (error || !data) return { items: [], total: 0 };
+  return { items: data as unknown as Order[], total: count ?? 0 };
 }
 
 // ---- Payouts -----------------------------------------------------------------

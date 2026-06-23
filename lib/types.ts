@@ -113,6 +113,8 @@ export interface Order {
   shipping_phone?: string | null;
   shipping_address?: string | null;
   buyer_email?: string | null;
+  /** Payment processor reference (Paystack). */
+  reference?: string | null;
 }
 
 export interface DashboardMetrics {

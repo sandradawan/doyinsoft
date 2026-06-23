@@ -2,10 +2,12 @@ import { TrendingUp, TrendingDown } from "lucide-react";
 import { VendorShell } from "@/components/vendor-shell";
 import { StatusBadge } from "@/components/status-badge";
 import { BarChart, LineChart } from "@/components/charts";
+import { Pagination } from "@/components/pagination";
 import { VendorOnboarding } from "@/components/vendor-onboarding";
 import {
   getDashboardMetrics,
   getRecentOrders,
+  getVendorOrders,
   getVendorProducts,
   getVendorSubaccount,
   vendorMonthlyStats,
@@ -14,16 +16,41 @@ import {
 import { requireVendor } from "@/lib/auth";
 import { formatPrice } from "@/lib/format";
 
-export default async function VendorDashboardPage() {
+const ORDERS_PER_PAGE = 3;
+
+export default async function VendorDashboardPage({
+  searchParams,
+}: {
+  searchParams: Promise<{ q?: string; page?: string }>;
+}) {
   const vendor = await requireVendor();
-  const [metrics, orders, monthly, topProducts, products, subaccount] = await Promise.all([
-    getDashboardMetrics(vendor.id),
-    getRecentOrders(vendor.id),
-    vendorMonthlyStats(vendor.id),
-    vendorTopProducts(vendor.id),
-    getVendorProducts(vendor.id),
-    getVendorSubaccount(vendor.id),
-  ]);
+  const { q, page: pageParam } = await searchParams;
+  const query = q?.trim() ?? "";
+  const oPage = Math.max(1, Number(pageParam) || 1);
+
+  const [metrics, recent, monthly, topProducts, products, subaccount, orderPage] =
+    await Promise.all([
+      getDashboardMetrics(vendor.id),
+      getRecentOrders(vendor.id),
+      vendorMonthlyStats(vendor.id),
+      vendorTopProducts(vendor.id),
+      getVendorProducts(vendor.id),
+      getVendorSubaccount(vendor.id),
+      getVendorOrders(vendor.id, {
+        page: oPage,
+        pageSize: ORDERS_PER_PAGE,
+        search: query || undefined,
+      }),
+    ]);
+  const orders = orderPage.items;
+
+  const ordersHref = (p: number) => {
+    const params = new URLSearchParams();
+    if (query) params.set("q", query);
+    if (p > 1) params.set("page", String(p));
+    const s = params.toString();
+    return `/vendor/dashboard${s ? `?${s}` : ""}`;
+  };
 
   const last = monthly[monthly.length - 1]?.revenue_minor ?? 0;
   const prev = monthly[monthly.length - 2]?.revenue_minor ?? 0;
@@ -54,7 +81,7 @@ export default async function VendorDashboardPage() {
         whatsappDone={Boolean(vendor.whatsapp)}
         bankDone={subaccount.connected}
         productDone={products.length > 0}
-        saleDone={orders.some((o) => o.status === "paid")}
+        saleDone={recent.some((o) => o.status === "paid")}
       />
 
       {/* Metric cards */}
@@ -94,22 +121,50 @@ export default async function VendorDashboardPage() {
       </div>
 
       {/* Recent orders */}
-      <p className="text-[13px] font-medium m-0 mb-2">Recent orders</p>
-      <div>
-        {orders.map((order) => (
-          <div
-            key={order.id}
-            className="flex justify-between items-center py-2 border-t border-line text-[13px] gap-3"
-          >
-            <span className="flex-1 min-w-0 truncate">{order.product.name}</span>
-            <span className="text-ink-soft w-20 shrink-0">{order.buyer_name}</span>
-            <span className="w-20 text-right shrink-0">
-              {formatPrice(order.amount_minor, order.currency)}
-            </span>
-            <StatusBadge status={order.status} />
-          </div>
-        ))}
+      <div className="flex items-center justify-between mb-2">
+        <p className="text-[13px] font-medium m-0">Recent orders</p>
+        <a href="/vendor/orders" className="text-[12px] text-brand no-underline hover:underline">
+          View all →
+        </a>
       </div>
+      <form method="get" className="flex gap-2 mb-3 max-w-md">
+        <input
+          name="q"
+          defaultValue={query}
+          placeholder="Search email, reference or order ID…"
+          className="field flex-1"
+        />
+        <button className="btn-primary px-4 py-2">Search</button>
+      </form>
+      {orders.length === 0 ? (
+        <p className="text-[13px] text-ink-soft">
+          {query ? "No orders match your search." : "No orders yet."}
+        </p>
+      ) : (
+        <div>
+          {orders.map((order) => (
+            <div
+              key={order.id}
+              className="flex justify-between items-center py-2 border-t border-line text-[13px] gap-3"
+            >
+              <span className="flex-1 min-w-0 truncate">{order.product.name}</span>
+              <span className="text-ink-soft w-24 shrink-0 truncate">
+                {order.buyer_email || order.buyer_name}
+              </span>
+              <span className="w-20 text-right shrink-0">
+                {formatPrice(order.amount_minor, order.currency)}
+              </span>
+              <StatusBadge status={order.status} />
+            </div>
+          ))}
+        </div>
+      )}
+      <Pagination
+        page={oPage}
+        total={orderPage.total}
+        pageSize={ORDERS_PER_PAGE}
+        hrefForPage={ordersHref}
+      />
     </VendorShell>
   );
 }
