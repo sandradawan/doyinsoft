@@ -313,7 +313,7 @@ export async function sendTestEmail(): Promise<TestEmailState> {
         "Email is NOT configured in this environment. Set GMAIL_USER + GMAIL_APP_PASSWORD (or RESEND_API_KEY) in your deployment and redeploy.",
     };
   }
-  await sendEmail({
+  const res = await sendEmail({
     to: adminEmail,
     subject: "DoyinSoft — production email test ✅",
     html: emailLayout(
@@ -323,8 +323,11 @@ export async function sendTestEmail(): Promise<TestEmailState> {
       )
     ),
   });
-  await logAudit(adminEmail, "send_test_email", "email");
-  return { success: `Sent to ${adminEmail}. Check your inbox (and spam folder).` };
+  await logAudit(adminEmail, "send_test_email", "email", res.ok ? "ok" : res.error);
+  if (!res.ok) {
+    return { error: `Send failed (${res.via ?? "email"}): ${res.error ?? "unknown error"}` };
+  }
+  return { success: `Sent to ${adminEmail} via ${res.via}. Check your inbox (and spam folder).` };
 }
 
 // ---- Settings ----------------------------------------------------------------

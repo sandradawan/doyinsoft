@@ -14,59 +14,70 @@ const FROM =
 
 export const isEmailConfigured = Boolean((GMAIL_USER && GMAIL_PASS) || RESEND_KEY);
 
-let transporter: nodemailer.Transporter | null = null;
-function gmailTransport() {
-  if (!transporter) {
-    transporter = nodemailer.createTransport({
-      service: "gmail",
-      auth: { user: GMAIL_USER, pass: GMAIL_PASS },
-    });
-  }
-  return transporter;
+export interface SendResult {
+  ok: boolean;
+  via?: "gmail" | "resend";
+  error?: string;
 }
 
 /**
  * Send a transactional email. Uses Gmail SMTP when GMAIL_USER + GMAIL_APP_PASSWORD
- * are set, otherwise Resend, otherwise just logs. Fire-and-forget — never throws
- * into the caller.
+ * are set, otherwise Resend, otherwise logs. Never throws into the caller, but
+ * returns a result so the caller can surface failures (e.g. the admin test).
  */
 export async function sendEmail(opts: {
   to: string;
   subject: string;
   html: string;
-}): Promise<void> {
-  if (!opts.to) return;
+}): Promise<SendResult> {
+  if (!opts.to) return { ok: false, error: "No recipient." };
 
   // Gmail (note: Gmail rewrites the From address to the authenticated account).
   if (GMAIL_USER && GMAIL_PASS) {
     try {
-      await gmailTransport().sendMail({
+      // Fresh transport per send — avoids stale sockets on serverless.
+      const transport = nodemailer.createTransport({
+        host: "smtp.gmail.com",
+        port: 465,
+        secure: true,
+        auth: { user: GMAIL_USER, pass: GMAIL_PASS },
+        connectionTimeout: 15000,
+        greetingTimeout: 10000,
+        socketTimeout: 20000,
+      });
+      await transport.sendMail({
         from: FROM,
         to: opts.to,
         subject: opts.subject,
         html: opts.html,
       });
+      return { ok: true, via: "gmail" };
     } catch (e) {
-      console.error("sendEmail (gmail):", e);
+      const error = e instanceof Error ? e.message : String(e);
+      console.error("sendEmail (gmail):", error);
+      return { ok: false, via: "gmail", error };
     }
-    return;
   }
 
   // Resend
   if (RESEND_KEY) {
     try {
-      await fetch("https://api.resend.com/emails", {
+      const res = await fetch("https://api.resend.com/emails", {
         method: "POST",
         headers: { Authorization: `Bearer ${RESEND_KEY}`, "Content-Type": "application/json" },
         body: JSON.stringify({ from: FROM, to: opts.to, subject: opts.subject, html: opts.html }),
       });
+      if (!res.ok) return { ok: false, via: "resend", error: `Resend ${res.status}` };
+      return { ok: true, via: "resend" };
     } catch (e) {
-      console.error("sendEmail (resend):", e);
+      const error = e instanceof Error ? e.message : String(e);
+      console.error("sendEmail (resend):", error);
+      return { ok: false, via: "resend", error };
     }
-    return;
   }
 
   console.log(`[email skipped — none configured] to=${opts.to} subject="${opts.subject}"`);
+  return { ok: false, error: "Email not configured (no GMAIL_* or RESEND_API_KEY in this environment)." };
 }
 
 const SITE = process.env.NEXT_PUBLIC_SITE_URL ?? "https://doyinsoft.vercel.app";
