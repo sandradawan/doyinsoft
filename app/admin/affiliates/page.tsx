@@ -1,5 +1,6 @@
-import { adminAffiliatePayouts } from "@/lib/affiliate";
+import { adminAffiliatePayouts, AFFILIATE_PAYOUTS_PAGE_SIZE } from "@/lib/affiliate";
 import { formatPrice } from "@/lib/format";
+import { Pagination } from "@/components/pagination";
 import { markAffiliatePaid } from "../actions";
 
 function shortDate(iso: string): string {
@@ -7,17 +8,41 @@ function shortDate(iso: string): string {
   return new Date(iso).toLocaleDateString("en-NG", { day: "2-digit", month: "short" });
 }
 
-export default async function AdminAffiliatesPage() {
-  const payouts = await adminAffiliatePayouts();
+export default async function AdminAffiliatesPage({
+  searchParams,
+}: {
+  searchParams: Promise<{ q?: string; page?: string }>;
+}) {
+  const { q, page: pageParam } = await searchParams;
+  const query = q?.trim() ?? "";
+  const page = Math.max(1, Number(pageParam) || 1);
+  const { items: payouts, total } = await adminAffiliatePayouts(page, query || undefined);
   const pending = payouts.filter((p) => p.status === "requested");
+
+  const hrefForPage = (p: number) => {
+    const params = new URLSearchParams();
+    if (query) params.set("q", query);
+    if (p > 1) params.set("page", String(p));
+    const s = params.toString();
+    return `/admin/affiliates${s ? `?${s}` : ""}`;
+  };
 
   return (
     <div>
       <h1 className="text-[22px] font-medium m-0 mb-1">Affiliate payouts</h1>
-      <p className="text-[13px] text-ink-soft m-0 mb-5">
-        {pending.length} pending request{pending.length === 1 ? "" : "s"}. Send the transfer to the
-        bank shown, then mark it paid.
+      <p className="text-[13px] text-ink-soft m-0 mb-4">
+        {pending.length} pending on this page. Send the transfer to the bank shown, then mark it paid.
       </p>
+
+      <form method="get" className="flex gap-2 mb-4 max-w-md">
+        <input
+          name="q"
+          defaultValue={query}
+          placeholder="Search affiliate code or email…"
+          className="field flex-1"
+        />
+        <button className="btn-primary px-4 py-2">Search</button>
+      </form>
 
       {payouts.length === 0 ? (
         <p className="text-[13px] text-ink-soft">No payout requests yet.</p>
@@ -51,6 +76,13 @@ export default async function AdminAffiliatesPage() {
           ))}
         </div>
       )}
+
+      <Pagination
+        page={page}
+        total={total}
+        pageSize={AFFILIATE_PAYOUTS_PAGE_SIZE}
+        hrefForPage={hrefForPage}
+      />
     </div>
   );
 }

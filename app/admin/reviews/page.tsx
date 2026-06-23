@@ -1,5 +1,6 @@
 import { Stars } from "@/components/stars";
-import { adminReviews } from "@/lib/data";
+import { Pagination } from "@/components/pagination";
+import { ADMIN_PAGE_SIZE, adminReviews } from "@/lib/data";
 import { deleteReview } from "../actions";
 
 function shortDate(iso: string): string {
@@ -7,12 +8,37 @@ function shortDate(iso: string): string {
   return new Date(iso).toLocaleDateString("en-NG", { day: "2-digit", month: "short", year: "numeric" });
 }
 
-export default async function AdminReviewsPage() {
-  const reviews = await adminReviews();
+export default async function AdminReviewsPage({
+  searchParams,
+}: {
+  searchParams: Promise<{ q?: string; page?: string }>;
+}) {
+  const { q, page: pageParam } = await searchParams;
+  const query = q?.trim() ?? "";
+  const page = Math.max(1, Number(pageParam) || 1);
+  const { items: reviews, total } = await adminReviews(page, query || undefined);
+
+  const hrefForPage = (p: number) => {
+    const params = new URLSearchParams();
+    if (query) params.set("q", query);
+    if (p > 1) params.set("page", String(p));
+    const s = params.toString();
+    return `/admin/reviews${s ? `?${s}` : ""}`;
+  };
 
   return (
     <div>
       <h1 className="text-[22px] font-medium m-0 mb-4">Reviews</h1>
+
+      <form method="get" className="flex gap-2 mb-4 max-w-md">
+        <input
+          name="q"
+          defaultValue={query}
+          placeholder="Search reviewer or text…"
+          className="field flex-1"
+        />
+        <button className="btn-primary px-4 py-2">Search</button>
+      </form>
 
       {reviews.length === 0 ? (
         <p className="text-[13px] text-ink-soft">No reviews yet.</p>
@@ -39,6 +65,8 @@ export default async function AdminReviewsPage() {
           ))}
         </div>
       )}
+
+      <Pagination page={page} total={total} pageSize={ADMIN_PAGE_SIZE} hrefForPage={hrefForPage} />
     </div>
   );
 }

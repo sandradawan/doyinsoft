@@ -42,6 +42,22 @@ export async function getOrCreateAffiliate(
   return null;
 }
 
+/** Referral earnings credited today. */
+export async function getAffiliateToday(
+  affiliateId: string
+): Promise<{ earned_minor: number; count: number }> {
+  if (!hasServiceRole) return { earned_minor: 0, count: 0 };
+  const d = new Date();
+  d.setHours(0, 0, 0, 0);
+  const { data } = await createAdminClient()
+    .from("referrals")
+    .select("amount_minor")
+    .eq("affiliate_id", affiliateId)
+    .gte("created_at", d.toISOString());
+  const rows = (data as { amount_minor: number }[]) ?? [];
+  return { earned_minor: rows.reduce((t, r) => t + (r.amount_minor || 0), 0), count: rows.length };
+}
+
 export async function getAffiliateStats(affiliateId: string): Promise<AffiliateStats | null> {
   if (!hasServiceRole) return { code: "demo1234", earned_minor: 0, referrals: 0 };
   const admin = createAdminClient();
@@ -176,8 +192,13 @@ export interface AdminAffiliatePayout extends AffiliatePayout {
   bank_code: string | null;
 }
 
-export async function adminAffiliatePayouts(): Promise<AdminAffiliatePayout[]> {
-  if (!hasServiceRole) return [];
+export const AFFILIATE_PAYOUTS_PAGE_SIZE = 4;
+
+export async function adminAffiliatePayouts(
+  page = 1,
+  search?: string
+): Promise<{ items: AdminAffiliatePayout[]; total: number }> {
+  if (!hasServiceRole) return { items: [], total: 0 };
   const admin = createAdminClient();
   const { data } = await admin
     .from("affiliate_payouts")
@@ -185,8 +206,8 @@ export async function adminAffiliatePayouts(): Promise<AdminAffiliatePayout[]> {
       "id, amount_minor, status, created_at, paid_at, affiliate:affiliates(code, email, account_name, account_number, bank_code)"
     )
     .order("created_at", { ascending: false })
-    .limit(100);
-  return (
+    .limit(500);
+  const mappedAll = (
     (data as (AffiliatePayout & {
       affiliate:
         | { code: string; email: string | null; account_name: string | null; account_number: string | null; bank_code: string | null }
@@ -208,6 +229,16 @@ export async function adminAffiliatePayouts(): Promise<AdminAffiliatePayout[]> {
       bank_code: a?.bank_code ?? null,
     };
   });
+
+  const q = search?.trim().toLowerCase();
+  const filtered = q
+    ? mappedAll.filter((p) => `${p.code} ${p.email ?? ""}`.toLowerCase().includes(q))
+    : mappedAll;
+  const start = (page - 1) * AFFILIATE_PAYOUTS_PAGE_SIZE;
+  return {
+    items: filtered.slice(start, start + AFFILIATE_PAYOUTS_PAGE_SIZE),
+    total: filtered.length,
+  };
 }
 
 export async function markAffiliatePayoutPaid(id: string): Promise<void> {

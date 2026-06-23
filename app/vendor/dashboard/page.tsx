@@ -11,6 +11,7 @@ import {
   getVendorProducts,
   getVendorSubaccount,
   vendorMonthlyStats,
+  vendorTodayStats,
   vendorTopProducts,
 } from "@/lib/data";
 import { requireVendor } from "@/lib/auth";
@@ -28,7 +29,7 @@ export default async function VendorDashboardPage({
   const query = q?.trim() ?? "";
   const oPage = Math.max(1, Number(pageParam) || 1);
 
-  const [metrics, recent, monthly, topProducts, products, subaccount, orderPage] =
+  const [metrics, recent, monthly, topProducts, products, subaccount, today, orderPage] =
     await Promise.all([
       getDashboardMetrics(vendor.id),
       getRecentOrders(vendor.id),
@@ -36,6 +37,7 @@ export default async function VendorDashboardPage({
       vendorTopProducts(vendor.id),
       getVendorProducts(vendor.id),
       getVendorSubaccount(vendor.id),
+      vendorTodayStats(vendor.id),
       getVendorOrders(vendor.id, {
         page: oPage,
         pageSize: ORDERS_PER_PAGE,
@@ -57,6 +59,12 @@ export default async function VendorDashboardPage({
   const growth = prev === 0 ? (last > 0 ? 100 : 0) : Math.round(((last - prev) / prev) * 100);
 
   const cards = [
+    {
+      label: "Sales today",
+      value: formatPrice(today.revenue_minor, metrics.currency),
+      sub: `${today.count} order${today.count === 1 ? "" : "s"}`,
+      highlight: true,
+    },
     { label: "Revenue (30d)", value: formatPrice(metrics.revenue_minor, metrics.currency) },
     { label: "Units sold", value: String(metrics.units_sold) },
     { label: "Pending payout", value: formatPrice(metrics.pending_payout_minor, metrics.currency) },
@@ -85,11 +93,21 @@ export default async function VendorDashboardPage({
       />
 
       {/* Metric cards */}
-      <div className="grid [grid-template-columns:repeat(3,1fr)] gap-3 mb-4">
+      <div className="grid [grid-template-columns:repeat(auto-fit,minmax(140px,1fr))] gap-3 mb-4">
         {cards.map((c) => (
-          <div key={c.label} className="bg-muted rounded-md p-4">
-            <p className="text-[13px] text-ink-soft m-0 mb-[6px]">{c.label}</p>
-            <p className="text-[22px] font-medium m-0">{c.value}</p>
+          <div
+            key={c.label}
+            className={`rounded-md p-4 ${c.highlight ? "bg-brand-tint" : "bg-muted"}`}
+          >
+            <p className={`text-[13px] m-0 mb-[6px] ${c.highlight ? "text-brand" : "text-ink-soft"}`}>
+              {c.label}
+            </p>
+            <p
+              className={`text-[22px] font-medium m-0 ${c.highlight ? "text-brand" : "text-ink"}`}
+            >
+              {c.value}
+            </p>
+            {c.sub && <p className="text-[11px] text-ink-faint m-0 mt-1">{c.sub}</p>}
           </div>
         ))}
       </div>

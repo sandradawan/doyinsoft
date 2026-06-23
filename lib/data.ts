@@ -319,6 +319,27 @@ export async function getRecentOrders(vendorId = DEMO_VENDOR_ID): Promise<Order[
   return (data as unknown as Order[]) ?? [];
 }
 
+function startOfTodayISO(): string {
+  const d = new Date();
+  d.setHours(0, 0, 0, 0);
+  return d.toISOString();
+}
+
+/** Paid sales for this vendor since midnight (today). */
+export async function vendorTodayStats(
+  vendorId = DEMO_VENDOR_ID
+): Promise<{ revenue_minor: number; count: number }> {
+  if (!hasServiceRole) return { revenue_minor: 0, count: 0 };
+  const { data } = await createAdminClient()
+    .from("orders")
+    .select("amount_minor")
+    .eq("vendor_id", vendorId)
+    .eq("status", "paid")
+    .gte("created_at", startOfTodayISO());
+  const rows = (data as { amount_minor: number }[]) ?? [];
+  return { revenue_minor: rows.reduce((t, r) => t + (r.amount_minor || 0), 0), count: rows.length };
+}
+
 export async function getDashboardMetrics(
   vendorId = DEMO_VENDOR_ID
 ): Promise<DashboardMetrics> {
@@ -537,20 +558,32 @@ export interface AdminReview extends Review {
   product_name: string;
 }
 
-export async function adminReviews(limit = 100): Promise<AdminReview[]> {
+export async function adminReviews(
+  page = 1,
+  search?: string
+): Promise<{ items: AdminReview[]; total: number }> {
+  const q = search?.trim().toLowerCase();
   if (!hasServiceRole) {
-    return seedReviews.map((r) => ({
+    let all = seedReviews.map((r) => ({
       ...r,
       product_name: seedProducts.find((p) => p.id === r.product_id)?.name ?? "—",
     }));
+    if (q) all = all.filter((r) => `${r.author_name} ${r.body}`.toLowerCase().includes(q));
+    const start = (page - 1) * ADMIN_PAGE_SIZE;
+    return { items: all.slice(start, start + ADMIN_PAGE_SIZE), total: all.length };
   }
   const admin = createAdminClient();
-  const { data } = await admin
+  const from = (page - 1) * ADMIN_PAGE_SIZE;
+  let query = admin
     .from("reviews")
-    .select("id, product_id, author_name, rating, body, created_at, product:products(name)")
+    .select("id, product_id, author_name, rating, body, created_at, product:products(name)", {
+      count: "exact",
+    })
     .order("created_at", { ascending: false })
-    .limit(limit);
-  return (
+    .range(from, from + ADMIN_PAGE_SIZE - 1);
+  if (q) query = query.or(`author_name.ilike.%${q}%,body.ilike.%${q}%`);
+  const { data, count } = await query;
+  const items = (
     (data as (Review & { product: { name: string } | { name: string }[] | null })[]) ?? []
   ).map((r) => {
     const p = Array.isArray(r.product) ? r.product[0] : r.product;
@@ -564,6 +597,7 @@ export async function adminReviews(limit = 100): Promise<AdminReview[]> {
       product_name: p?.name ?? "—",
     };
   });
+  return { items, total: count ?? 0 };
 }
 
 export const ADMIN_ORDERS_PAGE_SIZE = 4;

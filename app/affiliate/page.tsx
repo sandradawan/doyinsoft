@@ -7,6 +7,7 @@ import {
   getAffiliateBank,
   getAffiliatePayouts,
   getAffiliateStats,
+  getAffiliateToday,
   getOrCreateAffiliate,
 } from "@/lib/affiliate";
 import { getSettings } from "@/lib/settings";
@@ -25,13 +26,14 @@ export default async function AffiliatePage() {
   const user = await requireUser();
   const affiliate = await getOrCreateAffiliate(user.id, user.email);
 
-  const [stats, settings, balance, bank, payouts, banks] = await Promise.all([
+  const [stats, settings, balance, bank, payouts, banks, today] = await Promise.all([
     affiliate ? getAffiliateStats(affiliate.id) : null,
     getSettings(),
     affiliate ? getAffiliateBalance(affiliate.id) : null,
     affiliate ? getAffiliateBank(affiliate.id) : null,
     affiliate ? getAffiliatePayouts(affiliate.id) : [],
     listPaystackBanks(),
+    affiliate ? getAffiliateToday(affiliate.id) : { earned_minor: 0, count: 0 },
   ]);
 
   const code = affiliate?.code ?? "";
@@ -53,7 +55,12 @@ export default async function AffiliatePage() {
         <span className="font-medium text-ink">{settings.affiliate_percent}%</span> of the sale.
       </p>
 
-      <div className="grid grid-cols-3 gap-3 mb-6">
+      <div className="grid [grid-template-columns:repeat(auto-fit,minmax(130px,1fr))] gap-3 mb-6">
+        <div className="bg-brand-tint rounded-md p-4">
+          <p className="text-[12px] text-brand m-0 mb-[6px]">Earned today</p>
+          <p className="text-[20px] font-medium text-brand m-0">{formatPrice(today.earned_minor, "NGN")}</p>
+          <p className="text-[11px] text-ink-faint m-0 mt-1">{today.count} sale{today.count === 1 ? "" : "s"}</p>
+        </div>
         <div className="bg-muted rounded-md p-4">
           <p className="text-[12px] text-ink-soft m-0 mb-[6px]">Available</p>
           <p className="text-[20px] font-medium m-0">{formatPrice(available, "NGN")}</p>
