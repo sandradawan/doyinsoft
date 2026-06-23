@@ -52,6 +52,30 @@ export async function toggleFollow(
   return true;
 }
 
+export interface FollowedVendor {
+  id: string;
+  slug: string;
+  name: string;
+  initials: string;
+  verified: boolean;
+}
+
+/** Vendors a user follows. */
+export async function getFollowedVendors(userId: string): Promise<FollowedVendor[]> {
+  if (!hasServiceRole) return [];
+  try {
+    const { data } = await createAdminClient()
+      .from("follows")
+      .select("vendor:vendors(id, slug, name, initials, verified)")
+      .eq("user_id", userId);
+    return ((data as { vendor: FollowedVendor | FollowedVendor[] | null }[]) ?? [])
+      .map((r) => (Array.isArray(r.vendor) ? r.vendor[0] : r.vendor))
+      .filter((v): v is FollowedVendor => Boolean(v));
+  } catch {
+    return [];
+  }
+}
+
 /** Emails of everyone following a vendor (for new-product notifications). */
 export async function vendorFollowerEmails(vendorId: string): Promise<string[]> {
   if (!hasServiceRole) return [];

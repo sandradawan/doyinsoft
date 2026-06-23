@@ -621,6 +621,24 @@ export async function getVendorProducts(vendorId = DEMO_VENDOR_ID): Promise<Prod
   return (data as unknown as ProductRow[]).map(mapProduct);
 }
 
+/** Recent approved products from a set of vendors (for the Following feed). */
+export async function getProductsByVendorIds(ids: string[], limit = 12): Promise<Product[]> {
+  if (ids.length === 0) return [];
+  if (!isSupabaseConfigured) {
+    return seedProducts.filter((p) => ids.includes(p.vendor.id) && p.status === "approved");
+  }
+  const supabase = await createClient();
+  const { data, error } = await supabase
+    .from("products")
+    .select(PRODUCT_SELECT)
+    .in("vendor_id", ids)
+    .eq("status", "approved")
+    .order("launched_at", { ascending: false, nullsFirst: false })
+    .limit(limit);
+  if (error || !data) return [];
+  return (data as unknown as ProductRow[]).map(mapProduct).filter((p) => !p.vendor.suspended);
+}
+
 /** Load one of the vendor's products by id, enforcing ownership. */
 export async function getVendorProductById(
   id: string,
