@@ -356,9 +356,11 @@ create table if not exists gift_cards (
   recipient_email    text,
   message            text,
   purchase_reference text,
+  design             text not null default 'classic',
   expires_at         timestamptz,
   created_at         timestamptz not null default now()
 );
+alter table gift_cards add column if not exists design text not null default 'classic';
 alter table gift_cards enable row level security;
 create index if not exists gift_cards_code_idx on gift_cards (code);
 create unique index if not exists gift_cards_purchase_ref_idx

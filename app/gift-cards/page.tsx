@@ -4,7 +4,7 @@ import { BuyGiftForm, CheckBalanceForm } from "./buy-form";
 
 export const metadata = {
   title: "Gift cards — DoyinMart",
-  description: "Buy a DoyinMart gift card and let someone shop any store. Redeem at checkout.",
+  description: "Buy a beautiful DoyinMart gift card for any occasion. Redeem at checkout, any store.",
 };
 
 export default function GiftCardsPage() {
@@ -18,31 +18,30 @@ export default function GiftCardsPage() {
         </span>
         <h1 className="text-[26px] font-medium m-0">Gift cards</h1>
       </div>
-      <p className="text-[15px] text-ink-soft m-0 mb-6 max-w-xl">
-        Give the gift of choice. A DoyinMart gift card works at checkout across any store — software,
-        digital goods, fashion and more. Spend it over multiple orders until the balance runs out.
+      <p className="text-[15px] text-ink-soft m-0 mb-7 max-w-2xl">
+        Give the gift of choice. Pick a design for the occasion, set any amount, and we’ll deliver a
+        beautiful card by email. It works at checkout across any store and can be spent over multiple
+        orders until the balance runs out.
       </p>
 
-      <div className="grid gap-10 md:grid-cols-[minmax(0,1fr)_280px]">
+      <BuyGiftForm />
+
+      {/* Check balance + how it works */}
+      <div className="grid gap-8 md:grid-cols-2 mt-12 pt-8 border-t border-line">
         <div>
-          <h2 className="text-[16px] font-medium m-0 mb-3">Buy a gift card</h2>
-          <BuyGiftForm />
-        </div>
-
-        <aside>
-          <h2 className="text-[16px] font-medium m-0 mb-3">Check a balance</h2>
+          <h2 className="text-[16px] font-medium m-0 mb-2">Check a balance</h2>
+          <p className="text-[13px] text-ink-soft m-0 mb-3">Enter a code to see what’s left on it.</p>
           <CheckBalanceForm />
-
-          <div className="mt-8 text-[13px] text-ink-soft leading-relaxed">
-            <p className="font-medium text-ink mb-1">How it works</p>
-            <ol className="list-decimal pl-4 space-y-1 m-0">
-              <li>Buy a card and pay with Paystack.</li>
-              <li>The code is emailed instantly.</li>
-              <li>At checkout, enter it in the <span className="text-ink">Gift card</span> field.</li>
-              <li>It covers part or all of the order — pay any remainder by card.</li>
-            </ol>
-          </div>
-        </aside>
+        </div>
+        <div className="text-[13px] text-ink-soft leading-relaxed">
+          <p className="font-medium text-ink mb-1">How it works</p>
+          <ol className="list-decimal pl-4 space-y-1 m-0">
+            <li>Choose a design and amount, then pay with Paystack.</li>
+            <li>The code is emailed instantly — to your recipient or to you.</li>
+            <li>At checkout, enter it in the <span className="text-ink">Gift card</span> field.</li>
+            <li>It covers part or all of the order — pay any remainder by card.</li>
+          </ol>
+        </div>
       </div>
     </div>
   );

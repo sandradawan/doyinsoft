@@ -1,7 +1,9 @@
 import Link from "next/link";
-import { Gift, X } from "lucide-react";
+import { X } from "lucide-react";
 import { verifyPaystackPayment, isPaystackConfigured } from "@/lib/paystack";
 import { issueGiftCardFromPayment } from "@/lib/giftcards";
+import { giftDesign } from "@/lib/gift-designs";
+import { GiftCardVisual } from "@/components/gift-card-visual";
 import { formatPrice } from "@/lib/format";
 
 export const metadata = { title: "Gift card — DoyinMart" };
@@ -16,10 +18,12 @@ export default async function GiftCardSuccessPage({
 
   let code: string | null = null;
   let amountMinor = 0;
+  let designKey = "classic";
   if (isPaystackConfigured && ref) {
     const v = await verifyPaystackPayment(ref);
     if (v.ok && v.metadata?.kind === "giftcard") {
       amountMinor = v.amountMinor ?? 0;
+      designKey = (v.metadata?.design as string) || "classic";
       // Issue using the amount ACTUALLY paid (idempotent on the reference).
       code = await issueGiftCardFromPayment({
         reference: ref,
@@ -27,6 +31,7 @@ export default async function GiftCardSuccessPage({
         purchaserEmail: (v.metadata?.purchaser_email as string) || v.email,
         recipientEmail: (v.metadata?.recipient_email as string) || undefined,
         message: (v.metadata?.message as string) || undefined,
+        design: designKey,
       });
     }
   }
@@ -51,16 +56,13 @@ export default async function GiftCardSuccessPage({
 
   return (
     <main className="max-w-[460px] mx-auto px-5 py-10">
-      <div className="w-9 h-9 rounded-full bg-success-bg flex items-center justify-center mb-3">
-        <Gift size={17} className="text-success" />
-      </div>
       <h1 className="text-[22px] font-medium m-0 mb-1">Gift card ready 🎁</h1>
       <p className="text-[14px] text-ink-soft m-0 mb-5">
-        Your {formatPrice(amountMinor, "NGN")} gift card has been issued and emailed. Here’s the code:
+        Your {formatPrice(amountMinor, "NGN")} gift card has been issued and emailed. Here it is:
       </p>
 
-      <div className="border border-line rounded-md p-4 bg-muted text-center font-mono text-[18px] font-semibold tracking-wide mb-5 break-all">
-        {code}
+      <div className="max-w-[320px] mb-5">
+        <GiftCardVisual design={giftDesign(designKey)} amountLabel={formatPrice(amountMinor, "NGN")} code={code} />
       </div>
 
       <p className="text-[13px] text-ink-faint mb-6">

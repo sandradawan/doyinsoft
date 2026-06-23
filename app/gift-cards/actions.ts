@@ -2,6 +2,7 @@
 
 import { redirect } from "next/navigation";
 import { GIFT_MIN_MINOR, GIFT_MAX_MINOR, validateGiftCard } from "@/lib/giftcards";
+import { giftDesign } from "@/lib/gift-designs";
 import { formatPrice } from "@/lib/format";
 import { checkRateLimit, clientId } from "@/lib/ratelimit";
 
@@ -28,6 +29,7 @@ export async function buyGiftCard(
   const buyerEmail = String(formData.get("buyer_email") ?? "").trim();
   const recipientEmail = String(formData.get("recipient_email") ?? "").trim();
   const message = String(formData.get("message") ?? "").trim().slice(0, 200);
+  const design = giftDesign(String(formData.get("design") ?? "")).key; // validated to a known key
 
   if (!EMAIL_RE.test(buyerEmail)) return { error: "Enter a valid email for your receipt." };
   if (recipientEmail && !EMAIL_RE.test(recipientEmail))
@@ -58,6 +60,7 @@ export async function buyGiftCard(
           recipient_email: recipientEmail || null,
           message: message || null,
           purchaser_email: buyerEmail,
+          design,
         },
       }),
     });

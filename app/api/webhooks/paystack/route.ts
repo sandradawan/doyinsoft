@@ -51,6 +51,7 @@ export async function POST(request: Request) {
           purchaserEmail: (v.metadata?.purchaser_email as string) || v.email,
           recipientEmail: (v.metadata?.recipient_email as string) || undefined,
           message: (v.metadata?.message as string) || undefined,
+          design: (v.metadata?.design as string) || undefined,
         });
       }
     } else if (orderId && reference) {
@@ -98,6 +99,7 @@ interface PaystackEvent {
       recipient_email?: string | null;
       message?: string | null;
       purchaser_email?: string | null;
+      design?: string | null;
     };
   };
 }

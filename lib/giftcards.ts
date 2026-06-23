@@ -4,6 +4,7 @@ import { createAdminClient } from "./supabase/admin";
 import { hasServiceRole } from "./supabase/env";
 import { sendEmail, emailLayout, emailText, emailKeyBox, emailButton, esc, subjectSafe } from "./email";
 import { formatPrice } from "./format";
+import { giftDesign, giftGradient } from "./gift-designs";
 
 const SITE_URL = process.env.NEXT_PUBLIC_SITE_URL ?? "http://localhost:3000";
 
@@ -80,6 +81,7 @@ export async function issueGiftCardFromPayment(opts: {
   purchaserEmail?: string;
   recipientEmail?: string;
   message?: string;
+  design?: string;
 }): Promise<string | null> {
   if (!hasServiceRole || !opts.reference || opts.amountMinor <= 0) return null;
   const admin = createAdminClient();
@@ -107,6 +109,7 @@ export async function issueGiftCardFromPayment(opts: {
         purchaser_email: opts.purchaserEmail ?? null,
         recipient_email: recipient || null,
         message: opts.message ?? null,
+        design: giftDesign(opts.design).key,
         purchase_reference: opts.reference,
       })
       .select("code")
@@ -131,15 +134,26 @@ export async function issueGiftCardFromPayment(opts: {
 
   if (recipient) {
     const amountStr = formatPrice(opts.amountMinor, "NGN");
-    const note = opts.message
-      ? emailText(`“${esc(opts.message)}”`)
-      : "";
+    const d = giftDesign(opts.design);
+    const note = opts.message ? emailText(`“${esc(opts.message)}”`) : "";
+    // A themed gift-card "face" rendered with inline styles (email-safe).
+    const cardFace = `<table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="margin:0 0 18px;">
+      <tr><td style="background:${giftGradient(d)};border-radius:16px;padding:22px 20px;color:#ffffff;">
+        <table role="presentation" width="100%"><tr>
+          <td style="font-size:14px;font-weight:700;color:#ffffff;">DoyinMart</td>
+          <td style="text-align:right;font-size:22px;">${d.emoji}</td>
+        </tr></table>
+        <p style="margin:18px 0 0;font-size:11px;letter-spacing:1px;text-transform:uppercase;color:rgba(255,255,255,0.75);">${esc(d.label)} gift card</p>
+        <p style="margin:2px 0 0;font-size:30px;font-weight:700;color:#ffffff;">${amountStr}</p>
+      </td></tr>
+    </table>`;
     await sendEmail({
       to: recipient,
-      subject: subjectSafe(`🎁 You’ve received a ${amountStr} DoyinMart gift card`),
+      subject: subjectSafe(`${d.emoji} You’ve received a ${amountStr} DoyinMart gift card`),
       html: emailLayout(
         "You’ve got a gift card 🎁",
-        `${emailText(`Someone sent you a <strong style="color:#171717">${amountStr}</strong> DoyinMart gift card. Use this code at checkout:`)}
+        `${cardFace}
+         ${emailText("Use this code at checkout:")}
          ${emailKeyBox(code)}
          ${note}
          <div style="margin:22px 0;">${emailButton(`${SITE_URL}/`, "Start shopping")}</div>
