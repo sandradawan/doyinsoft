@@ -1,4 +1,4 @@
-import { adminListGiftCards, adminGiftCardLiability } from "@/lib/giftcards";
+import { adminListGiftCards, adminGiftCardLiability, adminGiftCardRedeemed } from "@/lib/giftcards";
 import { formatPrice } from "@/lib/format";
 import { toggleGiftCard } from "./actions";
 
@@ -14,7 +14,11 @@ const BADGE: Record<string, string> = {
 };
 
 export default async function AdminGiftCardsPage() {
-  const [cards, liability] = await Promise.all([adminListGiftCards(100), adminGiftCardLiability()]);
+  const [cards, liability, redeemed] = await Promise.all([
+    adminListGiftCards(100),
+    adminGiftCardLiability(),
+    adminGiftCardRedeemed(),
+  ]);
   const issued = cards.reduce((t, c) => t + c.initial_minor, 0);
 
   return (
@@ -32,6 +36,11 @@ export default async function AdminGiftCardsPage() {
         <div className="bg-muted rounded-lg p-5">
           <p className="text-[14px] text-ink-soft m-0 mb-2">Total issued</p>
           <p className="text-[26px] font-medium m-0 leading-none">{formatPrice(issued, "NGN")}</p>
+        </div>
+        <div className="bg-muted rounded-lg p-5">
+          <p className="text-[14px] text-ink-soft m-0 mb-2">Redeemed at stores</p>
+          <p className="text-[26px] font-medium m-0 leading-none">{formatPrice(redeemed, "NGN")}</p>
+          <p className="text-[11px] text-ink-faint m-0 mt-1.5">owed to vendors from the float</p>
         </div>
         <div className="bg-muted rounded-lg p-5">
           <p className="text-[14px] text-ink-soft m-0 mb-2">Cards</p>

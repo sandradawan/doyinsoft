@@ -211,6 +211,22 @@ export async function adminGiftCardLiability(): Promise<number> {
   return ((data as { balance_minor: number }[]) ?? []).reduce((t, r) => t + (r.balance_minor || 0), 0);
 }
 
+/**
+ * Total gift-card value already spent at stores (sum of gift_card_minor on paid
+ * orders). This is the platform's settlement obligation to vendors — it collected
+ * the cash at card-purchase time, and Paystack's split only routed the
+ * card-charged remainder, so this amount is owed to vendors out of the float.
+ */
+export async function adminGiftCardRedeemed(): Promise<number> {
+  if (!hasServiceRole) return 0;
+  const { data } = await createAdminClient()
+    .from("orders")
+    .select("gift_card_minor")
+    .eq("status", "paid")
+    .gt("gift_card_minor", 0);
+  return ((data as { gift_card_minor: number }[]) ?? []).reduce((t, r) => t + (r.gift_card_minor || 0), 0);
+}
+
 /** Cards a person bought or received (for the account page). Masks the full code. */
 export async function getGiftCardsForEmail(email: string): Promise<GiftCard[]> {
   // Reject anything with PostgREST filter-grammar chars (defense-in-depth).
