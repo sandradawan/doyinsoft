@@ -303,10 +303,14 @@ export async function processPaymentByReference(
   }
 
   // Verify the amount actually paid covers the Paystack portion (order total minus
-  // any gift card) — never issue on an underpaid / mismatched transaction.
+  // any gift card) — never issue on an underpaid / mismatched transaction. Fail
+  // closed if the order can't be loaded.
   const ord = await getOrderAmount(v.orderId);
-  const due = ord ? ord.amount_minor - (ord.gift_card_minor ?? 0) : 0;
-  if (ord && (v.amountMinor ?? 0) < due) {
+  if (!ord) {
+    return { error: "No matching order found for this reference. Not issuing." };
+  }
+  const due = ord.amount_minor - (ord.gift_card_minor ?? 0);
+  if ((v.amountMinor ?? 0) < due) {
     return {
       error: `Paid amount (${(v.amountMinor ?? 0) / 100}) is less than what was due (${due / 100}). Not issuing.`,
     };
