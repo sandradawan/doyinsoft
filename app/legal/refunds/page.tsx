@@ -35,7 +35,7 @@ export default function RefundsPage() {
 
       <h2>4. How to request a refund</h2>
       <p>
-        Email <a href="mailto:support@doyinsoft.com">support@doyinsoft.com</a> with your order
+        Email <a href="mailto:support@doyinmart.com">support@doyinmart.com</a> with your order
         reference and the reason. We review requests fairly, in line with this policy and Nigerian
         consumer-protection law.
       </p>

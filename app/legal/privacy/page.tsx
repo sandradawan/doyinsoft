@@ -59,7 +59,7 @@ export default function PrivacyPage() {
       <h2>7. Your rights</h2>
       <p>
         You may access, correct, export or delete your data, and object to certain processing. Email{" "}
-        <a href="mailto:privacy@doyinsoft.com">privacy@doyinsoft.com</a> and we will respond within a
+        <a href="mailto:privacy@doyinmart.com">privacy@doyinmart.com</a> and we will respond within a
         reasonable time.
       </p>
 
@@ -71,7 +71,7 @@ export default function PrivacyPage() {
 
       <h2>9. Contact</h2>
       <p>
-        Privacy questions: <a href="mailto:privacy@doyinsoft.com">privacy@doyinsoft.com</a>.
+        Privacy questions: <a href="mailto:privacy@doyinmart.com">privacy@doyinmart.com</a>.
       </p>
 
       <p style={{ marginTop: 24, fontSize: 11, color: "var(--text-tertiary)" }}>

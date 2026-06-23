@@ -37,7 +37,7 @@ export default function AcceptableUsePage() {
       <p>
         We may remove content, withhold payouts, suspend or ban accounts, and report unlawful activity
         to the authorities. Report violations to{" "}
-        <a href="mailto:abuse@doyinsoft.com">abuse@doyinsoft.com</a>.
+        <a href="mailto:abuse@doyinmart.com">abuse@doyinmart.com</a>.
       </p>
 
       <p style={{ marginTop: 24, fontSize: 11, color: "var(--text-tertiary)" }}>

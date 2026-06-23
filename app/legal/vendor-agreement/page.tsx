@@ -67,7 +67,7 @@ export default function VendorAgreementPage() {
 
       <h2>9. Contact</h2>
       <p>
-        <a href="mailto:vendors@doyinsoft.com">vendors@doyinsoft.com</a>.
+        <a href="mailto:vendors@doyinmart.com">vendors@doyinmart.com</a>.
       </p>
 
       <p style={{ marginTop: 24, fontSize: 11, color: "var(--text-tertiary)" }}>

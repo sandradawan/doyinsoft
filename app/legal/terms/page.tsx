@@ -84,7 +84,7 @@ export default function TermsPage() {
 
       <h2>11. Contact</h2>
       <p>
-        Questions? Email <a href="mailto:support@doyinsoft.com">support@doyinsoft.com</a>.
+        Questions? Email <a href="mailto:support@doyinmart.com">support@doyinmart.com</a>.
       </p>
 
       <p style={{ marginTop: 24, fontSize: 11, color: "var(--text-tertiary)" }}>
