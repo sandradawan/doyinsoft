@@ -110,7 +110,7 @@ class _StoreCard extends StatelessWidget {
                   : _gradientBanner(context),
             ),
             Transform.translate(
-              offset: const Offset(12, -16),
+              offset: const Offset(12, -14),
               child: CircleAvatar(
                 radius: 16,
                 backgroundColor: brand.surface,
@@ -122,46 +122,48 @@ class _StoreCard extends StatelessWidget {
                 ),
               ),
             ),
-            Padding(
-              padding: const EdgeInsets.fromLTRB(12, 0, 12, 12),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Row(children: [
-                    Flexible(
-                      child: Text(store.name,
-                          maxLines: 1,
-                          overflow: TextOverflow.ellipsis,
-                          style: const TextStyle(fontWeight: FontWeight.w700, fontSize: 15)),
-                    ),
-                    if (store.verified)
-                      const Padding(
-                        padding: EdgeInsets.only(left: 4),
-                        child: Icon(Icons.verified, size: 14, color: Colors.green),
+            Expanded(
+              child: Padding(
+                padding: const EdgeInsets.fromLTRB(12, 0, 12, 12),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Row(children: [
+                      Flexible(
+                        child: Text(store.name,
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                            style: const TextStyle(fontWeight: FontWeight.w700, fontSize: 15)),
                       ),
-                  ]),
-                  const SizedBox(height: 4),
-                  Expanded(
-                    child: Text(
-                      (store.bio != null && store.bio!.isNotEmpty)
-                          ? store.bio!
-                          : 'Independent seller on DoyinMart.',
-                      maxLines: 2,
-                      overflow: TextOverflow.ellipsis,
-                      style: TextStyle(fontSize: 12, color: brand.inkSoft, height: 1.3),
+                      if (store.verified)
+                        const Padding(
+                          padding: EdgeInsets.only(left: 4),
+                          child: Icon(Icons.verified, size: 14, color: Colors.green),
+                        ),
+                    ]),
+                    const SizedBox(height: 4),
+                    Expanded(
+                      child: Text(
+                        (store.bio != null && store.bio!.isNotEmpty)
+                            ? store.bio!
+                            : 'Independent seller on DoyinMart.',
+                        maxLines: 2,
+                        overflow: TextOverflow.ellipsis,
+                        style: TextStyle(fontSize: 12, color: brand.inkSoft, height: 1.3),
+                      ),
                     ),
-                  ),
-                  const SizedBox(height: 6),
-                  Row(children: [
-                    Icon(Icons.inventory_2_outlined, size: 13, color: brand.inkSoft),
-                    const SizedBox(width: 4),
-                    Text('${store.products} products',
-                        style: TextStyle(fontSize: 11, color: brand.inkSoft)),
-                    const Spacer(),
-                    Text('${store.downloads}+',
-                        style: TextStyle(fontSize: 11, color: brand.brand, fontWeight: FontWeight.w600)),
-                  ]),
-                ],
+                    const SizedBox(height: 6),
+                    Row(children: [
+                      Icon(Icons.inventory_2_outlined, size: 13, color: brand.inkSoft),
+                      const SizedBox(width: 4),
+                      Text('${store.products} products',
+                          style: TextStyle(fontSize: 11, color: brand.inkSoft)),
+                      const Spacer(),
+                      Text('${store.downloads}+',
+                          style: TextStyle(fontSize: 11, color: brand.brand, fontWeight: FontWeight.w600)),
+                    ]),
+                  ],
+                ),
               ),
             ),
           ],
