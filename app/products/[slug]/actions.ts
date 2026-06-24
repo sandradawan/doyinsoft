@@ -6,11 +6,20 @@ import { createAdminClient } from "@/lib/supabase/admin";
 import { hasServiceRole, isSupabaseConfigured } from "@/lib/supabase/env";
 import { getCurrentUser } from "@/lib/auth";
 import { hasPurchased } from "@/lib/data";
+import { toggleWishlist } from "@/lib/wishlist";
 import { checkRateLimit, clientId, isBot } from "@/lib/ratelimit";
 
 export interface ReviewState {
   error?: string;
   success?: string;
+}
+
+/** Toggle saving a product to the wishlist. Returns the new state. */
+export async function toggleSave(productId: string): Promise<{ saved?: boolean; error?: string }> {
+  const user = await getCurrentUser();
+  if (!user) return { error: "Please sign in to save items." };
+  const saved = await toggleWishlist(user.id, productId);
+  return { saved };
 }
 
 export async function addReview(

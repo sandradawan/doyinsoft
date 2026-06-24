@@ -3,9 +3,10 @@ import { BadgeCheck, Download } from "lucide-react";
 import { Logo } from "@/components/logo";
 import { ProductCard } from "@/components/product-card";
 import { requireUser, getCurrentVendor } from "@/lib/auth";
-import { getLicensesByEmail, getProductsByVendorIds } from "@/lib/data";
+import { getLicensesByEmail, getProductsByVendorIds, getOrdersByEmail } from "@/lib/data";
 import { getFollowedVendors } from "@/lib/follows";
 import { getGiftCardsForEmail } from "@/lib/giftcards";
+import { getWishlistProducts } from "@/lib/wishlist";
 import { formatPrice } from "@/lib/format";
 
 export const metadata = { title: "Your account — DoyinMart" };
@@ -17,13 +18,25 @@ const GIFT_BADGE: Record<string, string> = {
   expired: "bg-muted text-ink-faint",
 };
 
+const ORDER_BADGE: Record<string, string> = {
+  paid: "bg-success-bg text-success",
+  pending: "bg-info-bg text-info",
+  refunded: "bg-muted text-ink-soft",
+};
+
+function shortDate(iso: string): string {
+  return iso ? new Date(iso).toLocaleDateString("en-NG", { day: "2-digit", month: "short", year: "numeric" }) : "";
+}
+
 export default async function AccountPage() {
   const user = await requireUser("/account");
-  const [licenses, vendor, followed, giftCards] = await Promise.all([
+  const [licenses, vendor, followed, giftCards, orders, saved] = await Promise.all([
     getLicensesByEmail(user.email),
     getCurrentVendor(),
     getFollowedVendors(user.id),
     getGiftCardsForEmail(user.email),
+    getOrdersByEmail(user.email),
+    getWishlistProducts(user.id),
   ]);
   const followingFeed = await getProductsByVendorIds(followed.map((v) => v.id), 8);
 
@@ -120,6 +133,40 @@ export default async function AccountPage() {
           <p className="text-[11px] text-ink-faint mt-2 mb-0">
             Enter a code in the “Gift card” field at checkout to spend the balance.
           </p>
+        </div>
+      )}
+
+      {/* Orders */}
+      {orders.length > 0 && (
+        <div className="mb-8">
+          <p className="text-[13px] font-medium m-0 mb-2">Your orders</p>
+          {orders.map((o) => (
+            <div
+              key={o.id}
+              className="flex items-center gap-3 py-2 border-t border-line text-[13px]"
+            >
+              <span className="w-20 shrink-0 text-ink-faint text-[11px]">{shortDate(o.created_at)}</span>
+              <span className="flex-1 min-w-0 truncate">{o.product_name}</span>
+              <span className="w-20 text-right shrink-0">{formatPrice(o.amount_minor, o.currency)}</span>
+              <span
+                className={`text-[11px] px-2 py-[2px] rounded-md w-16 text-center shrink-0 ${ORDER_BADGE[o.status] ?? "bg-muted text-ink-soft"}`}
+              >
+                {o.status}
+              </span>
+            </div>
+          ))}
+        </div>
+      )}
+
+      {/* Saved / wishlist */}
+      {saved.length > 0 && (
+        <div className="mb-8">
+          <p className="text-[13px] font-medium m-0 mb-2">Saved items</p>
+          <section className="grid gap-3" style={{ gridTemplateColumns: "repeat(auto-fit, minmax(150px, 1fr))" }}>
+            {saved.map((p) => (
+              <ProductCard key={p.id} product={p} />
+            ))}
+          </section>
         </div>
       )}
 

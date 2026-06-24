@@ -821,6 +821,19 @@ export async function getProductsByVendorIds(ids: string[], limit = 12): Promise
   return (data as unknown as ProductRow[]).map(mapProduct).filter((p) => !p.vendor.suspended);
 }
 
+/** Load approved products by id (preserves the given order). Used by wishlist. */
+export async function getProductsByIds(ids: string[]): Promise<Product[]> {
+  if (ids.length === 0 || !isSupabaseConfigured) {
+    return ids.map((id) => seedProducts.find((p) => p.id === id)).filter((p): p is Product => Boolean(p));
+  }
+  const supabase = await createClient();
+  const { data } = await supabase.from("products").select(PRODUCT_SELECT).in("id", ids).eq("status", "approved");
+  const byId = new Map(
+    ((data as unknown as ProductRow[]) ?? []).map(mapProduct).filter((p) => !p.vendor.suspended).map((p) => [p.id, p])
+  );
+  return ids.map((id) => byId.get(id)).filter((p): p is Product => Boolean(p));
+}
+
 /** Load one of the vendor's products by id, enforcing ownership. */
 export async function getVendorProductById(
   id: string,
@@ -1161,6 +1174,57 @@ export async function markOrderPaid(orderId: string, reference?: string): Promis
       .then(() => undefined, () => undefined);
   }
   return true;
+}
+
+export interface BuyerOrder {
+  id: string;
+  product_name: string;
+  product_slug: string;
+  amount_minor: number;
+  currency: "NGN" | "USD";
+  status: string;
+  fulfilment_status: string | null;
+  created_at: string;
+  license_key: string | null;
+}
+
+/** A buyer's full order history (digital + physical) by email. Service-role. */
+export async function getOrdersByEmail(email: string): Promise<BuyerOrder[]> {
+  if (!hasServiceRole || !email) return [];
+  const { data } = await createAdminClient()
+    .from("orders")
+    .select(
+      "id, amount_minor, currency, status, fulfilment_status, created_at, product:products(name, slug), license:licenses(key)"
+    )
+    .eq("buyer_email", email)
+    .order("created_at", { ascending: false })
+    .limit(100);
+
+  type Row = {
+    id: string;
+    amount_minor: number;
+    currency: "NGN" | "USD";
+    status: string;
+    fulfilment_status: string | null;
+    created_at: string;
+    product: { name: string; slug: string } | { name: string; slug: string }[] | null;
+    license: { key: string }[] | { key: string } | null;
+  };
+  return ((data as Row[]) ?? []).map((r) => {
+    const p = Array.isArray(r.product) ? r.product[0] : r.product;
+    const l = Array.isArray(r.license) ? r.license[0] : r.license;
+    return {
+      id: r.id,
+      product_name: p?.name ?? "Order",
+      product_slug: p?.slug ?? "",
+      amount_minor: r.amount_minor,
+      currency: r.currency,
+      status: r.status,
+      fulfilment_status: r.fulfilment_status,
+      created_at: r.created_at,
+      license_key: l?.key ?? null,
+    };
+  });
 }
 
 /** Has this email got an active license for the product? (verified-purchase) */

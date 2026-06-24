@@ -3,9 +3,11 @@ import Link from "next/link";
 import { notFound } from "next/navigation";
 import { getProductBySlug, getProducts, getReviews, hasPurchased } from "@/lib/data";
 import { getCurrentUser } from "@/lib/auth";
+import { isWishlisted } from "@/lib/wishlist";
 import { ProductCard } from "@/components/product-card";
 import { Stars } from "@/components/stars";
 import { WhatsAppButton } from "@/components/whatsapp-button";
+import { SaveButton } from "@/components/save-button";
 import { formatBytes, formatPrice } from "@/lib/format";
 import { ReviewForm } from "./review-form";
 
@@ -62,7 +64,10 @@ export default async function ProductDetailPage({
     getCurrentUser(),
   ]);
   const relatedProducts = related.filter((p) => p.id !== product.id).slice(0, 4);
-  const canReview = user ? await hasPurchased(product.id, user.email) : false;
+  const [canReview, saved] = await Promise.all([
+    user ? hasPurchased(product.id, user.email) : Promise.resolve(false),
+    user ? isWishlisted(user.id, product.id) : Promise.resolve(false),
+  ]);
 
   return (
     <main className="max-w-5xl mx-auto px-5 py-6">
@@ -212,16 +217,19 @@ export default async function ProductDetailPage({
                   ? "Shipped to your address after payment"
                   : "The seller will reach out to fulfil your request"}
             </p>
-            <Link
-              href={`/checkout/new?product=${product.slug}`}
-              className="btn-primary block w-full text-center py-[10px] no-underline"
-            >
-              {product.product_type === "digital"
-                ? "Buy license"
-                : product.product_type === "service"
-                  ? "Book now"
-                  : "Buy now"}
-            </Link>
+            <div className="flex gap-2">
+              <Link
+                href={`/checkout/new?product=${product.slug}`}
+                className="btn-primary flex-1 text-center py-[10px] no-underline"
+              >
+                {product.product_type === "digital"
+                  ? "Buy license"
+                  : product.product_type === "service"
+                    ? "Book now"
+                    : "Buy now"}
+              </Link>
+              <SaveButton productId={product.id} initialSaved={saved} />
+            </div>
             <div className="flex gap-[6px] mt-3 flex-wrap">
               {product.os_badges.map((badge) => (
                 <span
