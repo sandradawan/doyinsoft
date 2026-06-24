@@ -1,5 +1,6 @@
 import { getLicensesByEmail } from "@/lib/data";
 import { getGiftCardsForEmail } from "@/lib/giftcards";
+import { getFollowedVendors } from "@/lib/follows";
 import { json, preflight, getMobileUser } from "@/lib/mobile/api";
 
 export const dynamic = "force-dynamic";
@@ -14,13 +15,20 @@ export async function GET(request: Request) {
   const user = await getMobileUser(request);
   if (!user) return json({ error: "Unauthorized" }, 401);
 
-  const [licenses, giftCards] = await Promise.all([
+  const [licenses, giftCards, following] = await Promise.all([
     getLicensesByEmail(user.email),
     getGiftCardsForEmail(user.email),
+    getFollowedVendors(user.id),
   ]);
 
   return json({
     user: { id: user.id, email: user.email },
+    following: following.map((v) => ({
+      slug: v.slug,
+      name: v.name,
+      initials: v.initials,
+      verified: v.verified,
+    })),
     licenses: licenses.map((l) => ({
       key: l.key,
       status: l.status,

@@ -1,10 +1,9 @@
 import 'package:flutter/material.dart';
-import 'package:cached_network_image/cached_network_image.dart';
 
 import '../api.dart';
 import '../models.dart';
 import '../theme.dart';
-import 'product_screen.dart';
+import '../widgets/product_card.dart';
 
 class HomeScreen extends StatefulWidget {
   const HomeScreen({super.key});
@@ -12,9 +11,17 @@ class HomeScreen extends StatefulWidget {
   State<HomeScreen> createState() => _HomeScreenState();
 }
 
+const _types = [
+  (label: 'All', value: null),
+  (label: 'Software', value: 'digital'),
+  (label: 'Physical', value: 'physical'),
+  (label: 'Services', value: 'service'),
+];
+
 class _HomeScreenState extends State<HomeScreen> {
   late Future<List<Product>> _future;
   String _q = '';
+  String? _type;
 
   @override
   void initState() {
@@ -22,11 +29,13 @@ class _HomeScreenState extends State<HomeScreen> {
     _future = Api.instance.catalog();
   }
 
+  void _reload() {
+    setState(() => _future = Api.instance.catalog(q: _q, type: _type));
+  }
+
   void _search(String q) {
-    setState(() {
-      _q = q;
-      _future = Api.instance.catalog(q: q);
-    });
+    _q = q;
+    _reload();
   }
 
   @override
@@ -41,13 +50,35 @@ class _HomeScreenState extends State<HomeScreen> {
       body: Column(
         children: [
           Padding(
-            padding: const EdgeInsets.fromLTRB(16, 4, 16, 12),
+            padding: const EdgeInsets.fromLTRB(16, 4, 16, 8),
             child: TextField(
               decoration: const InputDecoration(hintText: 'Search products…', prefixIcon: Icon(Icons.search)),
               textInputAction: TextInputAction.search,
               onSubmitted: _search,
             ),
           ),
+          SizedBox(
+            height: 38,
+            child: ListView(
+              scrollDirection: Axis.horizontal,
+              padding: const EdgeInsets.symmetric(horizontal: 12),
+              children: _types.map((t) {
+                final selected = _type == t.value;
+                return Padding(
+                  padding: const EdgeInsets.symmetric(horizontal: 4),
+                  child: ChoiceChip(
+                    label: Text(t.label),
+                    selected: selected,
+                    onSelected: (_) {
+                      _type = t.value;
+                      _reload();
+                    },
+                  ),
+                );
+              }).toList(),
+            ),
+          ),
+          const SizedBox(height: 6),
           Expanded(
             child: FutureBuilder<List<Product>>(
               future: _future,
@@ -73,70 +104,13 @@ class _HomeScreenState extends State<HomeScreen> {
                       mainAxisSpacing: 12,
                     ),
                     itemCount: items.length,
-                    itemBuilder: (context, i) => _ProductCard(product: items[i]),
+                    itemBuilder: (context, i) => ProductCard(product: items[i]),
                   ),
                 );
               },
             ),
           ),
         ],
-      ),
-    );
-  }
-}
-
-class _ProductCard extends StatelessWidget {
-  final Product product;
-  const _ProductCard({required this.product});
-
-  @override
-  Widget build(BuildContext context) {
-    return InkWell(
-      borderRadius: BorderRadius.circular(12),
-      onTap: () => Navigator.push(
-        context,
-        MaterialPageRoute(builder: (_) => ProductScreen(slug: product.slug)),
-      ),
-      child: Container(
-        decoration: BoxDecoration(
-          color: context.brand.surface,
-          borderRadius: BorderRadius.circular(12),
-          border: Border.all(color: context.brand.line),
-        ),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Expanded(
-              child: ClipRRect(
-                borderRadius: const BorderRadius.vertical(top: Radius.circular(11)),
-                child: product.iconUrl != null
-                    ? CachedNetworkImage(
-                        imageUrl: product.iconUrl!,
-                        fit: BoxFit.cover,
-                        width: double.infinity,
-                        errorWidget: (_, __, ___) => const ColoredBox(color: Colors.black12),
-                      )
-                    : const ColoredBox(color: Colors.black12, child: Center(child: Icon(Icons.image_outlined))),
-              ),
-            ),
-            Padding(
-              padding: const EdgeInsets.all(10),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(product.name, maxLines: 1, overflow: TextOverflow.ellipsis,
-                      style: const TextStyle(fontWeight: FontWeight.w600, fontSize: 14)),
-                  const SizedBox(height: 2),
-                  Text(product.vendor.name, maxLines: 1, overflow: TextOverflow.ellipsis,
-                      style: TextStyle(fontSize: 12, color: context.brand.inkSoft)),
-                  const SizedBox(height: 6),
-                  Text(naira(product.priceMinor),
-                      style: TextStyle(fontWeight: FontWeight.w700, color: context.brand.brand)),
-                ],
-              ),
-            ),
-          ],
-        ),
       ),
     );
   }

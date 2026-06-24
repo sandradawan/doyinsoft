@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import '../api.dart';
 import '../models.dart';
 import '../theme.dart';
+import 'store_screen.dart';
 
 class StoresScreen extends StatefulWidget {
   const StoresScreen({super.key});
@@ -35,6 +36,11 @@ class _StoresScreenState extends State<StoresScreen> {
                 final s = stores[i];
                 return ListTile(
                   contentPadding: EdgeInsets.zero,
+                  onTap: () => Navigator.push(
+                    context,
+                    MaterialPageRoute(builder: (_) => StoreScreen(slug: s.slug, name: s.name)),
+                  ),
+                  trailing: const Icon(Icons.chevron_right, size: 18),
                   leading: CircleAvatar(
                     backgroundColor: Brand.tintDark,
                     child: Text(s.initials, style: TextStyle(color: context.brand.brand, fontWeight: FontWeight.w600)),

@@ -52,13 +52,24 @@ class Api {
     return ((body['stores'] ?? []) as List).map((s) => Store.fromJson(s)).toList();
   }
 
-  Future<({List<License> licenses, List<GiftCard> giftCards})> me() async {
+  Future<({Map<String, dynamic> store, List<Product> products})> storeDetail(String slug) async {
+    final res = await http.get(_u('/stores/$slug'));
+    if (res.statusCode != 200) throw Exception('Store not found');
+    final body = jsonDecode(res.body) as Map<String, dynamic>;
+    return (
+      store: Map<String, dynamic>.from(body['store'] ?? {}),
+      products: ((body['products'] ?? []) as List).map((p) => Product.fromJson(p)).toList(),
+    );
+  }
+
+  Future<({List<License> licenses, List<GiftCard> giftCards, List<Store> following})> me() async {
     final res = await http.get(_u('/me'), headers: _authHeaders());
     if (res.statusCode == 401) throw Exception('Please sign in.');
     final body = jsonDecode(res.body) as Map<String, dynamic>;
     return (
       licenses: ((body['licenses'] ?? []) as List).map((l) => License.fromJson(l)).toList(),
       giftCards: ((body['gift_cards'] ?? []) as List).map((g) => GiftCard.fromJson(g)).toList(),
+      following: ((body['following'] ?? []) as List).map((s) => Store.fromJson(s)).toList(),
     );
   }
 
