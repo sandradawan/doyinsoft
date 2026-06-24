@@ -62,6 +62,42 @@ class Api {
     );
   }
 
+  /// Post a verified-purchase review. Returns (ok, message).
+  Future<({bool ok, String message})> postReview({
+    required String productId,
+    required int rating,
+    required String body,
+    String? authorName,
+  }) async {
+    final res = await http.post(
+      _u('/reviews'),
+      headers: _authHeaders(),
+      body: jsonEncode({
+        'product_id': productId,
+        'rating': rating,
+        'body': body,
+        if (authorName != null) 'author_name': authorName,
+      }),
+    );
+    final json_ = jsonDecode(res.body) as Map<String, dynamic>;
+    if (res.statusCode == 200 && json_['ok'] == true) {
+      return (ok: true, message: 'Thanks — your review has been posted.');
+    }
+    return (ok: false, message: json_['error'] ?? 'Could not post review.');
+  }
+
+  /// Toggle following a store. Returns the new following state.
+  Future<bool> toggleFollow(String vendorSlug) async {
+    final res = await http.post(
+      _u('/follow'),
+      headers: _authHeaders(),
+      body: jsonEncode({'vendor_slug': vendorSlug}),
+    );
+    if (res.statusCode != 200) throw Exception('Please sign in to follow stores.');
+    final json_ = jsonDecode(res.body) as Map<String, dynamic>;
+    return json_['following'] == true;
+  }
+
   /// Returns (ok, message). On success the message is the formatted balance.
   Future<({bool ok, String message})> giftBalance(String code) async {
     final res = await http.post(

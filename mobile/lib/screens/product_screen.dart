@@ -6,6 +6,52 @@ import '../models.dart';
 import '../theme.dart';
 import 'checkout_webview.dart';
 
+/// Simple rating + comment dialog. Returns (rating, body) or null on cancel.
+class _ReviewDialog extends StatefulWidget {
+  const _ReviewDialog();
+  @override
+  State<_ReviewDialog> createState() => _ReviewDialogState();
+}
+
+class _ReviewDialogState extends State<_ReviewDialog> {
+  int _rating = 5;
+  final _body = TextEditingController();
+
+  @override
+  Widget build(BuildContext context) {
+    return AlertDialog(
+      title: const Text('Write a review'),
+      content: Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Row(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: List.generate(5, (i) {
+              final filled = i < _rating;
+              return IconButton(
+                onPressed: () => setState(() => _rating = i + 1),
+                icon: Icon(filled ? Icons.star : Icons.star_border, color: Colors.amber),
+              );
+            }),
+          ),
+          TextField(
+            controller: _body,
+            maxLines: 3,
+            decoration: const InputDecoration(hintText: 'Share your experience (optional)'),
+          ),
+        ],
+      ),
+      actions: [
+        TextButton(onPressed: () => Navigator.pop(context), child: const Text('Cancel')),
+        ElevatedButton(
+          onPressed: () => Navigator.pop(context, (rating: _rating, body: _body.text.trim())),
+          child: const Text('Post'),
+        ),
+      ],
+    );
+  }
+}
+
 class ProductScreen extends StatefulWidget {
   final String slug;
   const ProductScreen({super.key, required this.slug});
@@ -20,6 +66,34 @@ class _ProductScreenState extends State<ProductScreen> {
   void initState() {
     super.initState();
     _future = Api.instance.product(widget.slug);
+  }
+
+  void _snack(String msg) {
+    if (mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(msg)));
+  }
+
+  Future<void> _follow(String vendorSlug) async {
+    try {
+      final following = await Api.instance.toggleFollow(vendorSlug);
+      _snack(following ? 'Following this store' : 'Unfollowed');
+    } catch (e) {
+      _snack('$e'.replaceFirst('Exception: ', ''));
+    }
+  }
+
+  Future<void> _review(String productId) async {
+    final result = await showDialog<({int rating, String body})>(
+      context: context,
+      builder: (_) => const _ReviewDialog(),
+    );
+    if (result == null) return;
+    final res = await Api.instance.postReview(
+      productId: productId,
+      rating: result.rating,
+      body: result.body,
+    );
+    _snack(res.message);
+    if (res.ok) setState(() => _future = Api.instance.product(widget.slug));
   }
 
   @override
@@ -62,6 +136,20 @@ class _ProductScreenState extends State<ProductScreen> {
                     const SizedBox(width: 4),
                     Text('${p['rating_avg']} (${p['rating_count']})'),
                   ]),
+              ]),
+              const SizedBox(height: 14),
+              Row(children: [
+                OutlinedButton.icon(
+                  onPressed: () => _follow(p['vendor']?['slug'] ?? ''),
+                  icon: const Icon(Icons.add, size: 18),
+                  label: const Text('Follow store'),
+                ),
+                const SizedBox(width: 8),
+                OutlinedButton.icon(
+                  onPressed: () => _review(p['id'] ?? ''),
+                  icon: const Icon(Icons.rate_review_outlined, size: 18),
+                  label: const Text('Review'),
+                ),
               ]),
               const SizedBox(height: 16),
               if ((p['description'] ?? '').toString().isNotEmpty) ...[
