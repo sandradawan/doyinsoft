@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import '../api.dart';
 import '../models.dart';
 import '../theme.dart';
+import '../widgets/skeletons.dart';
 import 'store_screen.dart';
 
 const _pageSize = 6; // 2-col grid → 3 rows per page
@@ -47,7 +48,7 @@ class _StoresScreenState extends State<StoresScreen> {
               future: _future,
               builder: (context, snap) {
                 if (snap.connectionState == ConnectionState.waiting) {
-                  return const Center(child: CircularProgressIndicator());
+                  return const GridSkeleton(count: 6, aspect: 0.92);
                 }
                 if (snap.hasError) {
                   return Center(child: Text('Couldn\'t load stores.\n${snap.error}', textAlign: TextAlign.center));

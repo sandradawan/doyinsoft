@@ -16,6 +16,7 @@ dependencies:
   intl: ^0.19.0                   # ₦ formatting
   url_launcher: ^6.2.6            # open download links externally
   shared_preferences: ^2.2.3      # persist the theme choice
+  shimmer: ^3.0.0                 # skeleton loaders
   cupertino_icons: ^1.0.6
 
 dev_dependencies:

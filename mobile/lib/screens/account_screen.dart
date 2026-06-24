@@ -9,6 +9,8 @@ import '../theme.dart';
 import '../theme_controller.dart';
 import 'sign_in_screen.dart';
 import 'store_screen.dart';
+import 'orders_screen.dart';
+import 'wishlist_screen.dart';
 import 'checkout_webview.dart';
 
 class AccountScreen extends StatefulWidget {
@@ -103,6 +105,26 @@ class _AccountScreenState extends State<AccountScreen> {
       );
 
   Widget _muted(String text) => Text(text, style: TextStyle(color: context.brand.inkSoft));
+
+  Widget _quickTile(IconData icon, String label, VoidCallback onTap) => InkWell(
+        borderRadius: BorderRadius.circular(14),
+        onTap: onTap,
+        child: Container(
+          padding: const EdgeInsets.symmetric(vertical: 16),
+          decoration: BoxDecoration(
+            color: context.brand.surface,
+            borderRadius: BorderRadius.circular(14),
+            border: Border.all(color: context.brand.line),
+          ),
+          child: Column(
+            children: [
+              Icon(icon, color: context.brand.brand),
+              const SizedBox(height: 6),
+              Text(label, style: const TextStyle(fontWeight: FontWeight.w600)),
+            ],
+          ),
+        ),
+      );
 
   // Facebook-style following row: circular store avatars with names.
   Widget _followingRow(List<Store> following) {
@@ -216,7 +238,15 @@ class _AccountScreenState extends State<AccountScreen> {
               Center(child: _avatar(email)),
               const SizedBox(height: 12),
               Center(child: Text(email, style: const TextStyle(fontWeight: FontWeight.w600, fontSize: 15))),
-              const SizedBox(height: 24),
+              const SizedBox(height: 20),
+
+              // Quick access: Orders + Saved
+              Row(children: [
+                Expanded(child: _quickTile(Icons.receipt_long_outlined, 'Orders', () => Navigator.push(context, MaterialPageRoute(builder: (_) => const OrdersScreen())))),
+                const SizedBox(width: 12),
+                Expanded(child: _quickTile(Icons.favorite_border, 'Saved', () => Navigator.push(context, MaterialPageRoute(builder: (_) => const WishlistScreen())))),
+              ]),
+              const SizedBox(height: 16),
 
               if (snap.connectionState == ConnectionState.waiting)
                 const Padding(padding: EdgeInsets.all(24), child: Center(child: CircularProgressIndicator()))

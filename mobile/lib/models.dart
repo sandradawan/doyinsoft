@@ -96,6 +96,34 @@ class Store {
       );
 }
 
+class OrderItem {
+  final String id, productName, productSlug, status, currency, createdAt;
+  final String? fulfilmentStatus, downloadUrl;
+  final int amountMinor;
+  OrderItem({
+    required this.id,
+    required this.productName,
+    required this.productSlug,
+    required this.status,
+    required this.currency,
+    required this.createdAt,
+    required this.amountMinor,
+    this.fulfilmentStatus,
+    this.downloadUrl,
+  });
+  factory OrderItem.fromJson(Map<String, dynamic> j) => OrderItem(
+        id: j['id'] ?? '',
+        productName: j['product_name'] ?? 'Order',
+        productSlug: j['product_slug'] ?? '',
+        status: j['status'] ?? '',
+        currency: j['currency'] ?? 'NGN',
+        createdAt: j['created_at'] ?? '',
+        amountMinor: j['amount_minor'] ?? 0,
+        fulfilmentStatus: j['fulfilment_status'],
+        downloadUrl: j['download_url'],
+      );
+}
+
 class License {
   final String key, status, downloadUrl;
   final String productName, productVersion;

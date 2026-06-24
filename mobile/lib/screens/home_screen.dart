@@ -5,6 +5,7 @@ import '../models.dart';
 import '../theme.dart';
 import '../widgets/product_card.dart';
 import '../widgets/featured_carousel.dart';
+import '../widgets/skeletons.dart';
 
 const _types = [
   (label: 'All', value: null),
@@ -103,7 +104,7 @@ class _HomeScreenState extends State<HomeScreen> {
         future: _future,
         builder: (context, snap) {
           if (snap.connectionState == ConnectionState.waiting) {
-            return const Center(child: CircularProgressIndicator());
+            return const GridSkeleton(count: 8);
           }
           if (snap.hasError) {
             return _ErrorView(error: '${snap.error}', onRetry: _reload);

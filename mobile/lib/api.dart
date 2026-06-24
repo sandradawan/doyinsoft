@@ -82,6 +82,32 @@ class Api {
     );
   }
 
+  Future<List<OrderItem>> orders() async {
+    final res = await http.get(_u('/orders'), headers: _authHeaders());
+    if (res.statusCode == 401) throw Exception('Please sign in.');
+    final body = jsonDecode(res.body) as Map<String, dynamic>;
+    return ((body['orders'] ?? []) as List).map((o) => OrderItem.fromJson(o)).toList();
+  }
+
+  Future<List<Product>> wishlist() async {
+    final res = await http.get(_u('/wishlist'), headers: _authHeaders());
+    if (res.statusCode == 401) throw Exception('Please sign in.');
+    final body = jsonDecode(res.body) as Map<String, dynamic>;
+    return ((body['products'] ?? []) as List).map((p) => Product.fromJson(p)).toList();
+  }
+
+  /// Toggle saving a product. Returns the new saved state.
+  Future<bool> toggleSave(String productId) async {
+    final res = await http.post(
+      _u('/wishlist'),
+      headers: _authHeaders(),
+      body: jsonEncode({'product_id': productId}),
+    );
+    if (res.statusCode != 200) throw Exception('Please sign in to save items.');
+    final body = jsonDecode(res.body) as Map<String, dynamic>;
+    return body['saved'] == true;
+  }
+
   /// Post a verified-purchase review. Returns (ok, message).
   Future<({bool ok, String message})> postReview({
     required String productId,

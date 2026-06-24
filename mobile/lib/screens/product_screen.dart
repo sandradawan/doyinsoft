@@ -144,6 +144,8 @@ class ProductScreen extends StatefulWidget {
 
 class _ProductScreenState extends State<ProductScreen> {
   late Future<ProductDetail> _future;
+  bool _saved = false;
+  bool _saveBusy = false;
 
   @override
   void initState() {
@@ -153,6 +155,19 @@ class _ProductScreenState extends State<ProductScreen> {
 
   void _snack(String msg) {
     if (mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(msg)));
+  }
+
+  Future<void> _save(String productId) async {
+    setState(() => _saveBusy = true);
+    try {
+      final saved = await Api.instance.toggleSave(productId);
+      setState(() => _saved = saved);
+      _snack(saved ? 'Saved to your list' : 'Removed from saved');
+    } catch (e) {
+      _snack('$e'.replaceFirst('Exception: ', ''));
+    } finally {
+      if (mounted) setState(() => _saveBusy = false);
+    }
   }
 
   Future<void> _follow(String vendorSlug) async {
@@ -220,16 +235,30 @@ class _ProductScreenState extends State<ProductScreen> {
               ]),
               const SizedBox(height: 14),
               Row(children: [
-                OutlinedButton.icon(
-                  onPressed: () => _follow(p['vendor']?['slug'] ?? ''),
-                  icon: const Icon(Icons.add, size: 18),
-                  label: const Text('Follow store'),
+                Expanded(
+                  child: OutlinedButton.icon(
+                    onPressed: () => _follow(p['vendor']?['slug'] ?? ''),
+                    icon: const Icon(Icons.add, size: 18),
+                    label: const Text('Follow'),
+                  ),
                 ),
                 const SizedBox(width: 8),
-                OutlinedButton.icon(
-                  onPressed: () => _review(p['id'] ?? ''),
-                  icon: const Icon(Icons.rate_review_outlined, size: 18),
-                  label: const Text('Review'),
+                Expanded(
+                  child: OutlinedButton.icon(
+                    onPressed: () => _review(p['id'] ?? ''),
+                    icon: const Icon(Icons.rate_review_outlined, size: 18),
+                    label: const Text('Review'),
+                  ),
+                ),
+                const SizedBox(width: 8),
+                OutlinedButton(
+                  onPressed: _saveBusy ? null : () => _save(p['id'] ?? ''),
+                  style: OutlinedButton.styleFrom(
+                    minimumSize: const Size(48, 44),
+                    padding: EdgeInsets.zero,
+                    foregroundColor: _saved ? context.brand.brand : null,
+                  ),
+                  child: Icon(_saved ? Icons.favorite : Icons.favorite_border, size: 20),
                 ),
               ]),
               const SizedBox(height: 16),
