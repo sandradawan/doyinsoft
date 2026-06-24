@@ -54,11 +54,20 @@ class Api {
 
   Future<({Map<String, dynamic> store, List<Product> products})> storeDetail(String slug) async {
     final res = await http.get(_u('/stores/$slug'));
-    if (res.statusCode != 200) throw Exception('Store not found');
-    final body = jsonDecode(res.body) as Map<String, dynamic>;
+    if (res.statusCode == 200) {
+      final body = jsonDecode(res.body) as Map<String, dynamic>;
+      return (
+        store: Map<String, dynamic>.from(body['store'] ?? {}),
+        products: ((body['products'] ?? []) as List).map((p) => Product.fromJson(p)).toList(),
+      );
+    }
+    // Fallback (detail endpoint not deployed yet): filter the catalog client-side.
+    final all = await catalog();
+    final products = all.where((p) => p.vendor.slug == slug).toList();
+    final v = products.isNotEmpty ? products.first.vendor : null;
     return (
-      store: Map<String, dynamic>.from(body['store'] ?? {}),
-      products: ((body['products'] ?? []) as List).map((p) => Product.fromJson(p)).toList(),
+      store: {'slug': slug, 'name': v?.name ?? slug, 'initials': '', 'verified': v?.verified ?? false, 'bio': ''},
+      products: products,
     );
   }
 

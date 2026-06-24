@@ -39,48 +39,126 @@ class _AccountScreenState extends State<AccountScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(title: const Text('Account')),
+      appBar: AppBar(
+        title: const Text('Account'),
+        centerTitle: true,
+        actions: [
+          if (_signedIn)
+            IconButton(
+              icon: const Icon(Icons.logout),
+              tooltip: 'Sign out',
+              onPressed: () async {
+                await Supabase.instance.client.auth.signOut();
+                _refresh();
+              },
+            ),
+        ],
+      ),
       body: _signedIn ? _buildSignedIn() : _buildSignedOut(),
     );
   }
 
-  Widget _themeRow() {
-    return Padding(
-      padding: const EdgeInsets.symmetric(vertical: 8),
-      child: Row(
-        children: [
-          Icon(Icons.brightness_6_outlined, size: 20, color: context.brand.inkSoft),
-          const SizedBox(width: 12),
-          const Text('Theme'),
-          const Spacer(),
-          ValueListenableBuilder<ThemeMode>(
-            valueListenable: ThemeController.instance,
-            builder: (context, mode, _) => SegmentedButton<ThemeMode>(
-              style: const ButtonStyle(visualDensity: VisualDensity.compact),
-              segments: const [
-                ButtonSegment(value: ThemeMode.system, label: Text('Auto')),
-                ButtonSegment(value: ThemeMode.light, icon: Icon(Icons.light_mode, size: 16)),
-                ButtonSegment(value: ThemeMode.dark, icon: Icon(Icons.dark_mode, size: 16)),
-              ],
-              selected: {mode},
-              onSelectionChanged: (s) => ThemeController.instance.set(s.first),
+  // --- Reusable bits -----------------------------------------------------------
+
+  Widget _avatar(String seed, {double radius = 40}) => CircleAvatar(
+        radius: radius,
+        backgroundColor: Brand.tintDark,
+        child: Text(
+          (seed.isNotEmpty ? seed[0] : '?').toUpperCase(),
+          style: TextStyle(color: context.brand.brand, fontWeight: FontWeight.w700, fontSize: radius * 0.7),
+        ),
+      );
+
+  Widget _card({required String title, required Widget child}) => Container(
+        width: double.infinity,
+        margin: const EdgeInsets.only(bottom: 14),
+        padding: const EdgeInsets.all(16),
+        decoration: BoxDecoration(
+          color: context.brand.surface,
+          borderRadius: BorderRadius.circular(14),
+          border: Border.all(color: context.brand.line),
+        ),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(title, style: const TextStyle(fontWeight: FontWeight.w700, fontSize: 15)),
+            const SizedBox(height: 10),
+            child,
+          ],
+        ),
+      );
+
+  Widget _muted(String text) => Text(text, style: TextStyle(color: context.brand.inkSoft));
+
+  Widget _themeCard() => _card(
+        title: 'Appearance',
+        child: Row(
+          children: [
+            Icon(Icons.brightness_6_outlined, size: 20, color: context.brand.inkSoft),
+            const SizedBox(width: 10),
+            const Text('Theme'),
+            const Spacer(),
+            ValueListenableBuilder<ThemeMode>(
+              valueListenable: ThemeController.instance,
+              builder: (context, mode, _) => SegmentedButton<ThemeMode>(
+                style: const ButtonStyle(visualDensity: VisualDensity.compact),
+                segments: const [
+                  ButtonSegment(value: ThemeMode.system, label: Text('Auto')),
+                  ButtonSegment(value: ThemeMode.light, icon: Icon(Icons.light_mode, size: 16)),
+                  ButtonSegment(value: ThemeMode.dark, icon: Icon(Icons.dark_mode, size: 16)),
+                ],
+                selected: {mode},
+                onSelectionChanged: (s) => ThemeController.instance.set(s.first),
+              ),
             ),
-          ),
-        ],
-      ),
-    );
-  }
+          ],
+        ),
+      );
+
+  Widget _linksCard() => _card(
+        title: 'More',
+        child: Column(
+          children: [
+            _link(Icons.payments_outlined, 'Earn — affiliate', () => _openWeb('/affiliate', 'Affiliate')),
+            _link(Icons.storefront_outlined, 'Sell on DoyinMart', () => _openWeb('/vendor/dashboard', 'Vendor')),
+            _link(Icons.description_outlined, 'Legal & policies', () => _openWeb('/legal', 'Legal')),
+          ],
+        ),
+      );
+
+  Widget _link(IconData icon, String label, VoidCallback onTap) => ListTile(
+        contentPadding: EdgeInsets.zero,
+        dense: true,
+        leading: Icon(icon, size: 20),
+        title: Text(label),
+        trailing: const Icon(Icons.chevron_right, size: 18),
+        onTap: onTap,
+      );
+
+  // --- Signed-out --------------------------------------------------------------
 
   Widget _buildSignedOut() {
     return ListView(
       padding: const EdgeInsets.all(20),
       children: [
-        const SizedBox(height: 12),
-        const Icon(Icons.person_outline, size: 44),
-        const SizedBox(height: 12),
-        const Text('Sign in to see your purchases, license keys, gift cards and the stores you follow.',
-            textAlign: TextAlign.center),
+        const SizedBox(height: 24),
+        Center(child: _avatar('?')),
         const SizedBox(height: 16),
+        const Center(
+          child: Text('Welcome to DoyinMart', style: TextStyle(fontWeight: FontWeight.w700, fontSize: 18)),
+        ),
+        const SizedBox(height: 6),
+        Center(
+          child: Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 24),
+            child: Text(
+              'Sign in to see your purchases, license keys, gift cards and the stores you follow.',
+              textAlign: TextAlign.center,
+              style: TextStyle(color: context.brand.inkSoft),
+            ),
+          ),
+        ),
+        const SizedBox(height: 20),
         Center(
           child: ElevatedButton(
             onPressed: () async {
@@ -88,14 +166,17 @@ class _AccountScreenState extends State<AccountScreen> {
                   context, MaterialPageRoute(builder: (_) => const SignInScreen()));
               if (ok == true) _refresh();
             },
-            child: const Text('Sign in'),
+            child: const Text('Sign in or create an account'),
           ),
         ),
-        const Divider(height: 40),
-        _themeRow(),
+        const SizedBox(height: 28),
+        _themeCard(),
+        _linksCard(),
       ],
     );
   }
+
+  // --- Signed-in ---------------------------------------------------------------
 
   Widget _buildSignedIn() {
     final email = Supabase.instance.client.auth.currentUser?.email ?? '';
@@ -107,118 +188,88 @@ class _AccountScreenState extends State<AccountScreen> {
           child: ListView(
             padding: const EdgeInsets.all(16),
             children: [
-              // Profile header
-              Row(children: [
-                CircleAvatar(
-                  radius: 24,
-                  backgroundColor: Brand.tintDark,
-                  child: Text((email.isNotEmpty ? email[0] : '?').toUpperCase(),
-                      style: TextStyle(color: context.brand.brand, fontWeight: FontWeight.w700, fontSize: 18)),
-                ),
-                const SizedBox(width: 12),
-                Expanded(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      const Text('Signed in', style: TextStyle(fontWeight: FontWeight.w600)),
-                      Text(email, style: TextStyle(color: context.brand.inkSoft, fontSize: 13)),
-                    ],
-                  ),
-                ),
-                IconButton(
-                  icon: const Icon(Icons.logout),
-                  tooltip: 'Sign out',
-                  onPressed: () async {
-                    await Supabase.instance.client.auth.signOut();
-                    _refresh();
-                  },
-                ),
-              ]),
+              // Centered profile header
               const SizedBox(height: 8),
+              Center(child: _avatar(email)),
+              const SizedBox(height: 12),
+              Center(child: Text(email, style: const TextStyle(fontWeight: FontWeight.w600, fontSize: 15))),
+              const SizedBox(height: 2),
+              Center(child: Text('Signed in', style: TextStyle(color: context.brand.inkSoft, fontSize: 12))),
+              const SizedBox(height: 24),
 
               if (snap.connectionState == ConnectionState.waiting)
                 const Padding(padding: EdgeInsets.all(24), child: Center(child: CircularProgressIndicator()))
               else if (snap.hasError)
-                Padding(padding: const EdgeInsets.all(16), child: Text('Couldn\'t load your account.\n${snap.error}'))
+                _card(title: 'Account', child: _muted('Couldn\'t load your account. Pull to refresh.'))
               else ...[
-                _section('Following'),
-                if (snap.data!.following.isEmpty)
-                  _muted('You\'re not following any stores yet.')
-                else
-                  Wrap(
-                    spacing: 8,
-                    runSpacing: 8,
-                    children: snap.data!.following
-                        .map((s) => ActionChip(
-                              avatar: CircleAvatar(
-                                  backgroundColor: Brand.tintDark,
-                                  child: Text(s.initials,
-                                      style: TextStyle(fontSize: 10, color: context.brand.brand))),
-                              label: Text(s.name),
-                              onPressed: () => Navigator.push(context,
-                                  MaterialPageRoute(builder: (_) => StoreScreen(slug: s.slug, name: s.name))),
-                            ))
-                        .toList(),
-                  ),
-                const SizedBox(height: 16),
-
-                _section('Your gift cards'),
-                if (snap.data!.giftCards.isEmpty)
-                  _muted('No gift cards yet.')
-                else
-                  ...snap.data!.giftCards.map((g) => ListTile(
-                        contentPadding: EdgeInsets.zero,
-                        dense: true,
-                        title: Text(g.code, style: const TextStyle(fontFamily: 'monospace', fontSize: 12)),
-                        subtitle: Text(g.status, style: TextStyle(color: context.brand.inkSoft)),
-                        trailing: Text(naira(g.balanceMinor), style: const TextStyle(fontWeight: FontWeight.w700)),
-                      )),
-                const SizedBox(height: 16),
-
-                _section('Your purchases'),
-                if (snap.data!.licenses.isEmpty)
-                  _muted('No purchases yet.')
-                else
-                  ...snap.data!.licenses.map((l) => ListTile(
-                        contentPadding: EdgeInsets.zero,
-                        title: Text('${l.productName}  v${l.productVersion}',
-                            style: const TextStyle(fontWeight: FontWeight.w600)),
-                        subtitle: Text(l.key, style: TextStyle(fontSize: 11, color: context.brand.inkSoft)),
-                        trailing: TextButton(
-                          onPressed: () => launchUrl(Uri.parse(l.downloadUrl), mode: LaunchMode.externalApplication),
-                          child: const Text('Download'),
+                _card(
+                  title: 'Following',
+                  child: snap.data!.following.isEmpty
+                      ? _muted('You\'re not following any stores yet.')
+                      : Wrap(
+                          spacing: 8,
+                          runSpacing: 8,
+                          children: snap.data!.following
+                              .map((s) => ActionChip(
+                                    avatar: CircleAvatar(
+                                        backgroundColor: Brand.tintDark,
+                                        child: Text(s.initials,
+                                            style: TextStyle(fontSize: 10, color: context.brand.brand))),
+                                    label: Text(s.name),
+                                    onPressed: () => Navigator.push(context,
+                                        MaterialPageRoute(builder: (_) => StoreScreen(slug: s.slug, name: s.name))),
+                                  ))
+                              .toList(),
                         ),
-                      )),
+                ),
+                _card(
+                  title: 'Your gift cards',
+                  child: snap.data!.giftCards.isEmpty
+                      ? _muted('No gift cards yet.')
+                      : Column(
+                          children: snap.data!.giftCards
+                              .map((g) => ListTile(
+                                    contentPadding: EdgeInsets.zero,
+                                    dense: true,
+                                    title: Text(g.code,
+                                        style: const TextStyle(fontFamily: 'monospace', fontSize: 12)),
+                                    subtitle: Text(g.status, style: TextStyle(color: context.brand.inkSoft)),
+                                    trailing: Text(naira(g.balanceMinor),
+                                        style: const TextStyle(fontWeight: FontWeight.w700)),
+                                  ))
+                              .toList(),
+                        ),
+                ),
+                _card(
+                  title: 'Your purchases',
+                  child: snap.data!.licenses.isEmpty
+                      ? _muted('No purchases yet.')
+                      : Column(
+                          children: snap.data!.licenses
+                              .map((l) => ListTile(
+                                    contentPadding: EdgeInsets.zero,
+                                    title: Text('${l.productName}  v${l.productVersion}',
+                                        style: const TextStyle(fontWeight: FontWeight.w600)),
+                                    subtitle: Text(l.key,
+                                        style: TextStyle(fontSize: 11, color: context.brand.inkSoft)),
+                                    trailing: TextButton(
+                                      onPressed: () => launchUrl(Uri.parse(l.downloadUrl),
+                                          mode: LaunchMode.externalApplication),
+                                      child: const Text('Download'),
+                                    ),
+                                  ))
+                              .toList(),
+                        ),
+                ),
               ],
 
-              const Divider(height: 32),
-              _section('More'),
-              _link(Icons.payments_outlined, 'Earn — affiliate', () => _openWeb('/affiliate', 'Affiliate')),
-              _link(Icons.storefront_outlined, 'Sell on DoyinMart', () => _openWeb('/vendor/dashboard', 'Vendor')),
-              _link(Icons.description_outlined, 'Legal & policies', () => _openWeb('/legal', 'Legal')),
-              const Divider(height: 24),
-              _themeRow(),
-              const SizedBox(height: 24),
+              _linksCard(),
+              _themeCard(),
+              const SizedBox(height: 16),
             ],
           ),
         );
       },
     );
   }
-
-  Widget _section(String title) => Padding(
-        padding: const EdgeInsets.only(bottom: 8, top: 4),
-        child: Text(title, style: const TextStyle(fontWeight: FontWeight.w600, fontSize: 16)),
-      );
-
-  Widget _muted(String text) =>
-      Padding(padding: const EdgeInsets.only(bottom: 4), child: Text(text, style: TextStyle(color: context.brand.inkSoft)));
-
-  Widget _link(IconData icon, String label, VoidCallback onTap) => ListTile(
-        contentPadding: EdgeInsets.zero,
-        leading: Icon(icon, size: 20),
-        title: Text(label),
-        trailing: const Icon(Icons.chevron_right, size: 18),
-        onTap: onTap,
-      );
 }

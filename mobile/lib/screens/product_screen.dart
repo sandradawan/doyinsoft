@@ -6,6 +6,89 @@ import '../models.dart';
 import '../theme.dart';
 import 'checkout_webview.dart';
 
+/// Swipeable screenshots/icon carousel with page indicator + tap-to-zoom.
+class _ImageCarousel extends StatefulWidget {
+  final List<String> images;
+  const _ImageCarousel({required this.images});
+  @override
+  State<_ImageCarousel> createState() => _ImageCarouselState();
+}
+
+class _ImageCarouselState extends State<_ImageCarousel> {
+  final _controller = PageController();
+  int _page = 0;
+
+  @override
+  void dispose() {
+    _controller.dispose();
+    super.dispose();
+  }
+
+  void _zoom(int index) {
+    Navigator.push(
+      context,
+      MaterialPageRoute(
+        builder: (_) => Scaffold(
+          backgroundColor: Colors.black,
+          appBar: AppBar(backgroundColor: Colors.black, foregroundColor: Colors.white),
+          body: Center(
+            child: InteractiveViewer(
+              child: CachedNetworkImage(imageUrl: widget.images[index], fit: BoxFit.contain),
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Column(
+      children: [
+        ClipRRect(
+          borderRadius: BorderRadius.circular(14),
+          child: SizedBox(
+            height: 200,
+            child: PageView.builder(
+              controller: _controller,
+              onPageChanged: (i) => setState(() => _page = i),
+              itemCount: widget.images.length,
+              itemBuilder: (context, i) => GestureDetector(
+                onTap: () => _zoom(i),
+                child: CachedNetworkImage(
+                  imageUrl: widget.images[i],
+                  fit: BoxFit.cover,
+                  width: double.infinity,
+                  errorWidget: (_, __, ___) => const ColoredBox(color: Colors.black12),
+                ),
+              ),
+            ),
+          ),
+        ),
+        if (widget.images.length > 1) ...[
+          const SizedBox(height: 8),
+          Row(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: List.generate(widget.images.length, (i) {
+              final active = i == _page;
+              return AnimatedContainer(
+                duration: const Duration(milliseconds: 250),
+                margin: const EdgeInsets.symmetric(horizontal: 3),
+                width: active ? 18 : 6,
+                height: 6,
+                decoration: BoxDecoration(
+                  color: active ? Theme.of(context).colorScheme.primary : Theme.of(context).dividerColor,
+                  borderRadius: BorderRadius.circular(3),
+                ),
+              );
+            }),
+          ),
+        ],
+      ],
+    );
+  }
+}
+
 /// Simple rating + comment dialog. Returns (rating, body) or null on cancel.
 class _ReviewDialog extends StatefulWidget {
   const _ReviewDialog();
@@ -113,14 +196,12 @@ class _ProductScreenState extends State<ProductScreen> {
           final p = d.product;
           final priceMinor = (p['price_minor'] ?? 0) as int;
           final icon = p['icon_url'] as String?;
+          final screenshots = ((p['screenshots'] as List?) ?? const []).cast<String>();
+          final images = <String>[if (icon != null) icon, ...screenshots];
           return ListView(
             padding: const EdgeInsets.all(16),
             children: [
-              if (icon != null)
-                ClipRRect(
-                  borderRadius: BorderRadius.circular(14),
-                  child: CachedNetworkImage(imageUrl: icon, height: 180, width: double.infinity, fit: BoxFit.cover),
-                ),
+              if (images.isNotEmpty) _ImageCarousel(images: images),
               const SizedBox(height: 14),
               Text(p['name'] ?? '', style: const TextStyle(fontSize: 22, fontWeight: FontWeight.w600)),
               const SizedBox(height: 4),
