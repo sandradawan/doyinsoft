@@ -18,15 +18,19 @@ export default async function GiftCardSuccessPage({
 
   let code: string | null = null;
   let amountMinor = 0;
+  let currency: "NGN" | "USD" = "NGN";
   let designKey = "classic";
   if (isPaystackConfigured && ref) {
     const v = await verifyPaystackPayment(ref);
     if (v.ok && v.metadata?.kind === "giftcard") {
-      amountMinor = v.amountMinor ?? 0;
+      currency = (v.metadata?.gift_currency as "NGN" | "USD") || "NGN";
+      amountMinor = Number(v.metadata?.gift_amount_minor ?? v.amountMinor ?? 0); // card value
       designKey = (v.metadata?.design as string) || "classic";
-      // Issue using the amount ACTUALLY paid (idempotent on the reference).
+      // Issue the card (idempotent on the reference; verifies the NGN paid covers it).
       code = await issueGiftCardFromPayment({
         reference: ref,
+        paidNgnMinor: v.amountMinor ?? 0,
+        currency,
         amountMinor,
         purchaserEmail: (v.metadata?.purchaser_email as string) || v.email,
         recipientEmail: (v.metadata?.recipient_email as string) || undefined,
@@ -58,11 +62,11 @@ export default async function GiftCardSuccessPage({
     <main className="max-w-[460px] mx-auto px-5 py-10">
       <h1 className="text-[22px] font-medium m-0 mb-1">Gift card ready 🎁</h1>
       <p className="text-[14px] text-ink-soft m-0 mb-5">
-        Your {formatPrice(amountMinor, "NGN")} gift card has been issued and emailed. Here it is:
+        Your {formatPrice(amountMinor, currency)} gift card has been issued and emailed. Here it is:
       </p>
 
       <div className="max-w-[320px] mb-5">
-        <GiftCardVisual design={giftDesign(designKey)} amountLabel={formatPrice(amountMinor, "NGN")} code={code} />
+        <GiftCardVisual design={giftDesign(designKey)} amountLabel={formatPrice(amountMinor, currency)} code={code} />
       </div>
 
       <p className="text-[13px] text-ink-faint mb-6">

@@ -5,15 +5,18 @@ import { hasServiceRole } from "./supabase/env";
 import { sendEmail, emailLayout, emailText, emailKeyBox, emailButton, esc, subjectSafe } from "./email";
 import { formatPrice } from "./format";
 import { giftDesign, giftGradient } from "./gift-designs";
+import { toNgnCharge } from "./money";
 import { PLATFORM_COMMISSION_PERCENT } from "./paystack";
 import { notify } from "./notifications";
+import type { Currency } from "./types";
 
 const SITE_URL = process.env.NEXT_PUBLIC_SITE_URL ?? "http://localhost:3000";
 
-// Purchase bounds (NGN kobo). Tiers shown in the UI; custom must be in range.
-export const GIFT_MIN_MINOR = 50_000; // ₦500
-export const GIFT_MAX_MINOR = 50_000_000; // ₦500,000
-export const GIFT_TIERS_MINOR = [100_000, 200_000, 500_000, 1_000_000, 2_000_000];
+// Purchase bounds per currency (minor units). NGN: ₦1,000 → ₦10m. USD: $2 → $1,000.
+export const GIFT_BOUNDS: Record<Currency, { min: number; max: number }> = {
+  NGN: { min: 100_000, max: 1_000_000_000 },
+  USD: { min: 200, max: 100_000 },
+};
 
 export type GiftCardStatus = "active" | "depleted" | "disabled" | "expired" | "inactive";
 
@@ -53,6 +56,9 @@ export interface GiftCardCheck {
   error?: string;
   code?: string;
   balance_minor?: number;
+  currency?: Currency;
+  /** The card's spending value in NGN (USD converted at the current rate). */
+  balance_ngn_minor?: number;
 }
 
 /** Validate a code for redemption/balance display. Server-authoritative. */
@@ -69,7 +75,13 @@ export async function validateGiftCard(rawCode: string): Promise<GiftCardCheck> 
   if (c.balance_minor <= 0) return { ok: false, error: "This gift card has no balance left." };
   if (c.expires_at && new Date(c.expires_at).getTime() < Date.now())
     return { ok: false, error: "This gift card has expired." };
-  return { ok: true, code: c.code, balance_minor: c.balance_minor };
+  return {
+    ok: true,
+    code: c.code,
+    balance_minor: c.balance_minor,
+    currency: c.currency,
+    balance_ngn_minor: toNgnCharge(c.balance_minor, c.currency),
+  };
 }
 
 /** Atomic, idempotent redeem against an order. Returns the amount actually debited. */
@@ -90,6 +102,11 @@ export async function redeemGiftCard(code: string, amountMinor: number, orderId:
  */
 export async function issueGiftCardFromPayment(opts: {
   reference: string;
+  /** NGN actually paid via Paystack (for the security check). */
+  paidNgnMinor: number;
+  /** Card denomination. */
+  currency: Currency;
+  /** Card face value, in `currency` minor units. */
   amountMinor: number;
   purchaserEmail?: string;
   recipientEmail?: string;
@@ -97,6 +114,13 @@ export async function issueGiftCardFromPayment(opts: {
   design?: string;
 }): Promise<string | null> {
   if (!hasServiceRole || !opts.reference || opts.amountMinor <= 0) return null;
+
+  // Security: the NGN paid must cover this card's value at the current rate.
+  // (Card amount/currency ride in our own server-set Paystack metadata, and this
+  // re-checks the verified paid amount — so an under-payment can't mint a card.)
+  const expectedNgn = toNgnCharge(opts.amountMinor, opts.currency);
+  if (opts.paidNgnMinor + 1 < expectedNgn) return null;
+
   const admin = createAdminClient();
 
   // Already issued for this payment? Return the existing code (idempotent).
@@ -117,7 +141,7 @@ export async function issueGiftCardFromPayment(opts: {
         code,
         initial_minor: opts.amountMinor,
         balance_minor: opts.amountMinor,
-        currency: "NGN",
+        currency: opts.currency,
         status: "active",
         purchaser_email: opts.purchaserEmail ?? null,
         recipient_email: recipient || null,
@@ -146,7 +170,7 @@ export async function issueGiftCardFromPayment(opts: {
   }
 
   if (recipient) {
-    const amountStr = formatPrice(opts.amountMinor, "NGN");
+    const amountStr = formatPrice(opts.amountMinor, opts.currency);
     const d = giftDesign(opts.design);
     await notify({
       email: recipient,
@@ -204,7 +228,7 @@ export async function batchCreateGiftCards(opts: {
   const count = Math.floor(opts.count);
   if (!Number.isFinite(count) || count < 1 || count > GIFT_BATCH_MAX)
     return { error: `Quantity must be between 1 and ${GIFT_BATCH_MAX}.` };
-  if (!Number.isFinite(opts.amountMinor) || opts.amountMinor < GIFT_MIN_MINOR || opts.amountMinor > GIFT_MAX_MINOR)
+  if (!Number.isFinite(opts.amountMinor) || opts.amountMinor < GIFT_BOUNDS.NGN.min || opts.amountMinor > GIFT_BOUNDS.NGN.max)
     return { error: "Amount is out of range." };
 
   const batchRef = `batch_${randomBytes(5).toString("hex")}`;
@@ -344,9 +368,13 @@ export async function adminGiftCardLiability(): Promise<number> {
   if (!hasServiceRole) return 0;
   const { data } = await createAdminClient()
     .from("gift_cards")
-    .select("balance_minor")
+    .select("balance_minor, currency")
     .eq("status", "active");
-  return ((data as { balance_minor: number }[]) ?? []).reduce((t, r) => t + (r.balance_minor || 0), 0);
+  // Convert each card's balance to NGN so the total is meaningful across currencies.
+  return ((data as { balance_minor: number; currency: Currency }[]) ?? []).reduce(
+    (t, r) => t + toNgnCharge(r.balance_minor || 0, r.currency),
+    0
+  );
 }
 
 /**

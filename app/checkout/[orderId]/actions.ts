@@ -10,7 +10,7 @@ import {
   getVendorSubaccountCode,
   issueLicenseForOrder,
 } from "@/lib/data";
-import { toNgnCharge } from "@/lib/money";
+import { toNgnCharge, USD_TO_NGN } from "@/lib/money";
 import { getCurrentUser } from "@/lib/auth";
 import { affiliateOwnedByUser, resolveAffiliateId } from "@/lib/affiliate";
 import { validateCoupon, type CouponCheck } from "@/lib/coupons";
@@ -122,16 +122,27 @@ export async function startCheckout(
     }
   }
 
-  // Apply a gift card as a payment method (prepaid credit, not a discount). It
-  // pays toward the order value; the rest goes to Paystack. The card is debited
-  // atomically only once the order is paid (in issueLicenseForOrder/markOrderPaid).
+  // Apply a gift card as a payment method (prepaid credit, not a discount). A card
+  // may be NGN- or USD-denominated; its NGN spending value is converted at the
+  // current rate. We track the NGN covered (gift_card_minor, for the Paystack net)
+  // and the amount to debit in the CARD's currency (gift_card_debit_minor).
   let giftCardCode: string | null = null;
-  let giftCardMinor = 0;
+  let giftCardMinor = 0; // NGN covered
+  let giftCardDebit = 0; // amount to debit, in card currency minor units
   if (input.giftCard) {
     const gc = await validateGiftCard(input.giftCard);
     if (gc.ok) {
+      const cardCur = gc.currency ?? "NGN";
+      const balanceNgn = toNgnCharge(gc.balance_minor ?? 0, cardCur);
       giftCardCode = gc.code ?? null;
-      giftCardMinor = Math.min(gc.balance_minor ?? 0, orderValue);
+      giftCardMinor = Math.min(balanceNgn, orderValue);
+      // Full card used → debit the whole balance (no dust); else convert NGN→card.
+      giftCardDebit =
+        giftCardMinor >= balanceNgn
+          ? (gc.balance_minor ?? 0)
+          : cardCur === "USD"
+            ? Math.round(giftCardMinor / USD_TO_NGN)
+            : giftCardMinor;
     }
   }
   const payNow = orderValue - giftCardMinor; // what Paystack must charge
@@ -157,6 +168,7 @@ export async function startCheckout(
         discount_minor: discountMinor,
         gift_card_code: giftCardCode,
         gift_card_minor: giftCardMinor,
+        gift_card_debit_minor: giftCardDebit,
         fulfilment_status: needsFulfilment ? "pending" : null,
         shipping_name: input.shippingName || null,
         shipping_phone: input.shippingPhone || null,
@@ -173,9 +185,9 @@ export async function startCheckout(
   // card no longer covers it, fail safe instead of releasing the goods.
   if (payNow <= 0) {
     if (hasServiceRole && orderId !== "new") {
-      if (giftCardCode && giftCardMinor > 0) {
-        const debited = await redeemGiftCard(giftCardCode, giftCardMinor, orderId);
-        if (debited < giftCardMinor) {
+      if (giftCardCode && giftCardDebit > 0) {
+        const debited = await redeemGiftCard(giftCardCode, giftCardDebit, orderId);
+        if (debited < giftCardDebit) {
           return { error: "That gift card no longer has enough balance. Please try again." };
         }
       }

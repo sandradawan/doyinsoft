@@ -272,7 +272,7 @@ class _AccountScreenState extends State<AccountScreen> {
                                 dense: true,
                                 title: Text(g.code, style: const TextStyle(fontFamily: 'monospace', fontSize: 12)),
                                 subtitle: Text(g.status, style: TextStyle(color: context.brand.inkSoft)),
-                                trailing: Text(naira(g.balanceMinor), style: const TextStyle(fontWeight: FontWeight.w700)),
+                                trailing: Text(money(g.balanceMinor, g.currency), style: const TextStyle(fontWeight: FontWeight.w700)),
                               ))
                           .toList(),
                     ),

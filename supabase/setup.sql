@@ -382,8 +382,9 @@ create table if not exists gift_card_txns (
 alter table gift_card_txns enable row level security;
 create unique index if not exists gift_card_txns_card_order_uniq
   on gift_card_txns (gift_card_id, order_id) where order_id is not null;
-alter table orders add column if not exists gift_card_code  text;
-alter table orders add column if not exists gift_card_minor integer not null default 0;
+alter table orders add column if not exists gift_card_code        text;
+alter table orders add column if not exists gift_card_minor       integer not null default 0;
+alter table orders add column if not exists gift_card_debit_minor integer not null default 0;
 create or replace function redeem_gift_card(p_code text, p_amount integer, p_order uuid)
 returns integer language plpgsql as $$
 declare v_id uuid; debited integer;

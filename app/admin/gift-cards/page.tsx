@@ -8,6 +8,7 @@ import {
 } from "@/lib/giftcards";
 import { PLATFORM_COMMISSION_PERCENT } from "@/lib/paystack";
 import { GIFT_DESIGNS } from "@/lib/gift-designs";
+import { toNgnCharge } from "@/lib/money";
 import { formatPrice } from "@/lib/format";
 import { toggleGiftCard, activateGiftCardAction, createGiftCardBatch } from "./actions";
 
@@ -36,7 +37,7 @@ export default async function AdminGiftCardsPage({
     adminGiftCardVendorOwed(),
     adminListBatches(),
   ]);
-  const issued = cards.reduce((t, c) => t + c.initial_minor, 0);
+  const issued = cards.reduce((t, c) => t + toNgnCharge(c.initial_minor, c.currency), 0);
 
   return (
     <div>

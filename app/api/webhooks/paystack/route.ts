@@ -47,7 +47,9 @@ export async function POST(request: Request) {
       if (v.ok && (v.amountMinor ?? 0) > 0) {
         await issueGiftCardFromPayment({
           reference,
-          amountMinor: v.amountMinor ?? 0,
+          paidNgnMinor: v.amountMinor ?? 0,
+          currency: (v.metadata?.gift_currency as "NGN" | "USD") || "NGN",
+          amountMinor: Number(v.metadata?.gift_amount_minor ?? v.amountMinor ?? 0),
           purchaserEmail: (v.metadata?.purchaser_email as string) || v.email,
           recipientEmail: (v.metadata?.recipient_email as string) || undefined,
           message: (v.metadata?.message as string) || undefined,
@@ -96,6 +98,8 @@ interface PaystackEvent {
       order_id?: string;
       product_slug?: string | null;
       kind?: string;
+      gift_currency?: string | null;
+      gift_amount_minor?: number | null;
       recipient_email?: string | null;
       message?: string | null;
       purchaser_email?: string | null;

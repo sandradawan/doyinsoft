@@ -14,7 +14,9 @@ interface AppliedCoupon {
 
 interface AppliedGift {
   code: string;
-  balanceMinor: number;
+  balanceMinor: number; // in the card's currency
+  balanceNgn: number; // spending value in NGN
+  currency: Currency;
 }
 
 const GATEWAYS: { value: Gateway; label: string }[] = [
@@ -57,7 +59,7 @@ export function CheckoutForm({
   const [giftPending, startGift] = useTransition();
 
   const orderValue = applied ? applied.finalMinor : amountMinor; // after discount
-  const giftMinor = gift ? Math.min(gift.balanceMinor, orderValue) : 0;
+  const giftMinor = gift ? Math.min(gift.balanceNgn, orderValue) : 0;
   const payMinor = orderValue - giftMinor;
 
   function applyCoupon() {
@@ -94,7 +96,12 @@ export function CheckoutForm({
     startGift(async () => {
       const res = await previewGiftCard(code);
       if (res.ok) {
-        setGift({ code: res.code!, balanceMinor: res.balance_minor ?? 0 });
+        setGift({
+          code: res.code!,
+          balanceMinor: res.balance_minor ?? 0,
+          balanceNgn: res.balance_ngn_minor ?? res.balance_minor ?? 0,
+          currency: res.currency ?? "NGN",
+        });
         setGiftMsg(null);
       } else {
         setGift(null);
@@ -262,7 +269,7 @@ export function CheckoutForm({
       {gift ? (
         <div className="flex items-center justify-between border border-brand/40 bg-brand-tint rounded-md px-[10px] py-2 mb-2 text-[13px]">
           <span className="text-brand font-medium">
-            {gift.code} — {formatPrice(gift.balanceMinor, currency)} balance
+            {gift.code} — {formatPrice(gift.balanceMinor, gift.currency)} balance
           </span>
           <button
             type="button"

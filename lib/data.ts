@@ -1149,7 +1149,7 @@ export async function markOrderPaid(orderId: string, reference?: string): Promis
   const admin = createAdminClient();
   const { data: order } = await admin
     .from("orders")
-    .select("amount_minor, affiliate_id, buyer_email, gift_card_code, gift_card_minor")
+    .select("amount_minor, affiliate_id, buyer_email, gift_card_code, gift_card_debit_minor")
     .eq("id", orderId)
     .maybeSingle();
   await admin
@@ -1161,10 +1161,10 @@ export async function markOrderPaid(orderId: string, reference?: string): Promis
     affiliate_id: string | null;
     buyer_email: string | null;
     gift_card_code: string | null;
-    gift_card_minor: number | null;
+    gift_card_debit_minor: number | null;
   } | null;
-  if (o?.gift_card_code && (o.gift_card_minor ?? 0) > 0) {
-    await redeemGiftCard(o.gift_card_code, o.gift_card_minor ?? 0, orderId);
+  if (o?.gift_card_code && (o.gift_card_debit_minor ?? 0) > 0) {
+    await redeemGiftCard(o.gift_card_code, o.gift_card_debit_minor ?? 0, orderId);
   }
   if (o?.affiliate_id && !(await affiliateOwnsEmail(o.affiliate_id, o.buyer_email))) {
     const { affiliate_percent } = await getSettings();
@@ -1316,7 +1316,7 @@ export async function issueLicenseForOrder(
   // Look up the order, then mark it paid and mint the key.
   const { data: order } = await admin
     .from("orders")
-    .select("id, product_id, vendor_id, amount_minor, currency, affiliate_id, coupon_code, gift_card_code, gift_card_minor, buyer_email, product:products(name, product_type)")
+    .select("id, product_id, vendor_id, amount_minor, currency, affiliate_id, coupon_code, gift_card_code, gift_card_debit_minor, buyer_email, product:products(name, product_type)")
     .eq("id", orderId)
     .maybeSingle();
   if (!order) return null;
@@ -1330,10 +1330,10 @@ export async function issueLicenseForOrder(
   const couponCode = (order as { coupon_code?: string | null }).coupon_code;
   if (couponCode) await incrementCouponUse(couponCode);
 
-  // Debit the gift card for its share (atomic + idempotent per order).
+  // Debit the gift card for its share, in the card's own currency (atomic + idempotent).
   const gcCode = (order as { gift_card_code?: string | null }).gift_card_code;
-  const gcMinor = (order as { gift_card_minor?: number }).gift_card_minor ?? 0;
-  if (gcCode && gcMinor > 0) await redeemGiftCard(gcCode, gcMinor, orderId);
+  const gcDebit = (order as { gift_card_debit_minor?: number }).gift_card_debit_minor ?? 0;
+  if (gcCode && gcDebit > 0) await redeemGiftCard(gcCode, gcDebit, orderId);
 
   const o = order as {
     product_id: string;

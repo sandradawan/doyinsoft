@@ -7,15 +7,20 @@ import { GIFT_DESIGNS, giftDesign, giftGradient } from "@/lib/gift-designs";
 import { GiftCardVisual } from "@/components/gift-card-visual";
 import { buyGiftCard, checkGiftBalance, type BuyGiftState } from "./actions";
 
-const TIERS = [1000, 2000, 5000, 10000, 20000, 50000]; // naira
+type Cur = "NGN" | "USD";
+const TIERS: Record<Cur, number[]> = {
+  NGN: [1000, 2000, 5000, 10000, 20000, 50000],
+  USD: [2, 5, 10, 25, 50, 100],
+};
+const DEFAULT_AMT: Record<Cur, number> = { NGN: 5000, USD: 10 };
 
-const naira = (n: number) => `₦${n.toLocaleString("en-NG")}`;
+const fmt = (n: number, c: Cur) => (c === "USD" ? `$${n.toLocaleString("en-US")}` : `₦${n.toLocaleString("en-NG")}`);
 
-function BuyButton({ amount }: { amount: number }) {
+function BuyButton({ amount, currency }: { amount: number; currency: Cur }) {
   const { pending } = useFormStatus();
   return (
     <button type="submit" disabled={pending || amount <= 0} className="btn-primary w-full py-3 text-[15px]">
-      {pending ? "Redirecting…" : amount > 0 ? `Continue — ${naira(amount)}` : "Choose an amount"}
+      {pending ? "Redirecting…" : amount > 0 ? `Continue — ${fmt(amount, currency)}` : "Choose an amount"}
     </button>
   );
 }
@@ -23,17 +28,24 @@ function BuyButton({ amount }: { amount: number }) {
 export function BuyGiftForm() {
   const [state, action] = useActionState<BuyGiftState, FormData>(buyGiftCard, {});
   const [designKey, setDesignKey] = useState("classic");
-  const [amount, setAmount] = useState(5000);
+  const [currency, setCurrency] = useState<Cur>("NGN");
+  const [amount, setAmount] = useState(DEFAULT_AMT.NGN);
   const [custom, setCustom] = useState("");
   const [delivery, setDelivery] = useState<"gift" | "self">("gift");
+
+  function pickCurrency(c: Cur) {
+    setCurrency(c);
+    setCustom("");
+    setAmount(DEFAULT_AMT[c]);
+  }
 
   const design = giftDesign(designKey);
 
   function pickDesign(key: string) {
     setDesignKey(key);
     const d = giftDesign(key);
-    // Default to the middle suggested amount for the occasion.
-    if (!custom) setAmount(d.suggested[1] ?? d.suggested[0] ?? amount);
+    // Occasion-suggested amounts are in naira; only apply for NGN cards.
+    if (currency === "NGN" && !custom) setAmount(d.suggested[1] ?? d.suggested[0] ?? amount);
   }
   function pickTier(n: number) {
     setAmount(n);
@@ -48,7 +60,7 @@ export function BuyGiftForm() {
     <div className="grid gap-7 md:grid-cols-[300px_minmax(0,1fr)] items-start">
       {/* Live preview */}
       <div className="md:sticky md:top-5">
-        <GiftCardVisual design={design} amountLabel={amount > 0 ? naira(amount) : "₦—"} />
+        <GiftCardVisual design={design} amountLabel={amount > 0 ? fmt(amount, currency) : `${currency === "USD" ? "$" : "₦"}—`} />
         <p className="text-[12px] text-ink-faint text-center mt-3">
           Live preview — this is what they’ll receive.
         </p>
@@ -80,10 +92,31 @@ export function BuyGiftForm() {
         </div>
         <input type="hidden" name="design" value={designKey} />
 
+        {/* Currency */}
+        <label className="block text-[14px] font-medium mb-2">Currency</label>
+        <div className="grid grid-cols-2 gap-2 mb-4">
+          {(["NGN", "USD"] as Cur[]).map((c) => (
+            <button
+              type="button"
+              key={c}
+              onClick={() => pickCurrency(c)}
+              className={[
+                "border rounded-md py-2.5 text-[14px] cursor-pointer transition-colors",
+                currency === c
+                  ? "border-brand bg-brand-tint text-brand font-semibold"
+                  : "border-line text-ink-soft hover:text-ink hover:bg-muted",
+              ].join(" ")}
+            >
+              {c === "NGN" ? "₦ Naira" : "$ Dollar"}
+            </button>
+          ))}
+        </div>
+        <input type="hidden" name="currency" value={currency} />
+
         {/* Amount */}
         <label className="block text-[14px] font-medium mb-2">Amount</label>
         <div className="grid grid-cols-3 gap-2 mb-2">
-          {TIERS.map((t) => (
+          {TIERS[currency].map((t) => (
             <button
               type="button"
               key={t}
@@ -95,7 +128,7 @@ export function BuyGiftForm() {
                   : "border-line text-ink-soft hover:text-ink hover:bg-muted",
               ].join(" ")}
             >
-              {naira(t)}
+              {fmt(t, currency)}
             </button>
           ))}
         </div>
@@ -103,7 +136,7 @@ export function BuyGiftForm() {
           value={custom}
           onChange={(e) => onCustom(e.target.value.replace(/[^0-9]/g, ""))}
           inputMode="numeric"
-          placeholder="Or enter a custom amount (₦)"
+          placeholder={`Or enter a custom amount (${currency === "USD" ? "$2–$1,000" : "₦1,000+"})`}
           className="field w-full mb-5"
         />
         <input type="hidden" name="amount" value={amount} />
@@ -164,7 +197,7 @@ export function BuyGiftForm() {
           </p>
         )}
 
-        <BuyButton amount={amount} />
+        <BuyButton amount={amount} currency={currency} />
         <p className="text-[12px] text-ink-faint text-center mt-3 mb-0">
           Paid securely with Paystack · the code is emailed instantly after payment.
         </p>

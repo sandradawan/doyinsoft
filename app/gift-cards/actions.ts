@@ -1,10 +1,12 @@
 "use server";
 
 import { redirect } from "next/navigation";
-import { GIFT_MIN_MINOR, GIFT_MAX_MINOR, validateGiftCard } from "@/lib/giftcards";
+import { GIFT_BOUNDS, validateGiftCard } from "@/lib/giftcards";
 import { giftDesign } from "@/lib/gift-designs";
+import { toNgnCharge } from "@/lib/money";
 import { formatPrice } from "@/lib/format";
 import { checkRateLimit, clientId } from "@/lib/ratelimit";
+import type { Currency } from "@/lib/types";
 
 const PAYSTACK_SECRET = process.env.PAYSTACK_SECRET_KEY ?? "";
 const SITE_URL = process.env.NEXT_PUBLIC_SITE_URL ?? "http://localhost:3000";
@@ -24,8 +26,9 @@ export async function buyGiftCard(
   _prev: BuyGiftState,
   formData: FormData
 ): Promise<BuyGiftState> {
-  const amountNaira = Number(formData.get("amount") ?? 0);
-  const amountMinor = Math.round(amountNaira * 100);
+  const currency: Currency = String(formData.get("currency") ?? "NGN") === "USD" ? "USD" : "NGN";
+  const amountMajor = Number(formData.get("amount") ?? 0);
+  const amountMinor = Math.round(amountMajor * 100); // in `currency` minor units
   const buyerEmail = String(formData.get("buyer_email") ?? "").trim();
   const recipientEmail = String(formData.get("recipient_email") ?? "").trim();
   const message = String(formData.get("message") ?? "").trim().slice(0, 200);
@@ -34,15 +37,20 @@ export async function buyGiftCard(
   if (!EMAIL_RE.test(buyerEmail)) return { error: "Enter a valid email for your receipt." };
   if (recipientEmail && !EMAIL_RE.test(recipientEmail))
     return { error: "The recipient email looks invalid." };
-  if (!Number.isFinite(amountMinor) || amountMinor < GIFT_MIN_MINOR || amountMinor > GIFT_MAX_MINOR) {
+
+  const { min, max } = GIFT_BOUNDS[currency];
+  if (!Number.isFinite(amountMinor) || amountMinor < min || amountMinor > max) {
     return {
-      error: `Choose an amount between ${formatPrice(GIFT_MIN_MINOR, "NGN")} and ${formatPrice(GIFT_MAX_MINOR, "NGN")}.`,
+      error: `Choose an amount between ${formatPrice(min, currency)} and ${formatPrice(max, currency)}.`,
     };
   }
 
   if (!PAYSTACK_SECRET) {
     return { error: "Payments aren’t configured yet. Add your Paystack key to buy gift cards." };
   }
+
+  // Paystack (NG) always charges NGN — convert USD cards at the current rate.
+  const chargeNgn = toNgnCharge(amountMinor, currency);
 
   let url: string | undefined;
   let message_ = "";
@@ -52,11 +60,13 @@ export async function buyGiftCard(
       headers: { Authorization: `Bearer ${PAYSTACK_SECRET}`, "Content-Type": "application/json" },
       body: JSON.stringify({
         email: buyerEmail,
-        amount: amountMinor,
+        amount: chargeNgn,
         currency: "NGN",
         callback_url: `${SITE_URL}/gift-cards/success`,
         metadata: {
           kind: "giftcard",
+          gift_currency: currency,
+          gift_amount_minor: amountMinor,
           recipient_email: recipientEmail || null,
           message: message || null,
           purchaser_email: buyerEmail,
@@ -86,5 +96,5 @@ export async function checkGiftBalance(
   const code = String(formData.get("code") ?? "");
   const res = await validateGiftCard(code);
   if (!res.ok) return { error: res.error };
-  return { ok: true, label: `Balance: ${formatPrice(res.balance_minor ?? 0, "NGN")}` };
+  return { ok: true, label: `Balance: ${formatPrice(res.balance_minor ?? 0, res.currency ?? "NGN")}` };
 }

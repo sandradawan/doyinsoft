@@ -6,9 +6,17 @@ import 'package:supabase_flutter/supabase_flutter.dart';
 import 'config.dart';
 import 'models.dart';
 
-String naira(int minor) {
+String naira(int minor) => money(minor, 'NGN');
+
+/// Format a minor amount in its currency (₦ or $).
+String money(int minor, String currency) {
   if (minor == 0) return 'Free';
-  final f = NumberFormat.currency(locale: 'en_NG', symbol: '₦', decimalDigits: 0);
+  final usd = currency == 'USD';
+  final f = NumberFormat.currency(
+    locale: usd ? 'en_US' : 'en_NG',
+    symbol: usd ? '\$' : '₦',
+    decimalDigits: 0,
+  );
   return f.format(minor / 100);
 }
 
@@ -181,7 +189,7 @@ class Api {
     );
     final body = jsonDecode(res.body) as Map<String, dynamic>;
     if (body['ok'] == true) {
-      return (ok: true, message: 'Balance: ${naira(body['balance_minor'] ?? 0)}');
+      return (ok: true, message: 'Balance: ${money(body['balance_minor'] ?? 0, body['currency'] ?? 'NGN')}');
     }
     return (ok: false, message: (body['error'] as String?) ?? 'That code isn\'t valid.');
   }
