@@ -11,6 +11,7 @@ import 'sign_in_screen.dart';
 import 'store_screen.dart';
 import 'orders_screen.dart';
 import 'wishlist_screen.dart';
+import 'profile_screen.dart';
 import 'checkout_webview.dart';
 
 class AccountScreen extends StatefulWidget {
@@ -34,6 +35,12 @@ class _AccountScreenState extends State<AccountScreen> {
   void _refresh() => setState(() {
         _future = _signedIn ? Api.instance.me() : null;
       });
+
+  String _displayName(String email) {
+    final meta = Supabase.instance.client.auth.currentUser?.userMetadata ?? {};
+    final n = (meta['display_name'] as String?)?.trim();
+    return (n != null && n.isNotEmpty) ? n : (email.contains('@') ? email.split('@').first : 'You');
+  }
 
   void _openWeb(String path, String title) => Navigator.push(
         context,
@@ -237,9 +244,31 @@ class _AccountScreenState extends State<AccountScreen> {
             padding: const EdgeInsets.all(16),
             children: [
               const SizedBox(height: 8),
-              Center(child: _avatar(email)),
-              const SizedBox(height: 12),
-              Center(child: Text(email, style: const TextStyle(fontWeight: FontWeight.w600, fontSize: 15))),
+              GestureDetector(
+                onTap: () async {
+                  final ok = await Navigator.push<bool>(
+                      context, MaterialPageRoute(builder: (_) => const ProfileScreen()));
+                  if (ok == true && mounted) setState(() {});
+                },
+                child: Column(
+                  children: [
+                    _avatar(_displayName(email)),
+                    const SizedBox(height: 12),
+                    Text(_displayName(email), style: const TextStyle(fontWeight: FontWeight.w700, fontSize: 17)),
+                    const SizedBox(height: 2),
+                    Text(email, style: TextStyle(color: context.brand.inkSoft, fontSize: 13)),
+                    const SizedBox(height: 4),
+                    Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        Icon(Icons.edit_outlined, size: 13, color: context.brand.brand),
+                        const SizedBox(width: 4),
+                        Text('Edit profile', style: TextStyle(color: context.brand.brand, fontSize: 12)),
+                      ],
+                    ),
+                  ],
+                ),
+              ),
               const SizedBox(height: 20),
 
               // Quick access: Orders + Saved
