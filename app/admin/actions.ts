@@ -17,6 +17,7 @@ import { saveSettings } from "@/lib/settings";
 import { refundPaystackTransaction, verifyPaystackTransaction } from "@/lib/paystack";
 import { markAffiliatePayoutPaid } from "@/lib/affiliate";
 import { vendorFollowerEmails } from "@/lib/follows";
+import { notify } from "@/lib/notifications";
 import { emailButton, emailText, isEmailConfigured } from "@/lib/email";
 
 const SITE_URL = process.env.NEXT_PUBLIC_SITE_URL ?? "http://localhost:3000";
@@ -78,6 +79,13 @@ async function setProductStatus(
         .maybeSingle();
       const vname = (v as { name?: string } | null)?.name ?? "A seller you follow";
       for (const to of followers) {
+        await notify({
+          email: to,
+          type: "launch",
+          title: `New from ${vname}: ${row.name}`,
+          body: "A store you follow just launched something.",
+          link: `/products/${row.slug}`,
+        });
         await sendEmail({
           to,
           subject: subjectSafe(`New from ${vname}: ${row.name}`),

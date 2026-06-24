@@ -82,6 +82,34 @@ class Api {
     );
   }
 
+  Future<({int unread, List<AppNotification> items})> notifications() async {
+    final res = await http.get(_u('/notifications'), headers: _authHeaders());
+    if (res.statusCode == 401) throw Exception('Please sign in.');
+    final body = jsonDecode(res.body) as Map<String, dynamic>;
+    return (
+      unread: (body['unread'] ?? 0) as int,
+      items: ((body['notifications'] ?? []) as List).map((n) => AppNotification.fromJson(n)).toList(),
+    );
+  }
+
+  Future<int> unreadCount() async {
+    try {
+      final session = Supabase.instance.client.auth.currentSession;
+      if (session == null) return 0;
+      return (await notifications()).unread;
+    } catch (_) {
+      return 0;
+    }
+  }
+
+  Future<void> markNotificationsRead([String? id]) async {
+    await http.post(
+      _u('/notifications'),
+      headers: _authHeaders(),
+      body: jsonEncode(id != null ? {'id': id} : {}),
+    );
+  }
+
   Future<List<OrderItem>> orders() async {
     final res = await http.get(_u('/orders'), headers: _authHeaders());
     if (res.statusCode == 401) throw Exception('Please sign in.');

@@ -96,6 +96,30 @@ class Store {
       );
 }
 
+class AppNotification {
+  final String id, type, title, createdAt;
+  final String? body, link;
+  final bool read;
+  AppNotification({
+    required this.id,
+    required this.type,
+    required this.title,
+    required this.createdAt,
+    required this.read,
+    this.body,
+    this.link,
+  });
+  factory AppNotification.fromJson(Map<String, dynamic> j) => AppNotification(
+        id: j['id'] ?? '',
+        type: j['type'] ?? 'system',
+        title: j['title'] ?? '',
+        createdAt: j['created_at'] ?? '',
+        read: j['read'] ?? false,
+        body: j['body'],
+        link: j['link'],
+      );
+}
+
 class OrderItem {
   final String id, productName, productSlug, status, currency, createdAt;
   final String? fulfilmentStatus, downloadUrl;

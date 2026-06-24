@@ -7,6 +7,7 @@ import '../theme.dart';
 import '../widgets/product_card.dart';
 import '../widgets/featured_carousel.dart';
 import '../widgets/skeletons.dart';
+import '../widgets/notification_bell.dart';
 import 'product_screen.dart';
 
 const _types = [
@@ -163,6 +164,7 @@ class _HomeScreenState extends State<HomeScreen> {
             icon: Icon(_searching ? Icons.close : Icons.search),
             onPressed: _toggleSearch,
           ),
+          if (!_searching) const NotificationBell(),
         ],
       ),
       body: FutureBuilder<List<Product>>(

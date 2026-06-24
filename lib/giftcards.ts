@@ -6,6 +6,7 @@ import { sendEmail, emailLayout, emailText, emailKeyBox, emailButton, esc, subje
 import { formatPrice } from "./format";
 import { giftDesign, giftGradient } from "./gift-designs";
 import { PLATFORM_COMMISSION_PERCENT } from "./paystack";
+import { notify } from "./notifications";
 
 const SITE_URL = process.env.NEXT_PUBLIC_SITE_URL ?? "http://localhost:3000";
 
@@ -147,6 +148,13 @@ export async function issueGiftCardFromPayment(opts: {
   if (recipient) {
     const amountStr = formatPrice(opts.amountMinor, "NGN");
     const d = giftDesign(opts.design);
+    await notify({
+      email: recipient,
+      type: "gift",
+      title: `You received a ${amountStr} gift card 🎁`,
+      body: `Code ${code} — use it at checkout.`,
+      link: "/gift-cards",
+    });
     const note = opts.message ? emailText(`“${esc(opts.message)}”`) : "";
     // A themed gift-card "face" rendered with inline styles (email-safe).
     const cardFace = `<table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="margin:0 0 18px;">

@@ -423,6 +423,22 @@ create table if not exists follows (
 alter table follows enable row level security;
 create index if not exists follows_vendor_idx on follows (vendor_id);
 
+-- In-app notifications.
+create table if not exists notifications (
+  id         uuid primary key default gen_random_uuid(),
+  user_id    uuid,
+  email      text,
+  type       text not null,
+  title      text not null,
+  body       text,
+  link       text,
+  read       boolean not null default false,
+  created_at timestamptz not null default now()
+);
+alter table notifications enable row level security;
+create index if not exists notifications_email_idx on notifications (email, created_at desc);
+create index if not exists notifications_user_idx on notifications (user_id, created_at desc);
+
 -- Wishlist / saved products.
 create table if not exists wishlists (
   id         uuid primary key default gen_random_uuid(),

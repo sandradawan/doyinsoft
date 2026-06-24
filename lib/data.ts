@@ -13,6 +13,7 @@ import { getSettings } from "./settings";
 import { incrementCouponUse } from "./coupons";
 import { redeemGiftCard } from "./giftcards";
 import { affiliateOwnsEmail } from "./affiliate";
+import { notify } from "./notifications";
 import { formatPrice } from "./format";
 
 const SITE_URL = process.env.NEXT_PUBLIC_SITE_URL ?? "http://localhost:3000";
@@ -1377,12 +1378,26 @@ export async function issueLicenseForOrder(
   if (!inserted) return null;
   const license = mapLicense(inserted as unknown as LicenseRow);
 
-  // 1) Buyer — branded receipt (+ licence & download for digital).
+  // 1) Buyer — branded receipt (+ licence & download for digital) + in-app alert.
   await sendReceiptForOrder(orderId);
+  await notify({
+    email: o.buyer_email || email,
+    type: "order",
+    title: `Your ${productName} order is ready`,
+    body: isDigital ? "Your licence key and download are available." : "Payment confirmed — the seller will fulfil it.",
+    link: "/account",
+  });
 
   // 2) Vendor — new-sale alert.
   const vendorEmail = await getVendorOwnerEmail(o.vendor_id);
   if (vendorEmail) {
+    await notify({
+      email: vendorEmail,
+      type: "order",
+      title: `You made a sale — ${productName}`,
+      body: `${amountStr} · order #${ref}`,
+      link: "/vendor/dashboard",
+    });
     await sendEmail({
       to: vendorEmail,
       subject: subjectSafe(`💰 You made a sale — ${productName}`),
@@ -1403,6 +1418,13 @@ export async function issueLicenseForOrder(
       .maybeSingle();
     const affEmail = (aff as { email?: string } | null)?.email;
     if (affEmail) {
+      await notify({
+        email: affEmail,
+        type: "affiliate",
+        title: `You earned ${formatPrice(commission, o.currency)}`,
+        body: `From a referral on ${productName}.`,
+        link: "/affiliate",
+      });
       await sendEmail({
         to: affEmail,
         subject: `🎉 You earned ${formatPrice(commission, o.currency)} on DoyinMart`,
