@@ -4,10 +4,7 @@ import 'package:supabase_flutter/supabase_flutter.dart';
 import 'config.dart';
 import 'theme.dart';
 import 'theme_controller.dart';
-import 'screens/home_screen.dart';
-import 'screens/stores_screen.dart';
-import 'screens/gift_cards_screen.dart';
-import 'screens/account_screen.dart';
+import 'screens/splash_screen.dart';
 
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -30,35 +27,7 @@ class DoyinMartApp extends StatelessWidget {
         theme: buildTheme(Brightness.light),
         darkTheme: buildTheme(Brightness.dark),
         themeMode: mode,
-        home: const RootShell(),
-      ),
-    );
-  }
-}
-
-class RootShell extends StatefulWidget {
-  const RootShell({super.key});
-  @override
-  State<RootShell> createState() => _RootShellState();
-}
-
-class _RootShellState extends State<RootShell> {
-  int _tab = 0;
-  final _screens = const [HomeScreen(), StoresScreen(), GiftCardsScreen(), AccountScreen()];
-
-  @override
-  Widget build(BuildContext context) {
-    return Scaffold(
-      body: IndexedStack(index: _tab, children: _screens),
-      bottomNavigationBar: BottomNavigationBar(
-        currentIndex: _tab,
-        onTap: (i) => setState(() => _tab = i),
-        items: const [
-          BottomNavigationBarItem(icon: Icon(Icons.storefront_outlined), label: 'Shop'),
-          BottomNavigationBarItem(icon: Icon(Icons.store_outlined), label: 'Stores'),
-          BottomNavigationBarItem(icon: Icon(Icons.card_giftcard_outlined), label: 'Gift cards'),
-          BottomNavigationBarItem(icon: Icon(Icons.person_outline), label: 'Account'),
-        ],
+        home: const SplashScreen(),
       ),
     );
   }
