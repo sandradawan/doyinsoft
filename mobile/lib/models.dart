@@ -71,6 +71,7 @@ class Store {
   final String slug, name, initials;
   final bool verified;
   final int products, downloads;
+  final String? bio, coverUrl;
   Store({
     required this.slug,
     required this.name,
@@ -78,6 +79,8 @@ class Store {
     required this.verified,
     required this.products,
     required this.downloads,
+    this.bio,
+    this.coverUrl,
   });
   factory Store.fromJson(Map<String, dynamic> j) => Store(
         slug: j['slug'] ?? '',
@@ -86,6 +89,8 @@ class Store {
         verified: j['verified'] ?? false,
         products: j['products'] ?? 0,
         downloads: j['downloads'] ?? 0,
+        bio: j['bio'],
+        coverUrl: j['cover_url'],
       );
 }
 

@@ -278,6 +278,52 @@ export async function getProductBySlug(slug: string): Promise<Product | null> {
 
 // ---- Vendor storefronts ------------------------------------------------------
 
+export interface StoreCard {
+  slug: string;
+  name: string;
+  initials: string;
+  verified: boolean;
+  bio: string | null;
+  cover_url: string | null;
+  products: number;
+  downloads: number;
+}
+
+/** Stores (non-suspended) with product/download counts + bio + cover for cards. */
+export async function getStoresWithDetails(): Promise<StoreCard[]> {
+  const products = await getProducts();
+  const agg = new Map<string, Omit<StoreCard, "bio" | "cover_url">>();
+  for (const p of products) {
+    if (p.vendor.suspended) continue;
+    const e =
+      agg.get(p.vendor.slug) ??
+      { slug: p.vendor.slug, name: p.vendor.name, initials: p.vendor.initials, verified: p.vendor.verified, products: 0, downloads: 0 };
+    e.products += 1;
+    e.downloads += p.download_count;
+    agg.set(p.vendor.slug, e);
+  }
+  const slugs = [...agg.keys()];
+  if (slugs.length === 0) return [];
+
+  // Enrich with bio + cover (resilient — empty if the columns/rows aren't there).
+  const extra = new Map<string, { bio: string | null; cover_url: string | null }>();
+  if (isSupabaseConfigured) {
+    try {
+      const supabase = await createClient();
+      const { data } = await supabase.from("vendors").select("slug, bio, cover_url").in("slug", slugs);
+      for (const v of (data as { slug: string; bio: string | null; cover_url: string | null }[]) ?? []) {
+        extra.set(v.slug, { bio: v.bio ?? null, cover_url: v.cover_url ?? null });
+      }
+    } catch {
+      // columns may not exist on an older schema — fall back to no bio/cover
+    }
+  }
+
+  return [...agg.values()]
+    .sort((a, b) => b.downloads - a.downloads)
+    .map((s) => ({ ...s, bio: extra.get(s.slug)?.bio ?? null, cover_url: extra.get(s.slug)?.cover_url ?? null }));
+}
+
 export async function getVendorBySlug(slug: string): Promise<Vendor | null> {
   if (!isSupabaseConfigured) return seedVendors.find((v) => v.slug === slug) ?? null;
   const supabase = await createClient();
