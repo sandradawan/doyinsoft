@@ -287,41 +287,71 @@ export interface StoreCard {
   cover_url: string | null;
   products: number;
   downloads: number;
+  followers: number;
 }
 
-/** Stores (non-suspended) with product/download counts + bio + cover for cards. */
+/** Stores (non-suspended) with product/download/follower counts + bio + cover. */
 export async function getStoresWithDetails(): Promise<StoreCard[]> {
   const products = await getProducts();
-  const agg = new Map<string, Omit<StoreCard, "bio" | "cover_url">>();
+  const agg = new Map<
+    string,
+    { id: string; slug: string; name: string; initials: string; verified: boolean; products: number; downloads: number }
+  >();
   for (const p of products) {
     if (p.vendor.suspended) continue;
     const e =
       agg.get(p.vendor.slug) ??
-      { slug: p.vendor.slug, name: p.vendor.name, initials: p.vendor.initials, verified: p.vendor.verified, products: 0, downloads: 0 };
+      {
+        id: p.vendor.id,
+        slug: p.vendor.slug,
+        name: p.vendor.name,
+        initials: p.vendor.initials,
+        verified: p.vendor.verified,
+        products: 0,
+        downloads: 0,
+      };
     e.products += 1;
     e.downloads += p.download_count;
     agg.set(p.vendor.slug, e);
   }
-  const slugs = [...agg.keys()];
-  if (slugs.length === 0) return [];
+  const stores = [...agg.values()];
+  if (stores.length === 0) return [];
+  const ids = stores.map((s) => s.id);
 
-  // Enrich with bio + cover (resilient — empty if the columns/rows aren't there).
+  // Enrich with bio/cover + follower counts (service-role, server-side; resilient).
   const extra = new Map<string, { bio: string | null; cover_url: string | null }>();
-  if (isSupabaseConfigured) {
+  const followers = new Map<string, number>();
+  if (hasServiceRole) {
     try {
-      const supabase = await createClient();
-      const { data } = await supabase.from("vendors").select("slug, bio, cover_url").in("slug", slugs);
-      for (const v of (data as { slug: string; bio: string | null; cover_url: string | null }[]) ?? []) {
-        extra.set(v.slug, { bio: v.bio ?? null, cover_url: v.cover_url ?? null });
+      const admin = createAdminClient();
+      const [{ data: v }, { data: f }] = await Promise.all([
+        admin.from("vendors").select("id, bio, cover_url").in("id", ids),
+        admin.from("follows").select("vendor_id").in("vendor_id", ids),
+      ]);
+      for (const row of (v as { id: string; bio: string | null; cover_url: string | null }[]) ?? []) {
+        extra.set(row.id, { bio: row.bio ?? null, cover_url: row.cover_url ?? null });
+      }
+      for (const row of (f as { vendor_id: string }[]) ?? []) {
+        followers.set(row.vendor_id, (followers.get(row.vendor_id) ?? 0) + 1);
       }
     } catch {
-      // columns may not exist on an older schema — fall back to no bio/cover
+      // older schema / unavailable — fall back to no bio/cover/followers
     }
   }
 
-  return [...agg.values()]
-    .sort((a, b) => b.downloads - a.downloads)
-    .map((s) => ({ ...s, bio: extra.get(s.slug)?.bio ?? null, cover_url: extra.get(s.slug)?.cover_url ?? null }));
+  return stores
+    .map((s) => ({
+      slug: s.slug,
+      name: s.name,
+      initials: s.initials,
+      verified: s.verified,
+      products: s.products,
+      downloads: s.downloads,
+      followers: followers.get(s.id) ?? 0,
+      bio: extra.get(s.id)?.bio ?? null,
+      cover_url: extra.get(s.id)?.cover_url ?? null,
+    }))
+    .sort((a, b) => b.followers - a.followers || b.downloads - a.downloads);
 }
 
 export async function getVendorBySlug(slug: string): Promise<Vendor | null> {

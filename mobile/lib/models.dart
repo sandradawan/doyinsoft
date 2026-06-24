@@ -70,7 +70,7 @@ class ProductDetail {
 class Store {
   final String slug, name, initials;
   final bool verified;
-  final int products, downloads;
+  final int products, downloads, followers;
   final String? bio, coverUrl;
   Store({
     required this.slug,
@@ -79,6 +79,7 @@ class Store {
     required this.verified,
     required this.products,
     required this.downloads,
+    this.followers = 0,
     this.bio,
     this.coverUrl,
   });
@@ -89,6 +90,7 @@ class Store {
         verified: j['verified'] ?? false,
         products: j['products'] ?? 0,
         downloads: j['downloads'] ?? 0,
+        followers: j['followers'] ?? 0,
         bio: j['bio'],
         coverUrl: j['cover_url'],
       );

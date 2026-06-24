@@ -42,17 +42,7 @@ class _AccountScreenState extends State<AccountScreen> {
       appBar: AppBar(
         title: const Text('Account'),
         centerTitle: true,
-        actions: [
-          if (_signedIn)
-            IconButton(
-              icon: const Icon(Icons.logout),
-              tooltip: 'Sign out',
-              onPressed: () async {
-                await Supabase.instance.client.auth.signOut();
-                _refresh();
-              },
-            ),
-        ],
+        actions: [_themeToggle(), if (_signedIn) _signOutButton()],
       ),
       body: _signedIn ? _buildSignedIn() : _buildSignedOut(),
     );
@@ -60,16 +50,36 @@ class _AccountScreenState extends State<AccountScreen> {
 
   // --- Reusable bits -----------------------------------------------------------
 
+  Widget _themeToggle() => ValueListenableBuilder<ThemeMode>(
+        valueListenable: ThemeController.instance,
+        builder: (context, mode, _) {
+          final isDark = mode == ThemeMode.dark ||
+              (mode == ThemeMode.system && MediaQuery.platformBrightnessOf(context) == Brightness.dark);
+          return IconButton(
+            tooltip: isDark ? 'Switch to light' : 'Switch to dark',
+            icon: Icon(isDark ? Icons.light_mode_outlined : Icons.dark_mode_outlined),
+            onPressed: () => ThemeController.instance.set(isDark ? ThemeMode.light : ThemeMode.dark),
+          );
+        },
+      );
+
+  Widget _signOutButton() => IconButton(
+        icon: const Icon(Icons.logout),
+        tooltip: 'Sign out',
+        onPressed: () async {
+          await Supabase.instance.client.auth.signOut();
+          _refresh();
+        },
+      );
+
   Widget _avatar(String seed, {double radius = 40}) => CircleAvatar(
         radius: radius,
         backgroundColor: Brand.tintDark,
-        child: Text(
-          (seed.isNotEmpty ? seed[0] : '?').toUpperCase(),
-          style: TextStyle(color: context.brand.brand, fontWeight: FontWeight.w700, fontSize: radius * 0.7),
-        ),
+        child: Text((seed.isNotEmpty ? seed[0] : '?').toUpperCase(),
+            style: TextStyle(color: context.brand.brand, fontWeight: FontWeight.w700, fontSize: radius * 0.7)),
       );
 
-  Widget _card({required String title, required Widget child}) => Container(
+  Widget _card({required String title, Widget? trailing, required Widget child}) => Container(
         width: double.infinity,
         margin: const EdgeInsets.only(bottom: 14),
         padding: const EdgeInsets.all(16),
@@ -81,7 +91,11 @@ class _AccountScreenState extends State<AccountScreen> {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Text(title, style: const TextStyle(fontWeight: FontWeight.w700, fontSize: 15)),
+            Row(children: [
+              Text(title, style: const TextStyle(fontWeight: FontWeight.w700, fontSize: 15)),
+              const Spacer(),
+              if (trailing != null) trailing,
+            ]),
             const SizedBox(height: 10),
             child,
           ],
@@ -90,49 +104,66 @@ class _AccountScreenState extends State<AccountScreen> {
 
   Widget _muted(String text) => Text(text, style: TextStyle(color: context.brand.inkSoft));
 
-  Widget _themeCard() => _card(
-        title: 'Appearance',
-        child: Row(
-          children: [
-            Icon(Icons.brightness_6_outlined, size: 20, color: context.brand.inkSoft),
-            const SizedBox(width: 10),
-            const Text('Theme'),
-            const Spacer(),
-            ValueListenableBuilder<ThemeMode>(
-              valueListenable: ThemeController.instance,
-              builder: (context, mode, _) => SegmentedButton<ThemeMode>(
-                style: const ButtonStyle(visualDensity: VisualDensity.compact),
-                segments: const [
-                  ButtonSegment(value: ThemeMode.system, label: Text('Auto')),
-                  ButtonSegment(value: ThemeMode.light, icon: Icon(Icons.light_mode, size: 16)),
-                  ButtonSegment(value: ThemeMode.dark, icon: Icon(Icons.dark_mode, size: 16)),
+  // Facebook-style following row: circular store avatars with names.
+  Widget _followingRow(List<Store> following) {
+    if (following.isEmpty) return _muted('You\'re not following any stores yet.');
+    return SizedBox(
+      height: 84,
+      child: ListView.separated(
+        scrollDirection: Axis.horizontal,
+        itemCount: following.length,
+        separatorBuilder: (_, __) => const SizedBox(width: 14),
+        itemBuilder: (context, i) {
+          final s = following[i];
+          return GestureDetector(
+            onTap: () => Navigator.push(
+                context, MaterialPageRoute(builder: (_) => StoreScreen(slug: s.slug, name: s.name))),
+            child: SizedBox(
+              width: 62,
+              child: Column(
+                children: [
+                  CircleAvatar(
+                    radius: 26,
+                    backgroundColor: Brand.tintDark,
+                    child: Text(s.initials,
+                        style: TextStyle(color: context.brand.brand, fontWeight: FontWeight.w700)),
+                  ),
+                  const SizedBox(height: 5),
+                  Text(s.name,
+                      maxLines: 1, overflow: TextOverflow.ellipsis, style: const TextStyle(fontSize: 11)),
                 ],
-                selected: {mode},
-                onSelectionChanged: (s) => ThemeController.instance.set(s.first),
               ),
             ),
-          ],
-        ),
+          );
+        },
+      ),
+    );
+  }
+
+  Widget _moreTiles() => Row(
+        children: [
+          _moreTile(Icons.payments_outlined, 'Earn', () => _openWeb('/affiliate', 'Affiliate')),
+          _moreTile(Icons.storefront_outlined, 'Sell', () => _openWeb('/vendor/dashboard', 'Vendor')),
+          _moreTile(Icons.card_giftcard_outlined, 'Gift cards', () => _openWeb('/gift-cards', 'Gift cards')),
+          _moreTile(Icons.description_outlined, 'Legal', () => _openWeb('/legal', 'Legal')),
+        ],
       );
 
-  Widget _linksCard() => _card(
-        title: 'More',
-        child: Column(
-          children: [
-            _link(Icons.payments_outlined, 'Earn — affiliate', () => _openWeb('/affiliate', 'Affiliate')),
-            _link(Icons.storefront_outlined, 'Sell on DoyinMart', () => _openWeb('/vendor/dashboard', 'Vendor')),
-            _link(Icons.description_outlined, 'Legal & policies', () => _openWeb('/legal', 'Legal')),
-          ],
+  Widget _moreTile(IconData icon, String label, VoidCallback onTap) => Expanded(
+        child: InkWell(
+          borderRadius: BorderRadius.circular(12),
+          onTap: onTap,
+          child: Padding(
+            padding: const EdgeInsets.symmetric(vertical: 6),
+            child: Column(
+              children: [
+                CircleAvatar(radius: 22, backgroundColor: Brand.tintDark, child: Icon(icon, size: 20, color: context.brand.brand)),
+                const SizedBox(height: 6),
+                Text(label, style: const TextStyle(fontSize: 11), textAlign: TextAlign.center),
+              ],
+            ),
+          ),
         ),
-      );
-
-  Widget _link(IconData icon, String label, VoidCallback onTap) => ListTile(
-        contentPadding: EdgeInsets.zero,
-        dense: true,
-        leading: Icon(icon, size: 20),
-        title: Text(label),
-        trailing: const Icon(Icons.chevron_right, size: 18),
-        onTap: onTap,
       );
 
   // --- Signed-out --------------------------------------------------------------
@@ -144,34 +175,27 @@ class _AccountScreenState extends State<AccountScreen> {
         const SizedBox(height: 24),
         Center(child: _avatar('?')),
         const SizedBox(height: 16),
-        const Center(
-          child: Text('Welcome to DoyinMart', style: TextStyle(fontWeight: FontWeight.w700, fontSize: 18)),
-        ),
+        const Center(child: Text('Welcome to DoyinMart', style: TextStyle(fontWeight: FontWeight.w700, fontSize: 18))),
         const SizedBox(height: 6),
         Center(
           child: Padding(
             padding: const EdgeInsets.symmetric(horizontal: 24),
-            child: Text(
-              'Sign in to see your purchases, license keys, gift cards and the stores you follow.',
-              textAlign: TextAlign.center,
-              style: TextStyle(color: context.brand.inkSoft),
-            ),
+            child: Text('Sign in to see your purchases, license keys, gift cards and the stores you follow.',
+                textAlign: TextAlign.center, style: TextStyle(color: context.brand.inkSoft)),
           ),
         ),
         const SizedBox(height: 20),
         Center(
           child: ElevatedButton(
             onPressed: () async {
-              final ok = await Navigator.push<bool>(
-                  context, MaterialPageRoute(builder: (_) => const SignInScreen()));
+              final ok = await Navigator.push<bool>(context, MaterialPageRoute(builder: (_) => const SignInScreen()));
               if (ok == true) _refresh();
             },
             child: const Text('Sign in or create an account'),
           ),
         ),
         const SizedBox(height: 28),
-        _themeCard(),
-        _linksCard(),
+        _card(title: 'More', child: _moreTiles()),
       ],
     );
   }
@@ -188,13 +212,10 @@ class _AccountScreenState extends State<AccountScreen> {
           child: ListView(
             padding: const EdgeInsets.all(16),
             children: [
-              // Centered profile header
               const SizedBox(height: 8),
               Center(child: _avatar(email)),
               const SizedBox(height: 12),
               Center(child: Text(email, style: const TextStyle(fontWeight: FontWeight.w600, fontSize: 15))),
-              const SizedBox(height: 2),
-              Center(child: Text('Signed in', style: TextStyle(color: context.brand.inkSoft, fontSize: 12))),
               const SizedBox(height: 24),
 
               if (snap.connectionState == ConnectionState.waiting)
@@ -204,67 +225,69 @@ class _AccountScreenState extends State<AccountScreen> {
               else ...[
                 _card(
                   title: 'Following',
-                  child: snap.data!.following.isEmpty
-                      ? _muted('You\'re not following any stores yet.')
-                      : Wrap(
-                          spacing: 8,
-                          runSpacing: 8,
-                          children: snap.data!.following
-                              .map((s) => ActionChip(
-                                    avatar: CircleAvatar(
-                                        backgroundColor: Brand.tintDark,
-                                        child: Text(s.initials,
-                                            style: TextStyle(fontSize: 10, color: context.brand.brand))),
-                                    label: Text(s.name),
-                                    onPressed: () => Navigator.push(context,
-                                        MaterialPageRoute(builder: (_) => StoreScreen(slug: s.slug, name: s.name))),
-                                  ))
-                              .toList(),
-                        ),
+                  trailing: Text('${snap.data!.following.length}',
+                      style: TextStyle(color: context.brand.inkSoft, fontWeight: FontWeight.w600)),
+                  child: _followingRow(snap.data!.following),
                 ),
-                _card(
-                  title: 'Your gift cards',
-                  child: snap.data!.giftCards.isEmpty
-                      ? _muted('No gift cards yet.')
-                      : Column(
-                          children: snap.data!.giftCards
-                              .map((g) => ListTile(
-                                    contentPadding: EdgeInsets.zero,
-                                    dense: true,
-                                    title: Text(g.code,
-                                        style: const TextStyle(fontFamily: 'monospace', fontSize: 12)),
-                                    subtitle: Text(g.status, style: TextStyle(color: context.brand.inkSoft)),
-                                    trailing: Text(naira(g.balanceMinor),
-                                        style: const TextStyle(fontWeight: FontWeight.w700)),
-                                  ))
-                              .toList(),
-                        ),
-                ),
-                _card(
-                  title: 'Your purchases',
-                  child: snap.data!.licenses.isEmpty
-                      ? _muted('No purchases yet.')
-                      : Column(
-                          children: snap.data!.licenses
+
+                if (snap.data!.giftCards.isNotEmpty)
+                  _card(
+                    title: 'Gift cards',
+                    trailing: Text('${snap.data!.giftCards.length}',
+                        style: TextStyle(color: context.brand.inkSoft, fontWeight: FontWeight.w600)),
+                    child: Column(
+                      children: snap.data!.giftCards
+                          .map((g) => ListTile(
+                                contentPadding: EdgeInsets.zero,
+                                dense: true,
+                                title: Text(g.code, style: const TextStyle(fontFamily: 'monospace', fontSize: 12)),
+                                subtitle: Text(g.status, style: TextStyle(color: context.brand.inkSoft)),
+                                trailing: Text(naira(g.balanceMinor), style: const TextStyle(fontWeight: FontWeight.w700)),
+                              ))
+                          .toList(),
+                    ),
+                  ),
+
+                // Minimized purchases: collapsed by default, expands to the list.
+                Container(
+                  margin: const EdgeInsets.only(bottom: 14),
+                  decoration: BoxDecoration(
+                    color: context.brand.surface,
+                    borderRadius: BorderRadius.circular(14),
+                    border: Border.all(color: context.brand.line),
+                  ),
+                  clipBehavior: Clip.antiAlias,
+                  child: Theme(
+                    data: Theme.of(context).copyWith(dividerColor: Colors.transparent),
+                    child: ExpansionTile(
+                      tilePadding: const EdgeInsets.symmetric(horizontal: 16),
+                      leading: Icon(Icons.shopping_bag_outlined, color: context.brand.brand),
+                      title: const Text('Your purchases', style: TextStyle(fontWeight: FontWeight.w700, fontSize: 15)),
+                      trailing: Text('${snap.data!.licenses.length}',
+                          style: TextStyle(color: context.brand.inkSoft, fontWeight: FontWeight.w600)),
+                      childrenPadding: const EdgeInsets.fromLTRB(16, 0, 16, 8),
+                      children: snap.data!.licenses.isEmpty
+                          ? [Padding(padding: const EdgeInsets.only(bottom: 12), child: _muted('No purchases yet.'))]
+                          : snap.data!.licenses
                               .map((l) => ListTile(
                                     contentPadding: EdgeInsets.zero,
+                                    dense: true,
                                     title: Text('${l.productName}  v${l.productVersion}',
                                         style: const TextStyle(fontWeight: FontWeight.w600)),
-                                    subtitle: Text(l.key,
-                                        style: TextStyle(fontSize: 11, color: context.brand.inkSoft)),
+                                    subtitle: Text(l.key, style: TextStyle(fontSize: 11, color: context.brand.inkSoft)),
                                     trailing: TextButton(
-                                      onPressed: () => launchUrl(Uri.parse(l.downloadUrl),
-                                          mode: LaunchMode.externalApplication),
+                                      onPressed: () =>
+                                          launchUrl(Uri.parse(l.downloadUrl), mode: LaunchMode.externalApplication),
                                       child: const Text('Download'),
                                     ),
                                   ))
                               .toList(),
-                        ),
+                    ),
+                  ),
                 ),
               ],
 
-              _linksCard(),
-              _themeCard(),
+              _card(title: 'More', child: _moreTiles()),
               const SizedBox(height: 16),
             ],
           ),
