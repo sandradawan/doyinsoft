@@ -83,7 +83,7 @@ class Api {
     if (res.statusCode == 200 && json_['ok'] == true) {
       return (ok: true, message: 'Thanks — your review has been posted.');
     }
-    return (ok: false, message: json_['error'] ?? 'Could not post review.');
+    return (ok: false, message: (json_['error'] as String?) ?? 'Could not post review.');
   }
 
   /// Toggle following a store. Returns the new following state.
@@ -109,6 +109,6 @@ class Api {
     if (body['ok'] == true) {
       return (ok: true, message: 'Balance: ${naira(body['balance_minor'] ?? 0)}');
     }
-    return (ok: false, message: body['error'] ?? 'That code isn\'t valid.');
+    return (ok: false, message: (body['error'] as String?) ?? 'That code isn\'t valid.');
   }
 }

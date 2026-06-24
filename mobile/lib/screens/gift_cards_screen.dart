@@ -53,9 +53,9 @@ class _GiftCardsScreenState extends State<GiftCardsScreen> {
                 colors: [Color(0xFF0B5E46), Color(0xFF022C22)],
               ),
             ),
-            child: Column(
+            child: const Column(
               crossAxisAlignment: CrossAxisAlignment.start,
-              children: const [
+              children: [
                 Text('DoyinMart', style: TextStyle(color: Colors.white, fontWeight: FontWeight.w700, fontSize: 16)),
                 SizedBox(height: 24),
                 Text('GIFT CARD',
