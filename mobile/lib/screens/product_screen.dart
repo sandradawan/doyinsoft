@@ -1,7 +1,10 @@
 import 'package:flutter/material.dart';
 import 'package:cached_network_image/cached_network_image.dart';
 
+import 'package:share_plus/share_plus.dart';
+
 import '../api.dart';
+import '../config.dart';
 import '../models.dart';
 import '../recent.dart';
 import '../theme.dart';
@@ -147,6 +150,7 @@ class _ProductScreenState extends State<ProductScreen> {
   late Future<ProductDetail> _future;
   bool _saved = false;
   bool _saveBusy = false;
+  String _name = '';
 
   @override
   void initState() {
@@ -154,6 +158,7 @@ class _ProductScreenState extends State<ProductScreen> {
     _future = Api.instance.product(widget.slug);
     _future.then((d) {
       final p = d.product;
+      _name = p['name'] ?? '';
       RecentViews.add({
         'slug': p['slug'],
         'name': p['name'],
@@ -161,6 +166,11 @@ class _ProductScreenState extends State<ProductScreen> {
         'icon_url': p['icon_url'],
       });
     }).catchError((_) {});
+  }
+
+  void _share() {
+    final label = _name.isNotEmpty ? _name : 'this product';
+    Share.share('$label on DoyinMart: ${Config.apiBase}/products/${widget.slug}');
   }
 
   void _snack(String msg) {
@@ -211,7 +221,12 @@ class _ProductScreenState extends State<ProductScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(title: const Text('Product')),
+      appBar: AppBar(
+        title: const Text('Product'),
+        actions: [
+          IconButton(onPressed: _share, icon: const Icon(Icons.share_outlined), tooltip: 'Share'),
+        ],
+      ),
       body: FutureBuilder<ProductDetail>(
         future: _future,
         builder: (context, snap) {
