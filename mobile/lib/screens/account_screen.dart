@@ -31,7 +31,9 @@ class _AccountScreenState extends State<AccountScreen> {
     if (_signedIn) _future = Api.instance.me();
   }
 
-  void _refresh() => setState(() => _future = _signedIn ? Api.instance.me() : null);
+  void _refresh() => setState(() {
+        _future = _signedIn ? Api.instance.me() : null;
+      });
 
   void _openWeb(String path, String title) => Navigator.push(
         context,

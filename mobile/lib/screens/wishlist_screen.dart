@@ -37,7 +37,9 @@ class _WishlistScreenState extends State<WishlistScreen> {
             );
           }
           return RefreshIndicator(
-            onRefresh: () async => setState(() => _future = Api.instance.wishlist()),
+            onRefresh: () async => setState(() {
+              _future = Api.instance.wishlist();
+            }),
             child: GridView.builder(
               padding: const EdgeInsets.all(16),
               gridDelegate: const SliverGridDelegateWithMaxCrossAxisExtent(

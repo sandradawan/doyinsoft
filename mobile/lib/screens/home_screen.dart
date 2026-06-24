@@ -53,7 +53,9 @@ class _HomeScreenState extends State<HomeScreen> {
     super.dispose();
   }
 
-  void _reload() => setState(() => _future = Api.instance.catalog(q: _q, type: _type));
+  void _reload() => setState(() {
+        _future = Api.instance.catalog(q: _q, type: _type);
+      });
 
   void _toggleSearch() {
     setState(() => _searching = !_searching);

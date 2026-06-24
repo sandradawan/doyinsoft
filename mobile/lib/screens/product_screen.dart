@@ -201,7 +201,11 @@ class _ProductScreenState extends State<ProductScreen> {
       body: result.body,
     );
     _snack(res.message);
-    if (res.ok) setState(() => _future = Api.instance.product(widget.slug));
+    if (res.ok) {
+      setState(() {
+        _future = Api.instance.product(widget.slug);
+      });
+    }
   }
 
   @override

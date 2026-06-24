@@ -76,7 +76,9 @@ class _NotificationsScreenState extends State<NotificationsScreen> {
             );
           }
           return RefreshIndicator(
-            onRefresh: () async => setState(() => _future = Api.instance.notifications()),
+            onRefresh: () async => setState(() {
+              _future = Api.instance.notifications();
+            }),
             child: ListView.separated(
               itemCount: items.length,
               separatorBuilder: (_, __) => Divider(color: context.brand.line, height: 1),

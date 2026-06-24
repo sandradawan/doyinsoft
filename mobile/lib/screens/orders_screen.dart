@@ -45,7 +45,9 @@ class _OrdersScreenState extends State<OrdersScreen> {
             return const Center(child: Text('No orders yet.'));
           }
           return RefreshIndicator(
-            onRefresh: () async => setState(() => _future = Api.instance.orders()),
+            onRefresh: () async => setState(() {
+              _future = Api.instance.orders();
+            }),
             child: ListView.separated(
               padding: const EdgeInsets.all(16),
               itemCount: orders.length,

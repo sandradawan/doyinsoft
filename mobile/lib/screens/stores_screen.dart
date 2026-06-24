@@ -65,7 +65,9 @@ class _StoresScreenState extends State<StoresScreen> {
                   children: [
                     Expanded(
                       child: RefreshIndicator(
-                        onRefresh: () async => setState(() => _future = Api.instance.stores()),
+                        onRefresh: () async => setState(() {
+                          _future = Api.instance.stores();
+                        }),
                         child: GridView.builder(
                           padding: const EdgeInsets.fromLTRB(12, 0, 12, 8),
                           gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
