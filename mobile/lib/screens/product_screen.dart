@@ -3,6 +3,7 @@ import 'package:cached_network_image/cached_network_image.dart';
 
 import '../api.dart';
 import '../models.dart';
+import '../recent.dart';
 import '../theme.dart';
 import 'checkout_webview.dart';
 
@@ -151,6 +152,15 @@ class _ProductScreenState extends State<ProductScreen> {
   void initState() {
     super.initState();
     _future = Api.instance.product(widget.slug);
+    _future.then((d) {
+      final p = d.product;
+      RecentViews.add({
+        'slug': p['slug'],
+        'name': p['name'],
+        'price_minor': p['price_minor'] ?? 0,
+        'icon_url': p['icon_url'],
+      });
+    }).catchError((_) {});
   }
 
   void _snack(String msg) {

@@ -2,10 +2,12 @@ import 'package:flutter/material.dart';
 
 import '../api.dart';
 import '../models.dart';
+import '../recent.dart';
 import '../theme.dart';
 import '../widgets/product_card.dart';
 import '../widgets/featured_carousel.dart';
 import '../widgets/skeletons.dart';
+import 'product_screen.dart';
 
 const _types = [
   (label: 'All', value: null),
@@ -23,6 +25,7 @@ class HomeScreen extends StatefulWidget {
 class _HomeScreenState extends State<HomeScreen> {
   late Future<List<Product>> _future;
   late Future<List<Product>> _featured;
+  List<Map<String, dynamic>> _recent = [];
   final _searchCtrl = TextEditingController();
   final _searchFocus = FocusNode();
   bool _searching = false;
@@ -34,6 +37,12 @@ class _HomeScreenState extends State<HomeScreen> {
     super.initState();
     _future = Api.instance.catalog();
     _featured = Api.instance.catalog();
+    _loadRecent();
+  }
+
+  Future<void> _loadRecent() async {
+    final r = await RecentViews.get();
+    if (mounted) setState(() => _recent = r);
   }
 
   @override
@@ -59,6 +68,62 @@ class _HomeScreenState extends State<HomeScreen> {
   }
 
   bool get _showHero => !_searching && _q.isEmpty && _type == null;
+
+  Widget _recentRail() {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        const Padding(
+          padding: EdgeInsets.fromLTRB(16, 12, 16, 8),
+          child: Text('Recently viewed', style: TextStyle(fontWeight: FontWeight.w700, fontSize: 16)),
+        ),
+        SizedBox(
+          height: 148,
+          child: ListView.builder(
+            scrollDirection: Axis.horizontal,
+            padding: const EdgeInsets.symmetric(horizontal: 12),
+            itemCount: _recent.length,
+            itemBuilder: (context, i) {
+              final r = _recent[i];
+              final icon = r['icon_url'] as String?;
+              return GestureDetector(
+                onTap: () => Navigator.push(
+                    context, MaterialPageRoute(builder: (_) => ProductScreen(slug: r['slug'] ?? ''))),
+                child: Container(
+                  width: 118,
+                  margin: const EdgeInsets.symmetric(horizontal: 4),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      ClipRRect(
+                        borderRadius: BorderRadius.circular(10),
+                        child: SizedBox(
+                          height: 88,
+                          width: 118,
+                          child: icon != null
+                              ? Image.network(icon,
+                                  fit: BoxFit.cover,
+                                  errorBuilder: (_, __, ___) => const ColoredBox(color: Colors.black12))
+                              : const ColoredBox(color: Colors.black12),
+                        ),
+                      ),
+                      const SizedBox(height: 4),
+                      Text(r['name'] ?? '',
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                          style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w600)),
+                      Text(naira(r['price_minor'] ?? 0),
+                          style: TextStyle(fontSize: 12, color: context.brand.brand, fontWeight: FontWeight.w700)),
+                    ],
+                  ),
+                ),
+              );
+            },
+          ),
+        ),
+      ],
+    );
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -113,10 +178,12 @@ class _HomeScreenState extends State<HomeScreen> {
           return RefreshIndicator(
             onRefresh: () async {
               _featured = Api.instance.catalog();
+              _loadRecent();
               _reload();
             },
             child: CustomScrollView(
               slivers: [
+                if (_showHero && _recent.isNotEmpty) SliverToBoxAdapter(child: _recentRail()),
                 if (_showHero)
                   SliverToBoxAdapter(
                     child: Padding(

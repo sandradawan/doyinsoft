@@ -35,10 +35,26 @@ flutter build apk   --dart-define=API_BASE=... --dart-define=SUPABASE_URL=... --
 flutter build ipa   --dart-define=...
 ```
 
-## Notes / next steps
-- This is the **store app**. The dedicated **DmartCard** gift-card app reuses the
-  same `api.dart` + `theme.dart` (see `docs/dmartcard-app-plan.md`).
-- Planned: push notifications (FCM), Riverpod for state, offline caching, QR scan
-  to redeem (mobile_scanner), and a native checkout via the Paystack mobile SDK.
+## Features (shared with the web)
+- **Shop** — featured carousel, collapsible search, type filters, recently viewed, shimmer skeletons.
+- **Stores** — searchable, paginated card grid (avatar, bio, followers, items) → store profile (follow).
+- **Product** — image gallery (zoom), reviews, Buy (WebView), Follow, Review, **Save** (wishlist).
+- **Gift cards** — buy (WebView) + balance check.
+- **Account** — centered profile, Orders + Saved quick tiles, Facebook-style Following row,
+  gift cards, minimized purchases, theme toggle (light/dark), affiliate/sell/legal links.
+- **Orders** and **Wishlist** are shared with the web via `/api/mobile/orders` and `/wishlist`.
+
+## Push notifications (needs your Firebase project — not yet wired)
+The hooks exist server-side (orders paid, gift received, followed-store launches). To enable:
+1. Create a Firebase project; add Android (`google-services.json`) + iOS apps via `flutterfire configure`.
+2. Add `firebase_core` + `firebase_messaging`; request permission and read the FCM token on sign-in.
+3. Add a `device_tokens` table (`user_id`, `token`) + a `POST /api/mobile/device-token` endpoint.
+4. Server-side: on order paid / gift issued / product approved, look up the user's tokens and send
+   via the FCM HTTP v1 API using a Firebase service-account key (server-only env var).
+
+## Notes
+- The dedicated **DmartCard** gift-card app reuses the same `api.dart` + `theme.dart`
+  (see `docs/dmartcard-app-plan.md`).
 - The native shell never holds the service role; privileged actions go through the
   JWT-authenticated API or the WebView flow.
+- Regenerate icon/splash: `dart run flutter_launcher_icons && dart run flutter_native_splash:create`.
