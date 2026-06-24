@@ -1,0 +1,24 @@
+name: doyinmart
+description: DoyinMart — marketplace app (Flutter). Same theme & features as the web.
+publish_to: "none"
+version: 1.0.0+1
+
+environment:
+  sdk: ">=3.3.0 <4.0.0"
+
+dependencies:
+  flutter:
+    sdk: flutter
+  supabase_flutter: ^2.5.0        # auth (email/OTP) + session token for the API
+  http: ^1.2.0                    # REST calls to /api/mobile/*
+  webview_flutter: ^4.7.0         # checkout / gift-card purchase in the hardened web flow
+  cached_network_image: ^3.3.1    # low-bandwidth image caching
+  intl: ^0.19.0                   # ₦ formatting
+  url_launcher: ^6.2.6            # open download links externally
+  cupertino_icons: ^1.0.6
+
+dev_dependencies:
+  flutter_lints: ^4.0.0
+
+flutter:
+  uses-material-design: true
