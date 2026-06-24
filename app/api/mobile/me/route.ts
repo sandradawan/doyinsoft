@@ -1,4 +1,4 @@
-import { getLicensesByEmail } from "@/lib/data";
+import { getLicensesByEmail, getStoreByOwner } from "@/lib/data";
 import { getGiftCardsForEmail } from "@/lib/giftcards";
 import { getFollowedVendors } from "@/lib/follows";
 import { json, preflight, getMobileUser } from "@/lib/mobile/api";
@@ -15,14 +15,16 @@ export async function GET(request: Request) {
   const user = await getMobileUser(request);
   if (!user) return json({ error: "Unauthorized" }, 401);
 
-  const [licenses, giftCards, following] = await Promise.all([
+  const [licenses, giftCards, following, store] = await Promise.all([
     getLicensesByEmail(user.email),
     getGiftCardsForEmail(user.email),
     getFollowedVendors(user.id),
+    getStoreByOwner(user.id),
   ]);
 
   return json({
     user: { id: user.id, email: user.email },
+    store: store ? { slug: store.slug, name: store.name } : null,
     following: following.map((v) => ({
       slug: v.slug,
       name: v.name,

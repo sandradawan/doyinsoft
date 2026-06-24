@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:url_launcher/url_launcher.dart';
+import 'package:share_plus/share_plus.dart';
 
 import '../api.dart';
 import '../config.dart';
@@ -21,7 +22,7 @@ class AccountScreen extends StatefulWidget {
 }
 
 class _AccountScreenState extends State<AccountScreen> {
-  Future<({List<License> licenses, List<GiftCard> giftCards, List<Store> following})>? _future;
+  Future<({List<License> licenses, List<GiftCard> giftCards, List<Store> following, ({String slug, String name})? store})>? _future;
 
   bool get _signedIn =>
       Config.supabaseConfigured && Supabase.instance.client.auth.currentSession != null;
@@ -114,6 +115,41 @@ class _AccountScreenState extends State<AccountScreen> {
       );
 
   Widget _muted(String text) => Text(text, style: TextStyle(color: context.brand.inkSoft));
+
+  Widget _storeCard(String slug, String name) {
+    final link = '${Config.apiBase}/store/$slug';
+    return _card(
+      title: 'Your store',
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(name, style: const TextStyle(fontWeight: FontWeight.w600)),
+          const SizedBox(height: 2),
+          Text(link, maxLines: 1, overflow: TextOverflow.ellipsis,
+              style: TextStyle(color: context.brand.inkSoft, fontSize: 12)),
+          const SizedBox(height: 10),
+          Row(children: [
+            Expanded(
+              child: OutlinedButton.icon(
+                onPressed: () => Navigator.push(
+                    context, MaterialPageRoute(builder: (_) => StoreScreen(slug: slug, name: name))),
+                icon: const Icon(Icons.storefront_outlined, size: 18),
+                label: const Text('Open'),
+              ),
+            ),
+            const SizedBox(width: 8),
+            Expanded(
+              child: OutlinedButton.icon(
+                onPressed: () => Share.share('Visit my store $name on DoyinMart: $link'),
+                icon: const Icon(Icons.share_outlined, size: 18),
+                label: const Text('Share'),
+              ),
+            ),
+          ]),
+        ],
+      ),
+    );
+  }
 
   Widget _quickTile(IconData icon, String label, VoidCallback onTap) => InkWell(
         borderRadius: BorderRadius.circular(14),
@@ -235,7 +271,7 @@ class _AccountScreenState extends State<AccountScreen> {
 
   Widget _buildSignedIn() {
     final email = Supabase.instance.client.auth.currentUser?.email ?? '';
-    return FutureBuilder<({List<License> licenses, List<GiftCard> giftCards, List<Store> following})>(
+    return FutureBuilder<({List<License> licenses, List<GiftCard> giftCards, List<Store> following, ({String slug, String name})? store})>(
       future: _future,
       builder: (context, snap) {
         return RefreshIndicator(
@@ -284,6 +320,7 @@ class _AccountScreenState extends State<AccountScreen> {
               else if (snap.hasError)
                 _card(title: 'Account', child: _muted('Couldn\'t load your account. Pull to refresh.'))
               else ...[
+                if (snap.data!.store != null) _storeCard(snap.data!.store!.slug, snap.data!.store!.name),
                 _card(
                   title: 'Following',
                   trailing: Text('${snap.data!.following.length}',

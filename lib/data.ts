@@ -355,6 +355,17 @@ export async function getStoresWithDetails(): Promise<StoreCard[]> {
     .sort((a, b) => b.followers - a.followers || b.downloads - a.downloads);
 }
 
+/** The store owned by a user (for "Your store" in the account), or null. */
+export async function getStoreByOwner(userId: string): Promise<{ slug: string; name: string } | null> {
+  if (!hasServiceRole || !userId) return null;
+  const { data } = await createAdminClient()
+    .from("vendors")
+    .select("slug, name")
+    .eq("owner", userId)
+    .maybeSingle();
+  return (data as { slug: string; name: string }) ?? null;
+}
+
 export async function getVendorBySlug(slug: string): Promise<Vendor | null> {
   if (!isSupabaseConfigured) return seedVendors.find((v) => v.slug === slug) ?? null;
   const supabase = await createClient();

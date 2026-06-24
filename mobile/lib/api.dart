@@ -79,14 +79,22 @@ class Api {
     );
   }
 
-  Future<({List<License> licenses, List<GiftCard> giftCards, List<Store> following})> me() async {
+  Future<
+      ({
+        List<License> licenses,
+        List<GiftCard> giftCards,
+        List<Store> following,
+        ({String slug, String name})? store
+      })> me() async {
     final res = await http.get(_u('/me'), headers: _authHeaders());
     if (res.statusCode == 401) throw Exception('Please sign in.');
     final body = jsonDecode(res.body) as Map<String, dynamic>;
+    final s = body['store'];
     return (
       licenses: ((body['licenses'] ?? []) as List).map((l) => License.fromJson(l)).toList(),
       giftCards: ((body['gift_cards'] ?? []) as List).map((g) => GiftCard.fromJson(g)).toList(),
       following: ((body['following'] ?? []) as List).map((s) => Store.fromJson(s)).toList(),
+      store: s != null ? (slug: (s['slug'] ?? '') as String, name: (s['name'] ?? '') as String) : null,
     );
   }
 

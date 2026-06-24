@@ -1,6 +1,9 @@
 import 'package:flutter/material.dart';
+import 'package:url_launcher/url_launcher.dart';
+import 'package:share_plus/share_plus.dart';
 
 import '../api.dart';
+import '../config.dart';
 import '../models.dart';
 import '../theme.dart';
 import '../widgets/product_card.dart';
@@ -40,6 +43,19 @@ class _StoreScreenState extends State<StoreScreen> {
       if (mounted) setState(() => _followBusy = false);
     }
   }
+
+  String get _link => '${Config.apiBase}/store/${widget.slug}';
+
+  Future<void> _whatsapp(String number) async {
+    final digits = number.replaceAll(RegExp(r'[^0-9]'), '');
+    final text = Uri.encodeComponent('Hi, I found your store on DoyinMart: $_link');
+    final uri = Uri.parse('https://wa.me/$digits?text=$text');
+    if (!await launchUrl(uri, mode: LaunchMode.externalApplication) && mounted) {
+      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Could not open WhatsApp.')));
+    }
+  }
+
+  void _share(String name) => Share.share('Check out $name on DoyinMart: $_link');
 
   @override
   Widget build(BuildContext context) {
@@ -96,14 +112,31 @@ class _StoreScreenState extends State<StoreScreen> {
                         Text(store['bio'], style: const TextStyle(height: 1.4)),
                       ],
                       const SizedBox(height: 14),
-                      SizedBox(
-                        width: double.infinity,
-                        child: OutlinedButton.icon(
-                          onPressed: _followBusy ? null : _follow,
-                          icon: const Icon(Icons.add, size: 18),
-                          label: const Text('Follow store'),
+                      Row(children: [
+                        Expanded(
+                          child: OutlinedButton.icon(
+                            onPressed: _followBusy ? null : _follow,
+                            icon: const Icon(Icons.add, size: 18),
+                            label: const Text('Follow'),
+                          ),
                         ),
-                      ),
+                        if ((store['whatsapp'] ?? '').toString().isNotEmpty) ...[
+                          const SizedBox(width: 8),
+                          OutlinedButton(
+                            onPressed: () => _whatsapp(store['whatsapp']),
+                            style: OutlinedButton.styleFrom(
+                                minimumSize: const Size(48, 44), padding: EdgeInsets.zero),
+                            child: const Icon(Icons.chat_outlined, size: 20),
+                          ),
+                        ],
+                        const SizedBox(width: 8),
+                        OutlinedButton(
+                          onPressed: () => _share(store['name'] ?? 'this store'),
+                          style: OutlinedButton.styleFrom(
+                              minimumSize: const Size(48, 44), padding: EdgeInsets.zero),
+                          child: const Icon(Icons.share_outlined, size: 20),
+                        ),
+                      ]),
                       const SizedBox(height: 8),
                       const Text('Products', style: TextStyle(fontWeight: FontWeight.w600, fontSize: 16)),
                     ],
