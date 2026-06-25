@@ -43,11 +43,26 @@ class _SignInScreenState extends State<SignInScreen> {
     try {
       final auth = Supabase.instance.client.auth;
       if (_signUp) {
-        await auth.signUp(
+        final res = await auth.signUp(
           email: _email.text.trim(),
           password: _password.text,
           data: _name.text.trim().isNotEmpty ? {'display_name': _name.text.trim()} : null,
         );
+        // No session back → Supabase requires email confirmation first.
+        if (res.session == null) {
+          if (mounted) {
+            setState(() {
+              _signUp = false;
+              _busy = false;
+              _error = null;
+            });
+            ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
+              content: Text('Check your email to confirm your account, then sign in.'),
+              duration: Duration(seconds: 5),
+            ));
+          }
+          return;
+        }
       } else {
         await auth.signInWithPassword(email: _email.text.trim(), password: _password.text);
       }
@@ -58,6 +73,44 @@ class _SignInScreenState extends State<SignInScreen> {
       setState(() => _error = '$e');
     } finally {
       if (mounted) setState(() => _busy = false);
+    }
+  }
+
+  Future<void> _forgotPassword() async {
+    final ctrl = TextEditingController(text: _email.text.trim());
+    final email = await showDialog<String>(
+      context: context,
+      builder: (_) => AlertDialog(
+        title: const Text('Reset password'),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            const Text('We’ll email you a link to reset your password.'),
+            const SizedBox(height: 12),
+            TextField(
+              controller: ctrl,
+              keyboardType: TextInputType.emailAddress,
+              decoration: const InputDecoration(hintText: 'you@example.com'),
+            ),
+          ],
+        ),
+        actions: [
+          TextButton(onPressed: () => Navigator.pop(context), child: const Text('Cancel')),
+          ElevatedButton(onPressed: () => Navigator.pop(context, ctrl.text.trim()), child: const Text('Send link')),
+        ],
+      ),
+    );
+    if (email == null || email.isEmpty) return;
+    try {
+      await Supabase.instance.client.auth.resetPasswordForEmail(email);
+      if (mounted) {
+        ScaffoldMessenger.of(context)
+            .showSnackBar(SnackBar(content: Text('Password reset link sent to $email.')));
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('$e')));
+      }
     }
   }
 
@@ -163,7 +216,16 @@ class _SignInScreenState extends State<SignInScreen> {
                       ),
                     ),
                   ),
-                  const SizedBox(height: 20),
+                  if (!_signUp)
+                    Align(
+                      alignment: Alignment.centerRight,
+                      child: TextButton(
+                        onPressed: _forgotPassword,
+                        style: TextButton.styleFrom(visualDensity: VisualDensity.compact),
+                        child: Text('Forgot password?', style: TextStyle(color: brand.brand, fontSize: 13)),
+                      ),
+                    ),
+                  SizedBox(height: _signUp ? 20 : 8),
                   ElevatedButton(
                     onPressed: _busy ? null : _submit,
                     style: ElevatedButton.styleFrom(minimumSize: const Size.fromHeight(50)),

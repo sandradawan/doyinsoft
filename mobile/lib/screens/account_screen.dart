@@ -13,6 +13,7 @@ import 'store_screen.dart';
 import 'orders_screen.dart';
 import 'wishlist_screen.dart';
 import 'profile_screen.dart';
+import 'settings_screen.dart';
 import 'checkout_webview.dart';
 
 class AccountScreen extends StatefulWidget {
@@ -54,7 +55,18 @@ class _AccountScreenState extends State<AccountScreen> {
       appBar: AppBar(
         title: const Text('Account'),
         centerTitle: true,
-        actions: [_themeToggle(), if (_signedIn) _signOutButton()],
+        actions: [
+          _themeToggle(),
+          IconButton(
+            tooltip: 'Settings',
+            icon: const Icon(Icons.settings_outlined),
+            onPressed: () async {
+              final changed = await Navigator.push<bool>(
+                  context, MaterialPageRoute(builder: (_) => const SettingsScreen()));
+              if (changed == true && mounted) _refresh();
+            },
+          ),
+        ],
       ),
       body: _signedIn ? _buildSignedIn() : _buildSignedOut(),
     );
@@ -72,15 +84,6 @@ class _AccountScreenState extends State<AccountScreen> {
             icon: Icon(isDark ? Icons.light_mode_outlined : Icons.dark_mode_outlined),
             onPressed: () => ThemeController.instance.set(isDark ? ThemeMode.light : ThemeMode.dark),
           );
-        },
-      );
-
-  Widget _signOutButton() => IconButton(
-        icon: const Icon(Icons.logout),
-        tooltip: 'Sign out',
-        onPressed: () async {
-          await Supabase.instance.client.auth.signOut();
-          _refresh();
         },
       );
 

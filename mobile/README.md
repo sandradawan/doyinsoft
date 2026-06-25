@@ -52,6 +52,15 @@ The hooks exist server-side (orders paid, gift received, followed-store launches
 4. Server-side: on order paid / gift issued / product approved, look up the user's tokens and send
    via the FCM HTTP v1 API using a Firebase service-account key (server-only env var).
 
+## Still to add (need your accounts / a domain)
+- **Crash reporting + analytics (Sentry):** add `sentry_flutter`, wrap `main` in
+  `SentryFlutter.init`, and set a `SENTRY_DSN` dart-define. No-op without the DSN.
+- **Deep links / universal links:** custom scheme `doyinmart://` works now for in-app
+  routing; for shared **https** links to open the app you must host
+  `/.well-known/assetlinks.json` (Android) + `apple-app-site-association` (iOS) on the
+  domain and add intent-filters / associated-domains. Needs a real domain you own.
+- **Rate the app:** add `in_app_review` and prompt after a successful purchase.
+
 ## Notes
 - The dedicated **DmartCard** gift-card app reuses the same `api.dart` + `theme.dart`
   (see `docs/dmartcard-app-plan.md`).

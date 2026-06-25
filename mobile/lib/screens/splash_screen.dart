@@ -1,8 +1,10 @@
 import 'dart:async';
 import 'dart:math' as math;
 import 'package:flutter/material.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 
 import '../root_shell.dart';
+import 'onboarding_screen.dart';
 
 const _emerald = Color(0xFF04553E);
 const _emeraldDeep = Color(0xFF022C22);
@@ -42,12 +44,15 @@ class _SplashScreenState extends State<SplashScreen> with TickerProviderStateMix
         .animate(CurvedAnimation(parent: _intro, curve: Curves.easeOutBack));
     _fade = CurvedAnimation(parent: _intro, curve: const Interval(0.4, 1.0, curve: Curves.easeOut));
 
-    // Hold the splash for 6 seconds, then transition to the app.
-    Timer(const Duration(seconds: 6), () {
+    // Hold the splash for 6 seconds, then transition to onboarding (first run) or the app.
+    Timer(const Duration(seconds: 6), () async {
+      if (!mounted) return;
+      final prefs = await SharedPreferences.getInstance();
+      final onboarded = prefs.getBool(onboardedKey) ?? false;
       if (!mounted) return;
       Navigator.of(context).pushReplacement(PageRouteBuilder(
         transitionDuration: const Duration(milliseconds: 550),
-        pageBuilder: (_, __, ___) => const RootShell(),
+        pageBuilder: (_, __, ___) => onboarded ? const RootShell() : const OnboardingScreen(),
         transitionsBuilder: (_, anim, __, child) => FadeTransition(opacity: anim, child: child),
       ));
     });

@@ -5,6 +5,7 @@ import 'config.dart';
 import 'theme.dart';
 import 'theme_controller.dart';
 import 'screens/splash_screen.dart';
+import 'widgets/offline_banner.dart';
 
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -27,6 +28,7 @@ class DoyinMartApp extends StatelessWidget {
         theme: buildTheme(Brightness.light),
         darkTheme: buildTheme(Brightness.dark),
         themeMode: mode,
+        builder: (context, child) => OfflineBanner(child: child ?? const SizedBox.shrink()),
         home: const SplashScreen(),
       ),
     );

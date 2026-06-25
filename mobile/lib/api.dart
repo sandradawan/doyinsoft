@@ -118,6 +118,14 @@ class Api {
     }
   }
 
+  Future<void> deleteAccount() async {
+    final res = await http.post(_u('/account/delete'), headers: _authHeaders());
+    if (res.statusCode != 200) {
+      final body = jsonDecode(res.body) as Map<String, dynamic>;
+      throw Exception(body['error'] ?? 'Could not delete account.');
+    }
+  }
+
   Future<void> markNotificationsRead([String? id]) async {
     await http.post(
       _u('/notifications'),

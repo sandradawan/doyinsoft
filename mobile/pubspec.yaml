@@ -18,6 +18,8 @@ dependencies:
   shared_preferences: ^2.2.3      # persist the theme choice
   shimmer: ^3.0.0                 # skeleton loaders
   share_plus: ^9.0.0              # share store / product links
+  package_info_plus: ^8.0.0       # app version in settings
+  connectivity_plus: ^6.0.0       # offline detection banner
   cupertino_icons: ^1.0.6
 
 dev_dependencies:
