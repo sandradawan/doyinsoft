@@ -5,6 +5,7 @@ import 'config.dart';
 import 'theme.dart';
 import 'theme_controller.dart';
 import 'push_service.dart';
+import 'notification_router.dart';
 import 'screens/splash_screen.dart';
 import 'widgets/offline_banner.dart';
 
@@ -43,6 +44,7 @@ class DoyinMartApp extends StatelessWidget {
       valueListenable: ThemeController.instance,
       builder: (context, mode, _) => MaterialApp(
         title: 'DoyinMart',
+        navigatorKey: NotificationRouter.navigatorKey,
         debugShowCheckedModeBanner: false,
         theme: buildTheme(Brightness.light),
         darkTheme: buildTheme(Brightness.dark),

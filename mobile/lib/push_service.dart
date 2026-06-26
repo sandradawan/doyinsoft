@@ -5,6 +5,7 @@ import 'package:firebase_messaging/firebase_messaging.dart';
 import 'package:flutter/foundation.dart';
 
 import 'api.dart';
+import 'notification_router.dart';
 
 /// Background/terminated-state message handler. Must be a top-level, annotated
 /// function — it runs in its own isolate. The OS draws the notification; we only
@@ -29,6 +30,15 @@ class PushService {
         badge: true,
         sound: true,
       );
+
+      // Tapping a push opens the screen for its `data.link`.
+      FirebaseMessaging.onMessageOpenedApp.listen((m) {
+        NotificationRouter.handle(m.data['link'] as String?);
+      });
+      // If a tap cold-started the app, route once the UI is up (RootShell consumes it).
+      final initial = await FirebaseMessaging.instance.getInitialMessage();
+      if (initial != null) NotificationRouter.pendingLink = initial.data['link'] as String?;
+
       _ready = true;
       debugPrint('Push ready (project initialised).');
     } catch (e) {

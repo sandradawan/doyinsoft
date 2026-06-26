@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 
+import 'notification_router.dart';
 import 'screens/home_screen.dart';
 import 'screens/stores_screen.dart';
 import 'screens/gift_cards_screen.dart';
@@ -14,6 +15,13 @@ class RootShell extends StatefulWidget {
 class _RootShellState extends State<RootShell> {
   int _tab = 0;
   final _screens = const [HomeScreen(), StoresScreen(), GiftCardsScreen(), AccountScreen()];
+
+  @override
+  void initState() {
+    super.initState();
+    // Handle a tap that cold-started the app, once the navigator is mounted.
+    WidgetsBinding.instance.addPostFrameCallback((_) => NotificationRouter.consumePending());
+  }
 
   @override
   Widget build(BuildContext context) {
