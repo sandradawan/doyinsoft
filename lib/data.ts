@@ -341,6 +341,34 @@ export interface StoreCard {
 
 /** Stores (non-suspended) with product/download/follower counts + bio + cover. */
 export async function getStoresWithDetails(): Promise<StoreCard[]> {
+  // Fast path: aggregate in the database in one pass (migration 0028). Scales
+  // independent of catalog size. Falls back to the JS path below if the RPC
+  // isn't present yet (pre-migration) or there's no service role.
+  if (hasServiceRole) {
+    try {
+      const { data, error } = await createAdminClient().rpc("store_cards");
+      if (!error && Array.isArray(data)) {
+        return (data as {
+          slug: string; name: string; initials: string; verified: boolean;
+          products: number; downloads: number; followers: number;
+          bio: string | null; cover_url: string | null;
+        }[]).map((r) => ({
+          slug: r.slug,
+          name: r.name,
+          initials: r.initials,
+          verified: r.verified,
+          products: Number(r.products),
+          downloads: Number(r.downloads),
+          followers: Number(r.followers),
+          bio: r.bio ?? null,
+          cover_url: r.cover_url ?? null,
+        }));
+      }
+    } catch {
+      // RPC missing / older schema — fall through to the JS aggregation.
+    }
+  }
+
   const products = await getProducts();
   const agg = new Map<
     string,

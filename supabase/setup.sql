@@ -542,6 +542,54 @@ create policy "vendor reads own software" on storage.objects for select
 -- URLs with the service role after verifying the license.
 
 -- ============================================================================
+-- Stores aggregation (migration 0028) — one indexed SQL pass for the grid.
+-- ============================================================================
+create index if not exists products_vendor_status_idx on products (vendor_id, status);
+create index if not exists follows_vendor_idx on follows (vendor_id);
+
+create or replace function store_cards()
+returns table (
+  slug      text,
+  name      text,
+  initials  text,
+  verified  boolean,
+  products  bigint,
+  downloads bigint,
+  followers bigint,
+  bio       text,
+  cover_url text
+)
+language sql
+stable
+security definer
+set search_path = public
+as $$
+  select
+    v.slug,
+    v.name,
+    v.initials,
+    v.verified,
+    count(p.id)                          as products,
+    coalesce(sum(p.download_count), 0)   as downloads,
+    coalesce(fc.followers, 0)            as followers,
+    v.bio,
+    v.cover_url
+  from vendors v
+  join products p
+    on p.vendor_id = v.id and p.status = 'approved'
+  left join (
+    select vendor_id, count(*) as followers
+    from follows
+    group by vendor_id
+  ) fc on fc.vendor_id = v.id
+  where v.suspended = false
+  group by v.id, v.slug, v.name, v.initials, v.verified, v.bio, v.cover_url, fc.followers
+  order by followers desc, downloads desc;
+$$;
+
+grant execute on function store_cards() to anon, authenticated, service_role;
+
+-- ============================================================================
 -- Seed data (sample storefront content). Idempotent.
 -- ============================================================================
 insert into vendors (id, slug, name, initials, verified) values
