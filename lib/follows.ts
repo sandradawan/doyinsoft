@@ -1,6 +1,39 @@
 import "server-only";
 import { createAdminClient } from "./supabase/admin";
 import { hasServiceRole } from "./supabase/env";
+import { notify } from "./notifications";
+
+/** Notify a store's owner that they gained a follower (best-effort; in-app + push). */
+async function notifyNewFollower(
+  vendorId: string,
+  followerUserId: string,
+  followerEmail?: string
+): Promise<void> {
+  try {
+    const admin = createAdminClient();
+    const { data: vendor } = await admin
+      .from("vendors")
+      .select("name, owner")
+      .eq("id", vendorId)
+      .maybeSingle();
+    const v = vendor as { name?: string; owner?: string } | null;
+    if (!v?.owner) return; // seed/demo vendor with no auth owner
+    if (v.owner === followerUserId) return; // don't notify on self-follow
+    const { data: u } = await admin.auth.admin.getUserById(v.owner);
+    const ownerEmail = u?.user?.email ?? null;
+    const who = followerEmail ? followerEmail.split("@")[0] : "Someone";
+    await notify({
+      email: ownerEmail,
+      userId: v.owner,
+      type: "follow",
+      title: "New follower 🎉",
+      body: `${who} started following ${v.name ?? "your store"}.`,
+      link: "/vendor/dashboard",
+    });
+  } catch {
+    // follower notifications are non-critical — never block the follow
+  }
+}
 
 export async function isFollowing(vendorId: string, userId: string): Promise<boolean> {
   if (!hasServiceRole) return false;
@@ -49,6 +82,7 @@ export async function toggleFollow(
     return false;
   }
   await admin.from("follows").insert({ vendor_id: vendorId, user_id: userId, email });
+  await notifyNewFollower(vendorId, userId, email);
   return true;
 }
 

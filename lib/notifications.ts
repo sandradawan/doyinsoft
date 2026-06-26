@@ -3,7 +3,7 @@ import { createAdminClient } from "./supabase/admin";
 import { hasServiceRole } from "./supabase/env";
 import { pushToRecipient } from "./push";
 
-export type NotificationType = "order" | "gift" | "launch" | "affiliate" | "system";
+export type NotificationType = "order" | "gift" | "launch" | "affiliate" | "follow" | "system";
 
 export interface AppNotification {
   id: string;

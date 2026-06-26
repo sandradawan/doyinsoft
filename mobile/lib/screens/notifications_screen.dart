@@ -33,6 +33,8 @@ class _NotificationsScreenState extends State<NotificationsScreen> {
         return Icons.new_releases_outlined;
       case 'affiliate':
         return Icons.payments_outlined;
+      case 'follow':
+        return Icons.person_add_alt_1_outlined;
       default:
         return Icons.notifications_outlined;
     }
