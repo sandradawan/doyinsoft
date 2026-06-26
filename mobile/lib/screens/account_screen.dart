@@ -11,6 +11,7 @@ import '../theme_controller.dart';
 import 'sign_in_screen.dart';
 import 'store_screen.dart';
 import 'my_store_screen.dart';
+import 'vendor_sales_screen.dart';
 import 'orders_screen.dart';
 import 'wishlist_screen.dart';
 import 'profile_screen.dart';
@@ -151,15 +152,29 @@ class _AccountScreenState extends State<AccountScreen> {
             ),
           ]),
           const SizedBox(height: 8),
-          SizedBox(
-            width: double.infinity,
-            child: FilledButton.icon(
-              onPressed: () => Navigator.push(
-                  context, MaterialPageRoute(builder: (_) => const MyStoreScreen())),
-              icon: const Icon(Icons.inventory_2_outlined, size: 18),
-              label: const Text('Manage products'),
+          Row(children: [
+            Expanded(
+              child: FilledButton.icon(
+                onPressed: () => Navigator.push(
+                    context, MaterialPageRoute(builder: (_) => const MyStoreScreen())),
+                icon: const Icon(Icons.inventory_2_outlined, size: 18),
+                label: const Text('Products'),
+              ),
             ),
-          ),
+            const SizedBox(width: 8),
+            Expanded(
+              child: FilledButton.icon(
+                style: FilledButton.styleFrom(
+                    backgroundColor: context.brand.surface,
+                    foregroundColor: context.brand.brand,
+                    side: BorderSide(color: context.brand.brand)),
+                onPressed: () => Navigator.push(
+                    context, MaterialPageRoute(builder: (_) => const VendorSalesScreen())),
+                icon: const Icon(Icons.payments_outlined, size: 18),
+                label: const Text('Sales'),
+              ),
+            ),
+          ]),
         ],
       ),
     );

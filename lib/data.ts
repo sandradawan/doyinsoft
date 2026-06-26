@@ -862,6 +862,13 @@ export async function adminStats(): Promise<{
 
 /** The auth email of a vendor's owner — for approval/rejection notifications. */
 export async function getVendorOwnerEmail(vendorId: string): Promise<string | null> {
+  return (await getVendorOwner(vendorId))?.email ?? null;
+}
+
+/** A vendor store's owner — both the auth user id and email (for notifications). */
+export async function getVendorOwner(
+  vendorId: string
+): Promise<{ userId: string; email: string | null } | null> {
   if (!hasServiceRole) return null;
   const admin = createAdminClient();
   const { data: vendor } = await admin
@@ -872,7 +879,7 @@ export async function getVendorOwnerEmail(vendorId: string): Promise<string | nu
   const ownerId = (vendor as { owner?: string } | null)?.owner;
   if (!ownerId) return null;
   const { data } = await admin.auth.admin.getUserById(ownerId);
-  return data?.user?.email ?? null;
+  return { userId: ownerId, email: data?.user?.email ?? null };
 }
 
 // ---- Vendor products ---------------------------------------------------------
@@ -1475,16 +1482,19 @@ export async function issueLicenseForOrder(
     link: "/account",
   });
 
-  // 2) Vendor — new-sale alert.
-  const vendorEmail = await getVendorOwnerEmail(o.vendor_id);
-  if (vendorEmail) {
+  // 2) Vendor — new-sale alert (in-app + push to the owner's devices).
+  const vendorOwner = await getVendorOwner(o.vendor_id);
+  const vendorEmail = vendorOwner?.email ?? null;
+  if (vendorOwner) {
     await notify({
       email: vendorEmail,
+      userId: vendorOwner.userId, // push matches by user id OR email — more robust
       type: "order",
-      title: `You made a sale — ${productName}`,
+      title: `You made a sale — ${productName} 💰`,
       body: `${amountStr} · order #${ref}`,
       link: "/vendor/dashboard",
     });
+    if (vendorEmail)
     await sendEmail({
       to: vendorEmail,
       subject: subjectSafe(`💰 You made a sale — ${productName}`),

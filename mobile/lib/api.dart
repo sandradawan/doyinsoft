@@ -108,6 +108,18 @@ class Api {
     }
   }
 
+  /// The signed-in vendor's paid sales + totals.
+  Future<({List<Map<String, dynamic>> sales, int count, int totalMinor})> vendorSales() async {
+    final res = await http.get(_u('/vendor/sales'), headers: _authHeaders());
+    if (res.statusCode != 200) return (sales: <Map<String, dynamic>>[], count: 0, totalMinor: 0);
+    final b = jsonDecode(res.body) as Map<String, dynamic>;
+    return (
+      sales: ((b['sales'] ?? []) as List).map((e) => Map<String, dynamic>.from(e)).toList(),
+      count: (b['count'] ?? 0) as int,
+      totalMinor: (b['total_minor'] ?? 0) as int,
+    );
+  }
+
   Future<bool> deleteVendorProduct(String id) async {
     final res = await http.delete(_u('/vendor/products').replace(queryParameters: {'id': id}),
         headers: _authHeaders());

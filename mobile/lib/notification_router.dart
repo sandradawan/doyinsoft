@@ -4,6 +4,7 @@ import 'screens/gift_cards_screen.dart';
 import 'screens/account_screen.dart';
 import 'screens/product_screen.dart';
 import 'screens/notifications_screen.dart';
+import 'screens/vendor_sales_screen.dart';
 
 /// Routes a tapped push notification to the right screen, using the server's
 /// `data.link` (e.g. "/gift-cards", "/products/<slug>", "/account"). Holds the
@@ -40,10 +41,10 @@ class NotificationRouter {
       final slug = link.substring('/products/'.length).split('?').first;
       if (slug.isNotEmpty) return ProductScreen(slug: slug);
     }
-    // Order ready (/account), affiliate, vendor sale → the Account area.
-    if (link.startsWith('/account') ||
-        link.startsWith('/affiliate') ||
-        link.startsWith('/vendor')) {
+    // Vendor sale / dashboard → the vendor's Sales screen.
+    if (link.startsWith('/vendor')) return const VendorSalesScreen();
+    // Order ready (/account), affiliate → the Account area.
+    if (link.startsWith('/account') || link.startsWith('/affiliate')) {
       return const AccountScreen();
     }
     // Anything else: show the in-app notifications list.
