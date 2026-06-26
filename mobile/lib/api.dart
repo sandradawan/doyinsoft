@@ -1,6 +1,7 @@
 import 'dart:convert';
 import 'package:flutter/foundation.dart';
 import 'package:http/http.dart' as http;
+import 'package:http_parser/http_parser.dart' show MediaType;
 import 'package:intl/intl.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
@@ -135,9 +136,20 @@ class Api {
   Future<String?> uploadProductImage(String filePath) async {
     final token = Supabase.instance.client.auth.currentSession?.accessToken;
     if (token == null) return null;
+    // MultipartFile defaults to application/octet-stream; set a real image type
+    // (derived from the extension) so the server accepts it.
+    final ext = filePath.split('.').last.toLowerCase();
+    final subtype = ext == 'png'
+        ? 'png'
+        : ext == 'webp'
+            ? 'webp'
+            : ext == 'gif'
+                ? 'gif'
+                : 'jpeg';
     final req = http.MultipartRequest('POST', _u('/vendor/upload'))
       ..headers['authorization'] = 'Bearer $token'
-      ..files.add(await http.MultipartFile.fromPath('file', filePath));
+      ..files.add(await http.MultipartFile.fromPath('file', filePath,
+          contentType: MediaType('image', subtype)));
     final res = await http.Response.fromStream(await req.send());
     if (res.statusCode != 200) {
       debugPrint('[uploadProductImage] HTTP ${res.statusCode}: ${res.body}');

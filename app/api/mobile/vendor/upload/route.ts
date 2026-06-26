@@ -29,7 +29,14 @@ export async function POST(request: Request) {
   }
   if (!file || typeof file.arrayBuffer !== "function") return json({ error: "No file." }, 400);
   if (file.size > MAX_BYTES) return json({ error: "Image must be 5 MB or smaller." }, 400);
-  if (file.type && !file.type.startsWith("image/")) return json({ error: "Images only." }, 400);
+  // Accept by content-type OR extension — mobile multipart often sends
+  // application/octet-stream, which is fine for an image the vendor picked.
+  const looksImage =
+    file.type?.startsWith("image/") ||
+    !file.type ||
+    file.type === "application/octet-stream" ||
+    /\.(png|jpe?g|webp|gif|heic|heif)$/i.test(file.name || "");
+  if (!looksImage) return json({ error: "Images only." }, 400);
 
   const safe = (file.name || "image").replace(/[^a-zA-Z0-9._-]/g, "_");
   const path = `${vendorId}/${Date.now()}-${safe}`;
