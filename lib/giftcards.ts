@@ -6,7 +6,7 @@ import { sendEmail, emailLayout, emailText, emailKeyBox, emailButton, esc, subje
 import { formatPrice } from "./format";
 import { giftDesign, giftGradient } from "./gift-designs";
 import { toNgnCharge } from "./money";
-import { PLATFORM_COMMISSION_PERCENT } from "./paystack";
+import { PLATFORM_COMMISSION_PERCENT, verifyPaystackPayment } from "./paystack";
 import { notify } from "./notifications";
 import type { Currency } from "./types";
 
@@ -175,8 +175,33 @@ export async function issueGiftCardFromPayment(opts: {
     return null;
   }
 
+  const amountStr = formatPrice(opts.amountMinor, opts.currency);
+  const buyer = (opts.purchaserEmail || "").trim();
+  const isGift = !!recipient && buyer.toLowerCase() !== recipient.toLowerCase();
+
+  // Buyer receipt — always confirm the purchase to the person who paid. When the
+  // card was sent to someone else, the receipt confirms the gift (without the
+  // code, which belongs to the recipient); otherwise the card email below is
+  // their receipt, so we don't double-send. Best-effort: never block the card.
+  if (buyer && isGift) {
+    try {
+      await sendEmail({
+        to: buyer,
+        subject: subjectSafe(`Your DoyinMart gift card purchase — ${amountStr}`),
+        html: emailLayout(
+          "Thanks for your purchase 🎁",
+          `${emailText(`Your <strong>${amountStr}</strong> gift card has been issued and emailed to <strong>${esc(recipient)}</strong>.`)}
+           ${emailText(`Payment reference: <strong>${esc(opts.reference)}</strong>`)}
+           <div style="margin:22px 0;">${emailButton(`${SITE_URL}/account`, "View in your account")}</div>
+           ${emailText("The recipient can redeem it at checkout. You can see the card and its balance any time in your account.")}`
+        ),
+      });
+    } catch (e) {
+      console.error(`[giftcard] buyer receipt failed for ${opts.reference}:`, e);
+    }
+  }
+
   if (recipient) {
-    const amountStr = formatPrice(opts.amountMinor, opts.currency);
     const d = giftDesign(opts.design);
     await notify({
       email: recipient,
@@ -212,6 +237,60 @@ export async function issueGiftCardFromPayment(opts: {
     });
   }
   return code;
+}
+
+export interface ReissueResult {
+  /** Paystack confirmed this reference as a successful payment. */
+  paymentSucceeded: boolean;
+  /** The issued (or already-issued) gift-card code, or null if not issued. */
+  code: string | null;
+  amountMinor: number;
+  currency: Currency;
+  design: string;
+  error?: string;
+}
+
+/**
+ * Verify a Paystack reference and issue (idempotently) the gift card it paid for.
+ * The single source of truth shared by the success page, the webhook and the
+ * admin "re-issue by reference" tool — so all three behave identically.
+ */
+export async function reissueGiftCardFromReference(reference: string): Promise<ReissueResult> {
+  const base: ReissueResult = { paymentSucceeded: false, code: null, amountMinor: 0, currency: "NGN", design: "classic" };
+  const ref = (reference || "").trim();
+  if (!ref) return { ...base, error: "Enter a payment reference." };
+
+  const v = await verifyPaystackPayment(ref);
+  if (!v.ok) {
+    return { ...base, error: "Paystack hasn’t confirmed this reference as a successful payment." };
+  }
+  if (v.metadata?.kind !== "giftcard") {
+    console.warn(`[giftcard-reissue] ${ref} is not a gift-card purchase (kind=${v.metadata?.kind ?? "none"})`);
+    return { ...base, paymentSucceeded: true, error: "This reference isn’t a gift-card purchase." };
+  }
+
+  const currency = (v.metadata?.gift_currency as Currency) || "NGN";
+  const amountMinor = Number(v.metadata?.gift_amount_minor ?? v.amountMinor ?? 0);
+  const design = (v.metadata?.design as string) || "classic";
+  const code = await issueGiftCardFromPayment({
+    reference: ref,
+    paidNgnMinor: v.amountMinor ?? 0,
+    currency,
+    amountMinor,
+    purchaserEmail: (v.metadata?.purchaser_email as string) || v.email,
+    recipientEmail: (v.metadata?.recipient_email as string) || undefined,
+    message: (v.metadata?.message as string) || undefined,
+    design,
+  });
+  if (!code) console.error(`[giftcard-reissue] verified but issuance returned null for ${ref}`);
+  return {
+    paymentSucceeded: true,
+    code,
+    amountMinor,
+    currency,
+    design,
+    error: code ? undefined : "Payment verified, but the card couldn’t be issued — check the server logs.",
+  };
 }
 
 // ---- Physical / batch ----

@@ -3,7 +3,12 @@
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import { requireAdmin } from "@/lib/admin";
-import { setGiftCardDisabled, activateGiftCard, batchCreateGiftCards } from "@/lib/giftcards";
+import {
+  setGiftCardDisabled,
+  activateGiftCard,
+  batchCreateGiftCards,
+  reissueGiftCardFromReference,
+} from "@/lib/giftcards";
 import { giftDesign } from "@/lib/gift-designs";
 import { logAudit } from "@/lib/audit";
 
@@ -22,6 +27,22 @@ export async function activateGiftCardAction(formData: FormData) {
   await activateGiftCard(id);
   await logAudit(adminEmail, "giftcard.activate", "gift_card", id);
   revalidatePath("/admin/gift-cards");
+}
+
+/**
+ * Recover a stuck purchase: paste a Paystack reference and (idempotently) issue
+ * the gift card it paid for. Safe to re-run — returns the existing code if the
+ * card was already issued.
+ */
+export async function reissueGiftCard(formData: FormData) {
+  const adminEmail = await requireAdmin();
+  const reference = String(formData.get("reference") ?? "").trim();
+  const r = await reissueGiftCardFromReference(reference);
+  if (r.code) {
+    await logAudit(adminEmail, "giftcard.reissue", "gift_card", reference, r.code);
+    redirect(`/admin/gift-cards?notice=${encodeURIComponent(`Issued ${r.code} for ${reference}.`)}`);
+  }
+  redirect(`/admin/gift-cards?error=${encodeURIComponent(r.error ?? "Could not issue a card for that reference.")}`);
 }
 
 /** Create a batch of printable cards, then jump to the print sheet. */

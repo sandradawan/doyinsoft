@@ -1,8 +1,8 @@
 import { NextResponse } from "next/server";
 import { createHmac, timingSafeEqual } from "crypto";
 import { getOrderAmount, issueLicenseForOrder } from "@/lib/data";
-import { verifyPaystackTransaction, verifyPaystackPayment } from "@/lib/paystack";
-import { issueGiftCardFromPayment } from "@/lib/giftcards";
+import { verifyPaystackTransaction } from "@/lib/paystack";
+import { reissueGiftCardFromReference } from "@/lib/giftcards";
 
 const PAYSTACK_SECRET = process.env.PAYSTACK_SECRET_KEY ?? "";
 
@@ -41,21 +41,9 @@ export async function POST(request: Request) {
     const reference = event.data?.reference;
 
     // Gift-card purchase: issue a card for the amount actually paid (idempotent
-    // on the reference). No order is involved.
+    // on the reference, re-verified against Paystack). No order is involved.
     if (meta?.kind === "giftcard" && reference) {
-      const v = await verifyPaystackPayment(reference);
-      if (v.ok && (v.amountMinor ?? 0) > 0) {
-        await issueGiftCardFromPayment({
-          reference,
-          paidNgnMinor: v.amountMinor ?? 0,
-          currency: (v.metadata?.gift_currency as "NGN" | "USD") || "NGN",
-          amountMinor: Number(v.metadata?.gift_amount_minor ?? v.amountMinor ?? 0),
-          purchaserEmail: (v.metadata?.purchaser_email as string) || v.email,
-          recipientEmail: (v.metadata?.recipient_email as string) || undefined,
-          message: (v.metadata?.message as string) || undefined,
-          design: (v.metadata?.design as string) || undefined,
-        });
-      }
+      await reissueGiftCardFromReference(reference);
     } else if (orderId && reference) {
       // A valid signature only proves the body came from Paystack — it does NOT
       // prove the buyer paid. Re-verify with Paystack's API and require the paid

@@ -10,7 +10,7 @@ import { PLATFORM_COMMISSION_PERCENT } from "@/lib/paystack";
 import { GIFT_DESIGNS } from "@/lib/gift-designs";
 import { toNgnCharge } from "@/lib/money";
 import { formatPrice } from "@/lib/format";
-import { toggleGiftCard, activateGiftCardAction, createGiftCardBatch } from "./actions";
+import { toggleGiftCard, activateGiftCardAction, createGiftCardBatch, reissueGiftCard } from "./actions";
 
 function shortDate(iso: string): string {
   return iso ? new Date(iso).toLocaleDateString("en-NG", { day: "2-digit", month: "short", year: "numeric" }) : "—";
@@ -27,9 +27,9 @@ const BADGE: Record<string, string> = {
 export default async function AdminGiftCardsPage({
   searchParams,
 }: {
-  searchParams: Promise<{ error?: string }>;
+  searchParams: Promise<{ error?: string; notice?: string }>;
 }) {
-  const { error } = await searchParams;
+  const { error, notice } = await searchParams;
   const [cards, liability, redeemed, owed, batches] = await Promise.all([
     adminListGiftCards(100),
     adminGiftCardLiability(),
@@ -49,6 +49,30 @@ export default async function AdminGiftCardsPage({
       {error && (
         <p className="text-[13px] text-info bg-info-bg rounded-md px-3 py-2 mb-5">{error}</p>
       )}
+      {notice && (
+        <p className="text-[13px] text-success bg-success-bg rounded-md px-3 py-2 mb-5">{notice}</p>
+      )}
+
+      {/* Recover a stuck purchase by its Paystack reference */}
+      <form
+        action={reissueGiftCard}
+        className="border border-line rounded-lg p-4 mb-6 flex flex-wrap items-end gap-3"
+      >
+        <div>
+          <p className="text-[14px] font-medium m-0 mb-1">Re-issue by reference</p>
+          <p className="text-[12px] text-ink-soft m-0 max-w-[420px]">
+            A buyer was charged but didn’t get their card? Paste the Paystack reference to issue and
+            email it. Idempotent — safe to re-run; returns the existing code if already issued.
+          </p>
+        </div>
+        <div className="ml-auto flex items-end gap-2">
+          <label className="block">
+            <span className="block text-[11px] text-ink-faint mb-1">Payment reference</span>
+            <input name="reference" required placeholder="e.g. 0vd61pdyrc" className="field w-56" />
+          </label>
+          <button className="btn-primary px-4 py-2">Issue card</button>
+        </div>
+      </form>
 
       <div className="grid [grid-template-columns:repeat(auto-fit,minmax(160px,1fr))] gap-4 mb-6">
         <div className="bg-brand-tint rounded-lg p-5">

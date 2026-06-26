@@ -1,7 +1,7 @@
 import Link from "next/link";
 import { X } from "lucide-react";
-import { verifyPaystackPayment, isPaystackConfigured } from "@/lib/paystack";
-import { issueGiftCardFromPayment } from "@/lib/giftcards";
+import { isPaystackConfigured } from "@/lib/paystack";
+import { reissueGiftCardFromReference } from "@/lib/giftcards";
 import { giftDesign } from "@/lib/gift-designs";
 import { GiftCardVisual } from "@/components/gift-card-visual";
 import { formatPrice } from "@/lib/format";
@@ -22,29 +22,13 @@ export default async function GiftCardSuccessPage({
   let designKey = "classic";
   let paymentSucceeded = false; // verified by Paystack, even if issuance lags
   if (isPaystackConfigured && ref) {
-    const v = await verifyPaystackPayment(ref);
-    paymentSucceeded = v.ok;
-    if (v.ok && v.metadata?.kind === "giftcard") {
-      currency = (v.metadata?.gift_currency as "NGN" | "USD") || "NGN";
-      amountMinor = Number(v.metadata?.gift_amount_minor ?? v.amountMinor ?? 0); // card value
-      designKey = (v.metadata?.design as string) || "classic";
-      // Issue the card (idempotent on the reference; verifies the NGN paid covers it).
-      code = await issueGiftCardFromPayment({
-        reference: ref,
-        paidNgnMinor: v.amountMinor ?? 0,
-        currency,
-        amountMinor,
-        purchaserEmail: (v.metadata?.purchaser_email as string) || v.email,
-        recipientEmail: (v.metadata?.recipient_email as string) || undefined,
-        message: (v.metadata?.message as string) || undefined,
-        design: designKey,
-      });
-      if (!code) console.error(`[giftcard-success] verified but issuance returned null for ${ref}`);
-    } else {
-      // Most common real cause: the transaction isn't 'success' (abandoned / declined),
-      // or the secret key mode (test/live) doesn't match the one that started it.
-      console.warn(`[giftcard-success] not issued for ${ref}: paystackOk=${v.ok} kind=${v.metadata?.kind ?? "(none)"}`);
-    }
+    // Idempotent: issues the card if it hasn't been already (e.g. webhook lag).
+    const r = await reissueGiftCardFromReference(ref);
+    code = r.code;
+    paymentSucceeded = r.paymentSucceeded;
+    amountMinor = r.amountMinor;
+    currency = r.currency;
+    designKey = r.design;
   }
 
   if (!code) {
