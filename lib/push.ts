@@ -152,3 +152,54 @@ export async function pushToRecipient(
     console.error("[push] pushToRecipient error:", e);
   }
 }
+
+/**
+ * Verbose, single-shot test of the whole send path for one recipient. Returns a
+ * human-readable summary (config → service account → Google auth → per-token FCM
+ * response) so the admin "Send test push" button can pinpoint exactly what fails.
+ */
+export async function pushDiagnostics(who: {
+  userId?: string | null;
+  email?: string | null;
+}): Promise<string> {
+  if (!isPushConfigured) return "✗ FCM_SERVICE_ACCOUNT is not set on the server (Vercel env). Add it and redeploy.";
+  if (!hasServiceRole) return "✗ No Supabase service role configured on the server.";
+  const sa = serviceAccount();
+  if (!sa) return "✗ FCM_SERVICE_ACCOUNT is set but isn’t valid JSON (check it was pasted whole).";
+
+  const admin = createAdminClient();
+  const filters: string[] = [];
+  if (who.userId) filters.push(`user_id.eq.${who.userId}`);
+  if (who.email && !/[,()]/.test(who.email)) filters.push(`email.eq.${who.email}`);
+  if (filters.length === 0) return "✗ No user id or email to look up tokens for.";
+  const { data } = await admin.from("device_tokens").select("token").or(filters.join(","));
+  const tokens = [...new Set(((data as { token: string }[]) ?? []).map((r) => r.token))];
+  if (tokens.length === 0)
+    return `✗ No device tokens registered for ${who.email ?? who.userId}. Open the app, sign in as that user, and check the logs say “Push token registered”.`;
+
+  const accessToken = await getAccessToken(sa);
+  if (!accessToken)
+    return `✗ Google rejected the service account (couldn’t get an access token). The FCM_SERVICE_ACCOUNT is wrong, malformed, or from a different project. project_id=${sa.project_id}`;
+
+  const endpoint = `https://fcm.googleapis.com/v1/projects/${sa.project_id}/messages:send`;
+  const lines: string[] = [];
+  for (const token of tokens) {
+    const message = {
+      token,
+      notification: { title: "DoyinMart test 🔔", body: "Push notifications are working." },
+      android: { priority: "high", notification: { sound: "default" } },
+    };
+    try {
+      const res = await fetch(endpoint, {
+        method: "POST",
+        headers: { Authorization: `Bearer ${accessToken}`, "Content-Type": "application/json" },
+        body: JSON.stringify({ message }),
+      });
+      const body = await res.text();
+      lines.push(res.ok ? `✓ sent to ${token.slice(0, 12)}…` : `✗ ${res.status} ${token.slice(0, 12)}… → ${body.slice(0, 160)}`);
+    } catch (e) {
+      lines.push(`✗ network error: ${String(e).slice(0, 120)}`);
+    }
+  }
+  return `project=${sa.project_id}, tokens=${tokens.length}\n${lines.join("\n")}`;
+}

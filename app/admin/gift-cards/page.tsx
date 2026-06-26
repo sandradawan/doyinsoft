@@ -10,7 +10,7 @@ import { PLATFORM_COMMISSION_PERCENT } from "@/lib/paystack";
 import { GIFT_DESIGNS } from "@/lib/gift-designs";
 import { toNgnCharge } from "@/lib/money";
 import { formatPrice } from "@/lib/format";
-import { toggleGiftCard, activateGiftCardAction, createGiftCardBatch, reissueGiftCard } from "./actions";
+import { toggleGiftCard, activateGiftCardAction, createGiftCardBatch, reissueGiftCard, sendTestPush } from "./actions";
 
 function shortDate(iso: string): string {
   return iso ? new Date(iso).toLocaleDateString("en-NG", { day: "2-digit", month: "short", year: "numeric" }) : "—";
@@ -50,8 +50,29 @@ export default async function AdminGiftCardsPage({
         <p className="text-[13px] text-info bg-info-bg rounded-md px-3 py-2 mb-5">{error}</p>
       )}
       {notice && (
-        <p className="text-[13px] text-success bg-success-bg rounded-md px-3 py-2 mb-5">{notice}</p>
+        <pre className="text-[12px] text-success bg-success-bg rounded-md px-3 py-2 mb-5 whitespace-pre-wrap font-mono m-0">{notice}</pre>
       )}
+
+      {/* Push notification self-test */}
+      <form
+        action={sendTestPush}
+        className="border border-line rounded-lg p-4 mb-6 flex flex-wrap items-end gap-3"
+      >
+        <div>
+          <p className="text-[14px] font-medium m-0 mb-1">Test push notification</p>
+          <p className="text-[12px] text-ink-soft m-0 max-w-[420px]">
+            Sends a test push and reports the result (config, Google auth, FCM response). Leave the
+            email blank to push to your own signed-in devices.
+          </p>
+        </div>
+        <div className="ml-auto flex items-end gap-2">
+          <label className="block">
+            <span className="block text-[11px] text-ink-faint mb-1">Recipient email (optional)</span>
+            <input name="email" type="email" placeholder="you@example.com" className="field w-56" />
+          </label>
+          <button className="btn-primary px-4 py-2">Send test</button>
+        </div>
+      </form>
 
       {/* Recover a stuck purchase by its Paystack reference */}
       <form

@@ -10,6 +10,7 @@ import {
   reissueGiftCardFromReference,
 } from "@/lib/giftcards";
 import { giftDesign } from "@/lib/gift-designs";
+import { pushDiagnostics } from "@/lib/push";
 import { logAudit } from "@/lib/audit";
 
 export async function toggleGiftCard(formData: FormData) {
@@ -43,6 +44,18 @@ export async function reissueGiftCard(formData: FormData) {
     redirect(`/admin/gift-cards?notice=${encodeURIComponent(`Issued ${r.code} for ${reference}.`)}`);
   }
   redirect(`/admin/gift-cards?error=${encodeURIComponent(r.error ?? "Could not issue a card for that reference.")}`);
+}
+
+/**
+ * Send a test push to a recipient (defaults to the signed-in admin) and report
+ * exactly what happened — config, Google auth, and the FCM response per token.
+ */
+export async function sendTestPush(formData: FormData) {
+  const adminEmail = await requireAdmin();
+  const target = String(formData.get("email") ?? "").trim() || adminEmail;
+  const result = await pushDiagnostics({ email: target });
+  await logAudit(adminEmail, "push.test", "device_token", target);
+  redirect(`/admin/gift-cards?notice=${encodeURIComponent(`Push test → ${target}\n${result}`)}`);
 }
 
 /** Create a batch of printable cards, then jump to the print sheet. */
