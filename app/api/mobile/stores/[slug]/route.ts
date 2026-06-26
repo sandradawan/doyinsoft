@@ -1,7 +1,6 @@
 import { getVendorBySlug, getProducts } from "@/lib/data";
-import { json, preflight } from "@/lib/mobile/api";
+import { json, jsonCached, preflight } from "@/lib/mobile/api";
 
-export const dynamic = "force-dynamic";
 export function OPTIONS() {
   return preflight();
 }
@@ -15,7 +14,7 @@ export async function GET(_request: Request, { params }: { params: Promise<{ slu
   const all = await getProducts();
   const products = all.filter((p) => p.vendor.slug === slug);
 
-  return json({
+  return jsonCached({
     store: {
       slug: vendor.slug,
       name: vendor.name,
@@ -37,5 +36,5 @@ export async function GET(_request: Request, { params }: { params: Promise<{ slu
       rating_count: p.rating_count,
       vendor: { slug: p.vendor.slug, name: p.vendor.name, verified: p.vendor.verified },
     })),
-  });
+  }, 60);
 }

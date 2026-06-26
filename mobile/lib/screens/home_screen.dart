@@ -24,20 +24,30 @@ class HomeScreen extends StatefulWidget {
 }
 
 class _HomeScreenState extends State<HomeScreen> {
-  late Future<List<Product>> _future;
   late Future<List<Product>> _featured;
   List<Map<String, dynamic>> _recent = [];
   final _searchCtrl = TextEditingController();
   final _searchFocus = FocusNode();
+  final _scrollCtrl = ScrollController();
   bool _searching = false;
   String _q = '';
   String? _type;
 
+  // Paginated catalog state (infinite scroll).
+  final List<Product> _items = [];
+  int _page = 1;
+  bool _hasMore = true;
+  bool _loading = true;
+  bool _loadingMore = false;
+  Object? _error;
+  int _reqId = 0; // guards against out-of-order responses when filters change
+
   @override
   void initState() {
     super.initState();
-    _future = Api.instance.catalog();
     _featured = Api.instance.catalog();
+    _scrollCtrl.addListener(_onScroll);
+    _loadFirst();
     _loadRecent();
   }
 
@@ -50,12 +60,62 @@ class _HomeScreenState extends State<HomeScreen> {
   void dispose() {
     _searchCtrl.dispose();
     _searchFocus.dispose();
+    _scrollCtrl.dispose();
     super.dispose();
   }
 
-  void _reload() => setState(() {
-        _future = Api.instance.catalog(q: _q, type: _type);
+  Future<void> _loadFirst() async {
+    final id = ++_reqId;
+    setState(() {
+      _loading = true;
+      _error = null;
+      _items.clear();
+      _page = 1;
+      _hasMore = true;
+    });
+    try {
+      final res = await Api.instance.catalogPage(q: _q, type: _type, page: 1);
+      if (!mounted || id != _reqId) return;
+      setState(() {
+        _items.addAll(res.items);
+        _hasMore = res.hasMore;
+        _loading = false;
       });
+    } catch (e) {
+      if (!mounted || id != _reqId) return;
+      setState(() {
+        _error = e;
+        _loading = false;
+      });
+    }
+  }
+
+  Future<void> _loadMore() async {
+    if (_loadingMore || !_hasMore || _loading) return;
+    final id = _reqId;
+    setState(() => _loadingMore = true);
+    try {
+      final res = await Api.instance.catalogPage(q: _q, type: _type, page: _page + 1);
+      if (!mounted || id != _reqId) return;
+      setState(() {
+        _page += 1;
+        _items.addAll(res.items);
+        _hasMore = res.hasMore;
+        _loadingMore = false;
+      });
+    } catch (_) {
+      if (!mounted || id != _reqId) return;
+      setState(() => _loadingMore = false);
+    }
+  }
+
+  void _onScroll() {
+    if (_scrollCtrl.position.pixels >= _scrollCtrl.position.maxScrollExtent - 600) {
+      _loadMore();
+    }
+  }
+
+  void _reload() => _loadFirst();
 
   void _toggleSearch() {
     setState(() => _searching = !_searching);
@@ -169,23 +229,23 @@ class _HomeScreenState extends State<HomeScreen> {
           if (!_searching) const NotificationBell(),
         ],
       ),
-      body: FutureBuilder<List<Product>>(
-        future: _future,
-        builder: (context, snap) {
-          if (snap.connectionState == ConnectionState.waiting) {
+      body: Builder(
+        builder: (context) {
+          if (_loading) {
             return const GridSkeleton(count: 8);
           }
-          if (snap.hasError) {
-            return _ErrorView(error: '${snap.error}', onRetry: _reload);
+          if (_error != null) {
+            return _ErrorView(error: '$_error', onRetry: _reload);
           }
-          final items = snap.data ?? [];
+          final items = _items;
           return RefreshIndicator(
             onRefresh: () async {
-              _featured = Api.instance.catalog();
+              setState(() => _featured = Api.instance.catalog());
               _loadRecent();
-              _reload();
+              await _loadFirst();
             },
             child: CustomScrollView(
+              controller: _scrollCtrl,
               slivers: [
                 if (_showHero && _recent.isNotEmpty) SliverToBoxAdapter(child: _recentRail()),
                 if (_showHero)
@@ -253,6 +313,13 @@ class _HomeScreenState extends State<HomeScreen> {
                         (context, i) => ProductCard(product: items[i]),
                         childCount: items.length,
                       ),
+                    ),
+                  ),
+                if (_loadingMore)
+                  const SliverToBoxAdapter(
+                    child: Padding(
+                      padding: EdgeInsets.only(bottom: 24),
+                      child: Center(child: CircularProgressIndicator(strokeWidth: 2)),
                     ),
                   ),
               ],

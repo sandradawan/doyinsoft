@@ -1,7 +1,6 @@
 import { getProductBySlug, getReviews } from "@/lib/data";
-import { json, preflight } from "@/lib/mobile/api";
+import { json, jsonCached, preflight } from "@/lib/mobile/api";
 
-export const dynamic = "force-dynamic";
 export function OPTIONS() {
   return preflight();
 }
@@ -13,7 +12,7 @@ export async function GET(_request: Request, { params }: { params: Promise<{ slu
   if (!product) return json({ error: "Not found" }, 404);
 
   const reviews = await getReviews(product.id);
-  return json({
+  return jsonCached({
     product: {
       id: product.id,
       slug: product.slug,
@@ -48,5 +47,5 @@ export async function GET(_request: Request, { params }: { params: Promise<{ slu
     })),
     // The app completes payment in a WebView of the hardened web checkout.
     checkout_url: `/checkout/new?product=${encodeURIComponent(product.slug)}`,
-  });
+  }, 30);
 }

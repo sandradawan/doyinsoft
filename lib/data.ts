@@ -248,6 +248,54 @@ export async function getProducts(
     .filter((p) => !p.vendor.suspended);
 }
 
+/**
+ * Paginated approved products — for the mobile catalog (avoids shipping the whole
+ * table per request). Fetches pageSize+1 to compute `hasMore` without a count.
+ */
+export async function getProductsPage(opts: {
+  platform?: Platform;
+  search?: string;
+  category?: string;
+  productType?: ProductType;
+  page?: number;
+  pageSize?: number;
+}): Promise<{ items: Product[]; hasMore: boolean }> {
+  const page = Math.max(1, opts.page ?? 1);
+  const pageSize = Math.min(50, Math.max(1, opts.pageSize ?? 20));
+  const q = opts.search?.trim().toLowerCase();
+  const cat = opts.category?.trim();
+  const from = (page - 1) * pageSize;
+
+  if (!isSupabaseConfigured) {
+    let list = (opts.platform ? seedProducts.filter((p) => p.platform === opts.platform) : seedProducts)
+      .filter((p) => p.status === "approved");
+    if (cat) list = list.filter((p) => p.category === cat);
+    if (opts.productType) list = list.filter((p) => p.product_type === opts.productType);
+    if (q) list = list.filter((p) => [p.name, p.tagline, p.category, p.vendor.name].join(" ").toLowerCase().includes(q));
+    const slice = list.slice(from, from + pageSize + 1);
+    return { items: slice.slice(0, pageSize), hasMore: slice.length > pageSize };
+  }
+
+  const supabase = await createClient();
+  let query = supabase
+    .from("products")
+    .select(PRODUCT_SELECT)
+    .eq("status", "approved")
+    .order("name")
+    .range(from, from + pageSize); // +1 row to detect hasMore
+  if (opts.platform) query = query.eq("platform", opts.platform);
+  if (cat) query = query.eq("category", cat);
+  if (opts.productType) query = query.eq("product_type", opts.productType);
+  if (q) {
+    const like = `%${sanitizeLike(q)}%`;
+    query = query.or(`name.ilike.${like},tagline.ilike.${like},category.ilike.${like}`);
+  }
+  const { data, error } = await query;
+  if (error || !data) return { items: [], hasMore: false };
+  const rows = (data as unknown as ProductRow[]).map(mapProduct).filter((p) => !p.vendor.suspended);
+  return { items: rows.slice(0, pageSize), hasMore: rows.length > pageSize };
+}
+
 export async function getProductBySlug(slug: string): Promise<Product | null> {
   if (!isSupabaseConfigured) {
     const p = seedProducts.find((x) => x.slug === slug);

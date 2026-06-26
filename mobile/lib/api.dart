@@ -37,15 +37,29 @@ class Api {
     };
   }
 
-  Future<List<Product>> catalog({String? q, String? category, String? type}) async {
+  /// One page of the catalog (20 items). `hasMore` drives infinite scroll.
+  Future<({List<Product> items, bool hasMore})> catalogPage({
+    String? q,
+    String? category,
+    String? type,
+    int page = 1,
+  }) async {
     final params = <String, String>{
       if (q != null && q.isNotEmpty) 'q': q,
       if (category != null) 'category': category,
       if (type != null) 'type': type,
+      'page': '$page',
     };
     final res = await http.get(_u('/catalog').replace(queryParameters: params));
     final body = jsonDecode(res.body) as Map<String, dynamic>;
-    return ((body['products'] ?? []) as List).map((p) => Product.fromJson(p)).toList();
+    final items = ((body['products'] ?? []) as List).map((p) => Product.fromJson(p)).toList();
+    return (items: items, hasMore: body['hasMore'] == true);
+  }
+
+  /// First page only — for places that just need a quick list (e.g. fallbacks).
+  Future<List<Product>> catalog({String? q, String? category, String? type}) async {
+    final res = await catalogPage(q: q, category: category, type: type);
+    return res.items;
   }
 
   Future<ProductDetail> product(String slug) async {

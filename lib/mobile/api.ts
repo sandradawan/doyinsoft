@@ -18,6 +18,21 @@ export function json(data: unknown, status = 200): NextResponse {
   return NextResponse.json(data, { status, headers: CORS });
 }
 
+/**
+ * Like json() but cacheable at the CDN/edge for PUBLIC, non-user-specific reads
+ * (catalog, stores, product, config). At scale most requests are served from the
+ * Vercel edge cache instead of hitting the function + database.
+ */
+export function jsonCached(data: unknown, maxAge = 60): NextResponse {
+  return NextResponse.json(data, {
+    status: 200,
+    headers: {
+      ...CORS,
+      "cache-control": `public, s-maxage=${maxAge}, stale-while-revalidate=${maxAge * 4}`,
+    },
+  });
+}
+
 /** Preflight handler — export as OPTIONS from each route. */
 export function preflight(): NextResponse {
   return new NextResponse(null, { status: 204, headers: CORS });

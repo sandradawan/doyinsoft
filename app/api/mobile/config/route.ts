@@ -1,8 +1,7 @@
-import { json, preflight } from "@/lib/mobile/api";
+import { jsonCached, preflight } from "@/lib/mobile/api";
 import { GIFT_DESIGNS } from "@/lib/gift-designs";
 import { getCategories } from "@/lib/data";
 
-export const dynamic = "force-dynamic";
 export function OPTIONS() {
   return preflight();
 }
@@ -21,7 +20,7 @@ export async function GET() {
   } catch {
     categories = [];
   }
-  return json({
+  return jsonCached({
     web_base_url: SITE_URL,
     checkout_path: "/checkout/new?product=", // append slug
     gift_cards_path: "/gift-cards",
@@ -32,5 +31,5 @@ export async function GET() {
       to: d.to,
     })),
     categories,
-  });
+  }, 300);
 }
