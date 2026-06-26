@@ -44,13 +44,15 @@ flutter build ipa   --dart-define=...
   gift cards, minimized purchases, theme toggle (light/dark), affiliate/sell/legal links.
 - **Orders** and **Wishlist** are shared with the web via `/api/mobile/orders` and `/wishlist`.
 
-## Push notifications (needs your Firebase project — not yet wired)
-The hooks exist server-side (orders paid, gift received, followed-store launches). To enable:
-1. Create a Firebase project; add Android (`google-services.json`) + iOS apps via `flutterfire configure`.
-2. Add `firebase_core` + `firebase_messaging`; request permission and read the FCM token on sign-in.
-3. Add a `device_tokens` table (`user_id`, `token`) + a `POST /api/mobile/device-token` endpoint.
-4. Server-side: on order paid / gift issued / product approved, look up the user's tokens and send
-   via the FCM HTTP v1 API using a Firebase service-account key (server-only env var).
+## Push notifications (server side is built — finish the Firebase setup)
+The whole server pipeline is **already wired and dormant**: the `device_tokens` table
+(migration 0029), `POST/DELETE /api/mobile/device-token`, `lib/push.ts` (FCM HTTP v1),
+and `notify()` fires a push for every in-app event (orders paid, gift received,
+followed-store launches). `Api.registerDeviceToken` / `unregisterDeviceToken` exist here.
+
+To turn it on: create a Firebase project, set `FCM_SERVICE_ACCOUNT` in Vercel, and add
+the Flutter client wiring — full step-by-step with code in
+[`docs/push-notifications.md`](../docs/push-notifications.md).
 
 ## Still to add (need your accounts / a domain)
 - **Crash reporting + analytics (Sentry):** add `sentry_flutter`, wrap `main` in

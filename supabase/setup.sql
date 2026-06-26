@@ -590,6 +590,25 @@ $$;
 grant execute on function store_cards() to anon, authenticated, service_role;
 
 -- ============================================================================
+-- Push notifications: device tokens (migration 0029).
+-- ============================================================================
+create table if not exists device_tokens (
+  id         uuid primary key default gen_random_uuid(),
+  user_id    uuid references auth.users (id) on delete cascade,
+  email      text,
+  token      text not null unique,
+  platform   text not null default 'android',
+  updated_at timestamptz not null default now()
+);
+create index if not exists device_tokens_user_idx  on device_tokens (user_id);
+create index if not exists device_tokens_email_idx on device_tokens (email);
+alter table device_tokens enable row level security;
+do $$ begin
+  create policy "own device tokens" on device_tokens for all
+    using (auth.uid() = user_id) with check (auth.uid() = user_id);
+exception when duplicate_object then null; end $$;
+
+-- ============================================================================
 -- Seed data (sample storefront content). Idempotent.
 -- ============================================================================
 insert into vendors (id, slug, name, initials, verified) values

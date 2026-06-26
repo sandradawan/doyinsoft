@@ -62,6 +62,23 @@ class Api {
     return res.items;
   }
 
+  /// Register this device's FCM token for push (requires a signed-in session).
+  Future<void> registerDeviceToken(String token, {String platform = 'android'}) async {
+    if (Supabase.instance.client.auth.currentSession == null) return;
+    await http.post(
+      _u('/device-token'),
+      headers: _authHeaders(),
+      body: jsonEncode({'token': token, 'platform': platform}),
+    );
+  }
+
+  /// Unregister a token on sign-out.
+  Future<void> unregisterDeviceToken(String token) async {
+    if (Supabase.instance.client.auth.currentSession == null) return;
+    await http.delete(_u('/device-token').replace(queryParameters: {'token': token}),
+        headers: _authHeaders());
+  }
+
   Future<ProductDetail> product(String slug) async {
     final res = await http.get(_u('/products/$slug'));
     if (res.statusCode != 200) throw Exception('Product not found');

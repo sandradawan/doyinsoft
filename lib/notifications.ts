@@ -1,6 +1,7 @@
 import "server-only";
 import { createAdminClient } from "./supabase/admin";
 import { hasServiceRole } from "./supabase/env";
+import { pushToRecipient } from "./push";
 
 export type NotificationType = "order" | "gift" | "launch" | "affiliate" | "system";
 
@@ -38,6 +39,11 @@ export async function notify(opts: {
   } catch {
     // notifications are non-critical — never block the triggering action
   }
+  // Also deliver as a push to the recipient's devices (no-op until FCM is set up).
+  await pushToRecipient(
+    { userId: opts.userId, email },
+    { title: opts.title, body: opts.body, link: opts.link }
+  );
 }
 
 export async function getNotifications(email: string, limit = 50): Promise<AppNotification[]> {
