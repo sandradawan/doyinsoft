@@ -21,6 +21,8 @@ dependencies:
   package_info_plus: ^8.0.0       # app version in settings
   connectivity_plus: ^6.0.0       # offline detection banner
   cupertino_icons: ^1.0.6
+  firebase_core: ^3.4.0
+  firebase_messaging: ^15.1.0
 
 dev_dependencies:
   flutter_test:

@@ -4,6 +4,7 @@ import 'package:supabase_flutter/supabase_flutter.dart';
 import 'config.dart';
 import 'theme.dart';
 import 'theme_controller.dart';
+import 'push_service.dart';
 import 'screens/splash_screen.dart';
 import 'widgets/offline_banner.dart';
 
@@ -12,6 +13,24 @@ Future<void> main() async {
   await ThemeController.instance.load();
   if (Config.supabaseConfigured) {
     await Supabase.initialize(url: Config.supabaseUrl, anonKey: Config.supabaseAnonKey);
+    await PushService.init();
+    // Register now if already signed in, and react to future sign-in/out.
+    if (Supabase.instance.client.auth.currentSession != null) {
+      PushService.registerForUser();
+    }
+    Supabase.instance.client.auth.onAuthStateChange.listen((data) {
+      switch (data.event) {
+        case AuthChangeEvent.signedIn:
+        case AuthChangeEvent.tokenRefreshed:
+          PushService.registerForUser();
+          break;
+        case AuthChangeEvent.signedOut:
+          PushService.unregister();
+          break;
+        default:
+          break;
+      }
+    });
   }
   runApp(const DoyinMartApp());
 }
