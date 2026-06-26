@@ -163,6 +163,7 @@ class _ProductScreenState extends State<ProductScreen> {
         'slug': p['slug'],
         'name': p['name'],
         'price_minor': p['price_minor'] ?? 0,
+        'currency': p['currency'] ?? 'NGN',
         'icon_url': p['icon_url'],
       });
     }).catchError((_) {});
@@ -239,6 +240,7 @@ class _ProductScreenState extends State<ProductScreen> {
           final d = snap.data!;
           final p = d.product;
           final priceMinor = (p['price_minor'] ?? 0) as int;
+          final currency = (p['currency'] ?? 'NGN') as String;
           final icon = p['icon_url'] as String?;
           final screenshots = ((p['screenshots'] as List?) ?? const []).cast<String>();
           final images = <String>[if (icon != null) icon, ...screenshots];
@@ -252,7 +254,7 @@ class _ProductScreenState extends State<ProductScreen> {
               Text(p['tagline'] ?? '', style: TextStyle(fontSize: 15, color: context.brand.inkSoft)),
               const SizedBox(height: 10),
               Row(children: [
-                Text(naira(priceMinor),
+                Text(money(priceMinor, currency),
                     style: TextStyle(fontSize: 20, fontWeight: FontWeight.w700, color: context.brand.brand)),
                 const Spacer(),
                 if ((p['rating_count'] ?? 0) > 0)
@@ -334,7 +336,7 @@ class _ProductScreenState extends State<ProductScreen> {
                     builder: (_) => CheckoutWebView(path: snap.data!.checkoutPath, title: 'Checkout'),
                   ),
                 ),
-                child: Text('Buy — ${naira((snap.data!.product['price_minor'] ?? 0) as int)}'),
+                child: Text('Buy — ${money((snap.data!.product['price_minor'] ?? 0) as int, (snap.data!.product['currency'] ?? 'NGN') as String)}'),
               ),
             ),
           );

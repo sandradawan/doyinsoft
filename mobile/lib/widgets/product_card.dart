@@ -58,7 +58,7 @@ class ProductCard extends StatelessWidget {
                       overflow: TextOverflow.ellipsis,
                       style: TextStyle(fontSize: 12, color: context.brand.inkSoft)),
                   const SizedBox(height: 6),
-                  Text(naira(product.priceMinor),
+                  Text(money(product.priceMinor, product.currency),
                       style: TextStyle(fontWeight: FontWeight.w700, color: context.brand.brand)),
                 ],
               ),

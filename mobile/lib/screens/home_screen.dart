@@ -175,7 +175,7 @@ class _HomeScreenState extends State<HomeScreen> {
                           maxLines: 1,
                           overflow: TextOverflow.ellipsis,
                           style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w600)),
-                      Text(naira(r['price_minor'] ?? 0),
+                      Text(money((r['price_minor'] ?? 0) as int, (r['currency'] ?? 'NGN') as String),
                           style: TextStyle(fontSize: 12, color: context.brand.brand, fontWeight: FontWeight.w700)),
                     ],
                   ),

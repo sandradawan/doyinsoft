@@ -58,7 +58,7 @@ class _OrdersScreenState extends State<OrdersScreen> {
                 return ListTile(
                   contentPadding: EdgeInsets.zero,
                   title: Text(o.productName, style: const TextStyle(fontWeight: FontWeight.w600)),
-                  subtitle: Text('$date · ${naira(o.amountMinor)}',
+                  subtitle: Text('$date · ${money(o.amountMinor, o.currency)}',
                       style: TextStyle(color: context.brand.inkSoft, fontSize: 12)),
                   trailing: o.downloadUrl != null
                       ? TextButton(

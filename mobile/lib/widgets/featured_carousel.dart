@@ -128,7 +128,7 @@ class _FeaturedCard extends StatelessWidget {
                     Container(
                       padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
                       decoration: BoxDecoration(color: Colors.white, borderRadius: BorderRadius.circular(20)),
-                      child: Text(naira(product.priceMinor),
+                      child: Text(money(product.priceMinor, product.currency),
                           style: const TextStyle(color: Colors.black, fontWeight: FontWeight.w700, fontSize: 13)),
                     ),
                   ],
