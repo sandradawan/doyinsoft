@@ -1,4 +1,5 @@
 import 'dart:convert';
+import 'package:flutter/foundation.dart';
 import 'package:http/http.dart' as http;
 import 'package:intl/intl.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
@@ -85,7 +86,10 @@ class Api {
   /// the user hasn't set up a store yet.
   Future<({bool hasStore, List<Map<String, dynamic>> products})> vendorProducts() async {
     final res = await http.get(_u('/vendor/products'), headers: _authHeaders());
-    if (res.statusCode != 200) return (hasStore: false, products: <Map<String, dynamic>>[]);
+    if (res.statusCode != 200) {
+      debugPrint('[vendorProducts] HTTP ${res.statusCode}: ${res.body}');
+      return (hasStore: false, products: <Map<String, dynamic>>[]);
+    }
     final b = jsonDecode(res.body) as Map<String, dynamic>;
     return (
       hasStore: b['store'] == true,
@@ -100,6 +104,7 @@ class Api {
         : await http.patch(_u('/vendor/products'),
             headers: _authHeaders(), body: jsonEncode({...body, 'id': id}));
     if (res.statusCode == 200) return null;
+    debugPrint('[saveVendorProduct] HTTP ${res.statusCode}: ${res.body}');
     try {
       return (jsonDecode(res.body) as Map<String, dynamic>)['error'] as String? ??
           'Could not save (${res.statusCode}).';
@@ -134,7 +139,10 @@ class Api {
       ..headers['authorization'] = 'Bearer $token'
       ..files.add(await http.MultipartFile.fromPath('file', filePath));
     final res = await http.Response.fromStream(await req.send());
-    if (res.statusCode != 200) return null;
+    if (res.statusCode != 200) {
+      debugPrint('[uploadProductImage] HTTP ${res.statusCode}: ${res.body}');
+      return null;
+    }
     return (jsonDecode(res.body) as Map<String, dynamic>)['url'] as String?;
   }
 

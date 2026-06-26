@@ -56,13 +56,18 @@ class _ProductEditScreenState extends State<ProductEditScreen> {
         .pickImage(source: ImageSource.gallery, maxWidth: 1200, imageQuality: 85);
     if (picked == null) return;
     setState(() => _uploading = true);
-    final url = await Api.instance.uploadProductImage(picked.path);
+    String? url;
+    try {
+      url = await Api.instance.uploadProductImage(picked.path);
+    } catch (e) {
+      debugPrint('[ProductEdit._pickImage] $e');
+    }
     if (!mounted) return;
     setState(() {
       _uploading = false;
       if (url != null) _iconUrl = url;
     });
-    if (url == null) _snack('Image upload failed. Please try again.');
+    if (url == null) _snack('Image upload failed — check your connection and try again.');
   }
 
   Future<void> _save() async {
@@ -84,7 +89,13 @@ class _ProductEditScreenState extends State<ProductEditScreen> {
       'download_url': _download.text.trim(),
       'icon_url': _iconUrl ?? '',
     };
-    final err = await Api.instance.saveVendorProduct(body, id: widget.product?['id'] as String?);
+    String? err;
+    try {
+      err = await Api.instance.saveVendorProduct(body, id: widget.product?['id'] as String?);
+    } catch (e) {
+      debugPrint('[ProductEdit._save] $e');
+      err = 'Network error — check your connection and try again.';
+    }
     if (!mounted) return;
     setState(() => _saving = false);
     if (err != null) {
