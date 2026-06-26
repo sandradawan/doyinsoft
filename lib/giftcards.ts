@@ -119,7 +119,12 @@ export async function issueGiftCardFromPayment(opts: {
   // (Card amount/currency ride in our own server-set Paystack metadata, and this
   // re-checks the verified paid amount — so an under-payment can't mint a card.)
   const expectedNgn = toNgnCharge(opts.amountMinor, opts.currency);
-  if (opts.paidNgnMinor + 1 < expectedNgn) return null;
+  if (opts.paidNgnMinor + 1 < expectedNgn) {
+    console.warn(
+      `[giftcard] underpaid for ${opts.reference}: paidNgn=${opts.paidNgnMinor} expected>=${expectedNgn} (${opts.amountMinor} ${opts.currency})`
+    );
+    return null;
+  }
 
   const admin = createAdminClient();
 
@@ -166,6 +171,7 @@ export async function issueGiftCardFromPayment(opts: {
       code = generateGiftCardCode(); // code collision — retry with a new one
       continue;
     }
+    console.error(`[giftcard] insert failed for ${opts.reference}:`, error?.message ?? error);
     return null;
   }
 

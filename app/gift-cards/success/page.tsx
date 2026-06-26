@@ -20,8 +20,10 @@ export default async function GiftCardSuccessPage({
   let amountMinor = 0;
   let currency: "NGN" | "USD" = "NGN";
   let designKey = "classic";
+  let paymentSucceeded = false; // verified by Paystack, even if issuance lags
   if (isPaystackConfigured && ref) {
     const v = await verifyPaystackPayment(ref);
+    paymentSucceeded = v.ok;
     if (v.ok && v.metadata?.kind === "giftcard") {
       currency = (v.metadata?.gift_currency as "NGN" | "USD") || "NGN";
       amountMinor = Number(v.metadata?.gift_amount_minor ?? v.amountMinor ?? 0); // card value
@@ -37,6 +39,11 @@ export default async function GiftCardSuccessPage({
         message: (v.metadata?.message as string) || undefined,
         design: designKey,
       });
+      if (!code) console.error(`[giftcard-success] verified but issuance returned null for ${ref}`);
+    } else {
+      // Most common real cause: the transaction isn't 'success' (abandoned / declined),
+      // or the secret key mode (test/live) doesn't match the one that started it.
+      console.warn(`[giftcard-success] not issued for ${ref}: paystackOk=${v.ok} kind=${v.metadata?.kind ?? "(none)"}`);
     }
   }
 
@@ -46,11 +53,15 @@ export default async function GiftCardSuccessPage({
         <div className="w-9 h-9 rounded-full bg-info-bg flex items-center justify-center mb-3">
           <X size={17} className="text-info" />
         </div>
-        <h1 className="text-[22px] font-medium m-0 mb-1">We couldn’t confirm this purchase</h1>
+        <h1 className="text-[22px] font-medium m-0 mb-1">
+          {paymentSucceeded ? "Almost there — finalising your card" : "We couldn’t confirm this purchase"}
+        </h1>
         <p className="text-[14px] text-ink-soft m-0 mb-5">
-          If you were charged, your gift-card code will still be emailed once the payment confirms.
-          Contact support with your payment reference if it doesn’t arrive.
+          {paymentSucceeded
+            ? "Your payment went through. Your gift-card code is being issued and will be emailed in a moment — you can safely refresh this page."
+            : "If you completed payment, your gift-card code will still be emailed once it confirms. If you weren’t charged, no card was issued. Contact support with your payment reference if a charge doesn’t arrive."}
         </p>
+        {ref ? <p className="text-[12px] text-ink-faint m-0 mb-5">Reference: {ref}</p> : null}
         <Link href="/gift-cards" className="text-[14px] text-ink-soft no-underline hover:text-ink">
           ← Back to gift cards
         </Link>
