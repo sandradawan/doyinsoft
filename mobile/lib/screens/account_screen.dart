@@ -10,6 +10,7 @@ import '../theme.dart';
 import '../theme_controller.dart';
 import 'sign_in_screen.dart';
 import 'store_screen.dart';
+import 'my_store_screen.dart';
 import 'orders_screen.dart';
 import 'wishlist_screen.dart';
 import 'profile_screen.dart';
@@ -149,6 +150,16 @@ class _AccountScreenState extends State<AccountScreen> {
               ),
             ),
           ]),
+          const SizedBox(height: 8),
+          SizedBox(
+            width: double.infinity,
+            child: FilledButton.icon(
+              onPressed: () => Navigator.push(
+                  context, MaterialPageRoute(builder: (_) => const MyStoreScreen())),
+              icon: const Icon(Icons.inventory_2_outlined, size: 18),
+              label: const Text('Manage products'),
+            ),
+          ),
         ],
       ),
     );

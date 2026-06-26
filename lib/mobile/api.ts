@@ -1,7 +1,8 @@
 import "server-only";
 import { NextResponse } from "next/server";
 import { createClient } from "@supabase/supabase-js";
-import { SUPABASE_URL, SUPABASE_ANON_KEY } from "@/lib/supabase/env";
+import { SUPABASE_URL, SUPABASE_ANON_KEY, hasServiceRole } from "@/lib/supabase/env";
+import { createAdminClient } from "@/lib/supabase/admin";
 
 // Shared helpers for the /api/mobile/* REST surface consumed by the Flutter apps.
 // Reads go through the same lib/data functions the web uses; auth is by the
@@ -59,4 +60,15 @@ export async function getMobileUser(request: Request): Promise<MobileUser | null
   const { data, error } = await supabase.auth.getUser(token);
   if (error || !data.user) return null;
   return { id: data.user.id, email: data.user.email ?? "" };
+}
+
+/** The vendor (store) id owned by a user, or null if they don't have a store. */
+export async function getVendorIdForUser(userId: string): Promise<string | null> {
+  if (!hasServiceRole || !userId) return null;
+  const { data } = await createAdminClient()
+    .from("vendors")
+    .select("id")
+    .eq("owner", userId)
+    .maybeSingle();
+  return (data as { id: string } | null)?.id ?? null;
 }

@@ -79,6 +79,53 @@ class Api {
         headers: _authHeaders());
   }
 
+  // ---- Vendor: manage own products ----
+
+  /// The signed-in vendor's own products (all statuses). `hasStore` is false if
+  /// the user hasn't set up a store yet.
+  Future<({bool hasStore, List<Map<String, dynamic>> products})> vendorProducts() async {
+    final res = await http.get(_u('/vendor/products'), headers: _authHeaders());
+    if (res.statusCode != 200) return (hasStore: false, products: <Map<String, dynamic>>[]);
+    final b = jsonDecode(res.body) as Map<String, dynamic>;
+    return (
+      hasStore: b['store'] == true,
+      products: ((b['products'] ?? []) as List).map((e) => Map<String, dynamic>.from(e)).toList(),
+    );
+  }
+
+  /// Create (id == null) or update a product. Returns null on success, else an error.
+  Future<String?> saveVendorProduct(Map<String, dynamic> body, {String? id}) async {
+    final res = id == null
+        ? await http.post(_u('/vendor/products'), headers: _authHeaders(), body: jsonEncode(body))
+        : await http.patch(_u('/vendor/products'),
+            headers: _authHeaders(), body: jsonEncode({...body, 'id': id}));
+    if (res.statusCode == 200) return null;
+    try {
+      return (jsonDecode(res.body) as Map<String, dynamic>)['error'] as String? ??
+          'Could not save (${res.statusCode}).';
+    } catch (_) {
+      return 'Could not save (${res.statusCode}).';
+    }
+  }
+
+  Future<bool> deleteVendorProduct(String id) async {
+    final res = await http.delete(_u('/vendor/products').replace(queryParameters: {'id': id}),
+        headers: _authHeaders());
+    return res.statusCode == 200;
+  }
+
+  /// Upload a product image; returns its public URL or null on failure.
+  Future<String?> uploadProductImage(String filePath) async {
+    final token = Supabase.instance.client.auth.currentSession?.accessToken;
+    if (token == null) return null;
+    final req = http.MultipartRequest('POST', _u('/vendor/upload'))
+      ..headers['authorization'] = 'Bearer $token'
+      ..files.add(await http.MultipartFile.fromPath('file', filePath));
+    final res = await http.Response.fromStream(await req.send());
+    if (res.statusCode != 200) return null;
+    return (jsonDecode(res.body) as Map<String, dynamic>)['url'] as String?;
+  }
+
   Future<ProductDetail> product(String slug) async {
     final res = await http.get(_u('/products/$slug'));
     if (res.statusCode != 200) throw Exception('Product not found');
