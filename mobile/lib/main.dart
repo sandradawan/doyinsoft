@@ -11,6 +11,31 @@ import 'widgets/offline_banner.dart';
 
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
+
+  // Never show a raw black/grey crash box — render a friendly message instead.
+  ErrorWidget.builder = (FlutterErrorDetails details) => Material(
+        color: const Color(0xFF0B1220),
+        child: Center(
+          child: Padding(
+            padding: const EdgeInsets.all(24),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                const Icon(Icons.error_outline, color: Colors.white70, size: 36),
+                const SizedBox(height: 12),
+                const Text('Something went wrong on this screen.',
+                    textAlign: TextAlign.center,
+                    style: TextStyle(color: Colors.white, fontWeight: FontWeight.w600)),
+                const SizedBox(height: 6),
+                Text('Go back and try again.',
+                    textAlign: TextAlign.center,
+                    style: TextStyle(color: Colors.white.withValues(alpha: 0.6), fontSize: 13)),
+              ],
+            ),
+          ),
+        ),
+      );
+
   await ThemeController.instance.load();
   if (Config.supabaseConfigured) {
     await Supabase.initialize(url: Config.supabaseUrl, anonKey: Config.supabaseAnonKey);

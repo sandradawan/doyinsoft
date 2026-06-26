@@ -122,12 +122,16 @@ class _ProductEditScreenState extends State<ProductEditScreen> {
             _field(_name, 'Product name', required: true),
             _field(_tagline, 'Short tagline', hint: 'One line that sells it'),
             _field(_desc, 'Description', maxLines: 5),
-            Row(children: [
+            Row(crossAxisAlignment: CrossAxisAlignment.start, children: [
               Expanded(
+                flex: 2,
                 child: _field(_price, 'Price', keyboard: TextInputType.number, required: true),
               ),
               const SizedBox(width: 12),
-              _dropdown('Currency', _currency, const ['NGN', 'USD'], (v) => setState(() => _currency = v)),
+              Expanded(
+                child: _dropdown('Currency', _currency, const ['NGN', 'USD'],
+                    (v) => setState(() => _currency = v)),
+              ),
             ]),
             _dropdown('Type', _type, const ['digital', 'physical', 'service'],
                 (v) => setState(() => _type = v), labels: const {
