@@ -126,6 +126,21 @@ class Api {
     );
   }
 
+  /// Quick-add several products at once. Returns created count + skipped names.
+  Future<({int created, List<String> skipped})> bulkAddProducts(
+      List<Map<String, dynamic>> items) async {
+    final res = await http.post(_u('/vendor/products/bulk'),
+        headers: _authHeaders(), body: jsonEncode({'items': items}));
+    if (res.statusCode != 200) {
+      debugPrint('[bulkAddProducts] HTTP ${res.statusCode}: ${res.body}');
+      return (created: 0, skipped: <String>[]);
+    }
+    final b = jsonDecode(res.body) as Map<String, dynamic>;
+    final skipped =
+        ((b['skipped'] ?? []) as List).map((e) => (e['name'] ?? '').toString()).toList();
+    return (created: (b['created'] ?? 0) as int, skipped: skipped);
+  }
+
   Future<bool> deleteVendorProduct(String id) async {
     final res = await http.delete(_u('/vendor/products').replace(queryParameters: {'id': id}),
         headers: _authHeaders());

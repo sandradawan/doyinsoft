@@ -4,6 +4,7 @@ import 'package:cached_network_image/cached_network_image.dart';
 import '../api.dart';
 import '../theme.dart';
 import 'product_edit_screen.dart';
+import 'quick_add_screen.dart';
 
 /// A vendor's product manager: list, add, edit, delete their own products.
 class MyStoreScreen extends StatefulWidget {
@@ -27,6 +28,12 @@ class _MyStoreScreenState extends State<MyStoreScreen> {
     final saved = await Navigator.push<bool>(
         context, MaterialPageRoute(builder: (_) => const ProductEditScreen()));
     if (saved == true) _reload();
+  }
+
+  Future<void> _quickAdd() async {
+    final added = await Navigator.push<bool>(
+        context, MaterialPageRoute(builder: (_) => const QuickAddScreen()));
+    if (added == true) _reload();
   }
 
   Future<void> _edit(Map<String, dynamic> p) async {
@@ -64,7 +71,16 @@ class _MyStoreScreenState extends State<MyStoreScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(title: const Text('My products')),
+      appBar: AppBar(
+        title: const Text('My products'),
+        actions: [
+          IconButton(
+            tooltip: 'Quick add several',
+            onPressed: _quickAdd,
+            icon: const Icon(Icons.playlist_add),
+          ),
+        ],
+      ),
       floatingActionButton: FloatingActionButton.extended(
         onPressed: _add,
         icon: const Icon(Icons.add),
