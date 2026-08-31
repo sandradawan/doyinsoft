@@ -66,7 +66,9 @@ VENDOR                         PURCHASE                       BUYER
   checkable at `POST /api/licenses/verify` for in-app activation.
 - **The webhook is the source of truth** for "paid" — not the browser.
 
-### API endpoints
+### Internal routes used by this flow (not a public API)
+
+These are internal application routes, not a public/customer-facing API:
 
 | Endpoint | Purpose |
 |---|---|
@@ -131,3 +133,7 @@ the flow stays demoable.
 > Note: a small **email** field was added to the checkout form (not in the
 > original wireframe) because the payment gateway requires it to send the
 > receipt and license key.
+
+---
+<!-- pushpen-footer -->
+Documentation automatically generated and kept up to date by [Pushpen](https://pushpen.dev).
